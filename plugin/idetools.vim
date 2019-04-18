@@ -26,8 +26,8 @@
 " * Re-define a few of the shift-number row keys to make them a bit more useful:
 "     '*' is the current word, global
 "     '&' is the current WORD, global
-"     '#' is the current word, global
-"     '@' is the current WORD, global
+"     '#' is the current word, local
+"     '@' is the current WORD, local
 "   This made sense for my workflow because I never really want the backward
 "   search from '#', access my macros with the comma key instead of @, and the
 "   & key goes pretty much untouched.
@@ -50,7 +50,6 @@ augroup END
 set tags=./.vimtags "if ever go back to using files, want these settings
 set cpoptions+=d
 
-"------------------------------------------------------------------------------"
 "Options
 "Files that we wish to ignore
 let g:tags_ignore=['help', 'rst', 'qf', 'diff', 'man', 'nerdtree', 'tagbar']
@@ -160,7 +159,7 @@ endfunction
 function! s:ctagjump(ctag) "split by multiple whitespace, get the line number (comes after the colon)
   exe split(a:ctag, '\s\+')[0][:-2]
 endfunction
-nnoremap <silent> <Space><Space> :call fzf#run({'source': <sid>ctagmenu(b:ctags_alph), 'sink': function('<sid>ctagjump'), 'down': '~20%'})<CR>
+nnoremap <silent> <Leader><Leader> :call fzf#run({'source': <sid>ctagmenu(b:ctags_alph), 'sink': function('<sid>ctagjump'), 'down': '~20%'})<CR>
 
 "------------------------------------------------------------------------------"
 "Next tools for using ctags to approximate variable scope
@@ -206,13 +205,13 @@ function! s:ctagbracketmaps()
   if exists('g:tags_ignore') && index(g:tags_ignore, &ft)!=-1
     return
   endif
+  " if exists('g:has_nowait') && g:has_nowait
+  " noremap <nowait> <expr> <buffer> <silent> [ <sid>ctagbracket(0,'.v:count.').'gg'
+  " noremap <nowait> <expr> <buffer> <silent> ] <sid>ctagbracket(1,'.v:count.').'gg'
   noremap <expr> <buffer> <silent> [t <sid>ctagbracket(0,'.v:count.').'gg'
   noremap <expr> <buffer> <silent> [[ <sid>ctagbracket(0,'.v:count.').'gg'
   noremap <expr> <buffer> <silent> ]t <sid>ctagbracket(1,'.v:count.').'gg'
   noremap <expr> <buffer> <silent> ]] <sid>ctagbracket(1,'.v:count.').'gg'
-  " if exists('g:has_nowait') && g:has_nowait
-  " noremap <nowait> <expr> <buffer> <silent> [ <sid>ctagbracket(0,'.v:count.').'gg'
-  " noremap <nowait> <expr> <buffer> <silent> ] <sid>ctagbracket(1,'.v:count.').'gg'
 endfunction
 
 "------------------------------------------------------------------------------"
@@ -259,6 +258,7 @@ endfunction
 "------------------------------------------------------------------------------"
 "Display number of occurrences of word under cursor
 nnoremap <silent> <Leader>* :echo 'Number of occurences: '.system('grep -c "\b'.expand('<cword>').'\b" '.expand('%').' \| xargs')<CR>
+nnoremap <silent> <Leader>& :echo 'Number of occurences: '.system('grep -c "[ \n\t]'.expand('<cWORD>').'[ \n\t]" '.expand('%').' \| xargs')<CR>
 
 "Make */# search global/function-local <cword>, and &/@ the same for <cWORD>s
 "Note by default '&' repeats last :s command
@@ -280,7 +280,6 @@ nnoremap <silent> g? ?<C-r>=<sid>scopesearch(0)<CR>
 "by default ! waits for a motion, then starts :<range> command
 nnoremap <silent> ! ylh/<C-r>=escape(@",'/\')<CR><CR>
 
-"------------------------------------------------------------------------------"
 "Next a magical function; performs n<dot>n<dot>n style replacement in one keystroke
 "Script found here: https://www.reddit.com/r/vim/comments/2p6jqr/quick_replace_useful_refactoring_and_editing_tool/
 "Script referenced here: https://www.reddit.com/r/vim/comments/8k4p6v/what_are_your_best_mappings/
