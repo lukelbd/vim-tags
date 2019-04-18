@@ -5,7 +5,7 @@ of your code.
 It relies on [vim-repeat](https://github.com/tpope/vim-repeat), the [exuberant ctags](http://ctags.sourceforge.net/) command-line tool,
 and, optionally, the [FZF](https://github.com/junegunn/fzf) vim plugin.
 
-Adds the following normal-mode maps.
+Adds the following ctags-related normal mode maps.
 
 * `<Leader>c`: Displays a condensed table of the `ctags`.
 * `<Leader>C`: Manually refreshes the `b:ctags` variable (done automatically
@@ -16,6 +16,9 @@ Adds the following normal-mode maps.
 * `[[` and `]]`: Jumps to subsequent and preceding top-level "significant
   ctag locations" -- that is, omitting variable definitions, import statements, etc.
   Generally these are just function and class definition locations.
+
+Also adds the following refactoring-related normal mode maps.
+
 * `!`: Selects for the single character under the cursor.
 * `*`, `&`: Selects the word or WORD under the cursor. Is case-sensitive, and does not
   jump to the next one.
