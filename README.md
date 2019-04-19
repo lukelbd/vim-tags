@@ -19,9 +19,7 @@ Adds the following ctags-related normal mode maps.
 
 Also adds the following refactoring-related normal mode maps.
 
-* `!`: Selects for the single character under the cursor.
-* `*`, `&`: Selects the word or WORD under the cursor. Is case-sensitive, and does not
-  jump to the next one.
+* `!`, `*`, `&`: Selects the character, word or WORD under the cursor. Is case-sensitive, and does not jump to the next one.
 * `#`, `@`: As for `*` and `&`, but selecting only the approximate **local-scope**
   instead of the entire file, using "significant ctag locations" as
   approximate scope boundaries.
