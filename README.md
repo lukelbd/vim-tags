@@ -36,9 +36,9 @@ Also adds the following refactoring-related normal mode maps.
   Hitting `.` replaces this occurrence with the text you previously
   typed and jumps to the next one. This is like `:s/pattern/replacement/g`, but much cleaner.
 * `da/`, `da*`, `da&`, `da#`, `da@`: As with `d/`, `d*`, `d&`, `d#`, `d@`, but
-  deletes **all occurrences** in the file or approximate local scope.
+  deletes **all occurrences**.
 * `ca/`, `ca*`, `ca&`, `ca#`, `ca@`: As with `c/`, `c*`, `c&`, `c#`, `c@`, but
-  changes **all occurrences** in the file or approximate local scope.
+  changes **all occurrences**.
 * `<Leader>*`, `<Leader>&`: Counts the number of words or WORDs under the cursor
   in the file.
 
