@@ -33,8 +33,8 @@ Also adds the following refactoring-related normal mode maps.
   and moves to the next occurrence (`d/` just uses the last search pattern).
   Hitting `.` deletes this occurrence and jumps to the next one.
 * `c/`, `c*`, `c&`, `c#`, `c@`: **Replaces** the corresponding selection under the cursor
-  with user input text by (1) deleting the selection and (2) entering insert mode
-  and allowing the user to type something (`c/` just uses the last search pattern).
+  with user input text by (1) deleting the selection (`c/` just uses the last search pattern) and (2) entering insert mode
+  and allowing the user to type something.
   When the user presses `<Esc>`, it jumps to the next
   occurrence.
   Hitting `.` replaces this occurrence with the text you previously
