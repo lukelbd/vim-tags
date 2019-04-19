@@ -29,8 +29,8 @@ this plugin provides some neat refactoring tools.
   filetypes and whose values are lists of characters, corresponding to the ctags
   **categories** used to approximate the "local scope" refactoring tools.
   If the current filetype is not in the dictionary,
-  the `'default'` entry is used (by default, this is `f`, which generally
-  corresponds to **function definition** locations).
+  the `'default'` entry is used (by default, this is `f`, indicating
+  **function definition** locations).
   
   To generate a list of all possible ctags **categories** for all languages, run
   `ctags --list-kinds` on the command line. For a specific language, use
