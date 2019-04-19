@@ -38,7 +38,7 @@ Also adds the following refactoring-related normal mode maps.
   When the user presses `<Esc>`, it jumps to the next
   occurrence.
   Hitting `.` replaces this occurrence with the text you previously
-  typed and jumps to the next one. This is like `:s/pattern/replacement/g`, but much cleaner, much faster, and very powerful!
+  typed and jumps to the next one. This is like `:s/pattern/replacement/g`, but much cleaner.
 * `da/`, `da*`, `da&`, `da#`, `da@`: As with `d/`, `d*`, `d&`, `d#`, `d@`, but
   deletes **all occurrences** in the file or approximate local scope.
 * `ca/`, `ca*`, `ca&`, `ca#`, `ca@`: As with `c/`, `c*`, `c&`, `c#`, `c@`, but
