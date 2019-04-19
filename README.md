@@ -35,12 +35,11 @@ Also adds the following refactoring-related normal mode maps.
   occurrence.
   Hitting `.` replaces this occurrence with the text you previously
   typed and jumps to the next one. This is like `:s/pattern/replacement/g`, but much cleaner.
-* `<Leader>*`, `<Leader>&`: Counts the number of words or WORDs under the cursor
 * `da/`, `da*`, `da&`, `da#`, `da@`: As with `d/`, `d*`, `d&`, `d#`, `d@`, but
   deletes **all occurrences**.
 * `ca/`, `ca*`, `ca&`, `ca#`, `ca@`: As with `c/`, `c*`, `c&`, `c#`, `c@`, but
   changes **all occurrences**.
-  in the file.
+* `<Leader>*`, `<Leader>&`: Counts the number of words or WORDs under the cursor
 
 See the source code for more details.
 <!-- Detailed description is coming soon. -->
