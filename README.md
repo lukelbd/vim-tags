@@ -45,9 +45,14 @@ Also adds the following refactoring-related normal mode maps.
 See the source code for more details.
 <!-- Detailed description is coming soon. -->
 
-# Installation
-Install with your favorite [plugin manager](https://vi.stackexchange.com/questions/388/what-is-the-difference-between-the-vim-plugin-managers). I highly recommend the `[vim-plug](https://github.com/junegunn/vim-plug)` manager, with which you can install this plugin by adding
-```
-Plug 'lukelbd/vim-idetools'
-```
-to your `.vimrc` file.
+
+
+  # Installation
+  Install with your favorite [plugin manager](https://vi.stackexchange.com/questions/388/what-is-the-difference-between-the-vim-plugin-managers).
+  I highly recommend the [`vim-plug`](https://github.com/junegunn/vim-plug)` manager,
+  in which case you can install this plugin by adding
+  ```
+  Plug 'lukelbd/vim-idetools'
+  ```
+  to your `.vimrc`.
+  
