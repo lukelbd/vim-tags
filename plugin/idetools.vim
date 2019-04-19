@@ -53,22 +53,28 @@ set cpoptions+=d
 
 "Options
 "Files that we wish to ignore
-let g:tags_ignore=['help', 'rst', 'qf', 'diff', 'man', 'nerdtree', 'tagbar']
+if !exists('g:idetools_no_ctags')
+  let g:idetools_no_ctags=['help', 'rst', 'qf', 'diff', 'man', 'nerdtree', 'tagbar']
+endif
 "List of per-file/per-filetype tag categories that we define as 'scope-delimiters',
 "i.e. tags approximately denoting boundaries for variable scope of code block underneath cursor
-let g:tags_top = {
-  \ '.vimrc'  : 'a',
-  \ 'vim'     : 'afc',
-  \ 'tex'     : 'bs',
-  \ 'python'  : 'fcm',
-  \ 'fortran' : 'smfp',
-  \ 'default' : 'f',
-  \ }
+if !exists('g:idetools_top_ctags_map')
+  let g:idetools_top_ctags_map = {
+    \ '.vimrc'  : 'a',
+    \ 'vim'     : 'afc',
+    \ 'tex'     : 'bs',
+    \ 'python'  : 'fcm',
+    \ 'fortran' : 'smfp',
+    \ 'default' : 'f',
+    \ }
+endif
 "List of files for which we only want not just the 'top level' tags (i.e. tags
 "that do not belong to another block, e.g. a program or subroutine)
 "Note: In future, may want to only filter tags belonging to specific
-"group (e.g. if tag belongs to a 'program', ignore it).
-let g:fts_all = ['fortran']
+"group, e.g. if tag belongs to a 'program', ignore it.
+if !exists('g:idetools_all_ctags')
+  let g:idetools_all_ctags = ['fortran']
+endif
 
 "------------------------------------------------------------------------------"
 "The below contains super cool ctags functions that are way better than
@@ -114,7 +120,7 @@ function! s:ctagsread()
   "identifier, and numerically by line number
   "* To filter by category, use: filter(b:ctags, 'v:val[2]=="<category>"')
   "* First bail out if filetype is bad
-  if exists('g:tags_ignore') && index(g:tags_ignore, &ft)!=-1
+  if index(g:idetools_no_ctags, &ft)!=-1
     return
   endif
   let flags=(getline(1)=~'#!.*python[23]' ? '--language-force=python' : '')
@@ -133,15 +139,15 @@ function! s:ctagsread()
   let b:ctags_line=sort(deepcopy(ctags), 's:linesort') "sort alphabetically by *position 0* in the sub-arrays
   "Next filter the tags sorted by line to include only a few limited categories
   "Will also filter to pick only ***top-level*** items (i.e. tags with global scope)
-  if has_key(g:tags_top, expand('%:t'))
-    let cats=g:tags_top[expand('%:t')]
-  elseif has_key(g:tags_top, &ft)
-    let cats=g:tags_top[&ft]
+  if has_key(g:idetools_top_ctags_map, expand('%:t'))
+    let cats=g:idetools_top_ctags_map[expand('%:t')]
+  elseif has_key(g:idetools_top_ctags_map, &ft)
+    let cats=g:idetools_top_ctags_map[&ft]
   else
-    let cats=g:tags_top['default']
+    let cats=g:idetools_top_ctags_map['default']
   endif
   let b:ctags_top=filter(deepcopy(b:ctags_line),
-    \ 'v:val[2]=~"['.cats.']" && ('.index(g:fts_all,&ft).'!=-1 || len(v:val)==3)')
+    \ 'v:val[2]=~"['.cats.']" && ('.index(g:idetools_all_ctags, &ft).'!=-1 || len(v:val)==3)')
 endfunction
 command! ReadTags call <sid>ctagsread()
 
@@ -203,7 +209,7 @@ endfunction
 "Declare another useful map to jump to definition of key under cursor
 nnoremap <CR> gd
 function! s:ctagbracketmaps()
-  if exists('g:tags_ignore') && index(g:tags_ignore, &ft)!=-1
+  if index(g:idetools_no_ctags, &ft)!=-1
     return
   endif
   " if exists('g:has_nowait') && g:has_nowait
