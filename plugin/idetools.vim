@@ -38,6 +38,7 @@
 "Todo: Make sure python2 and python3 shebangs work
 "Maybe re-implement: if getline(1)=~"#!.*python[23]" | let force="--language=python"
 "------------------------------------------------------------------------------"
+"Check if possible
 call system("type ctags &>/dev/null")
 if v:shell_error "exit code
   finish
