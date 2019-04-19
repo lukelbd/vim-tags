@@ -72,11 +72,8 @@ this plugin provides some neat refactoring tools.
   changes **all occurrences**.
 * `<Leader>*`, `<Leader>&`: Counts the number of words or WORDs under the cursor
 
-See the source code for more details.
+<!-- See the source code for more details. -->
 <!-- Detailed description is coming soon. -->
-
-
-
 
   # Installation
   Install with your favorite [plugin manager](https://vi.stackexchange.com/questions/388/what-is-the-difference-between-the-vim-plugin-managers).
