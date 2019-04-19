@@ -19,11 +19,11 @@ Adds the following ctags-related normal mode maps.
 
 Also adds the following refactoring-related normal mode maps.
 
-* `!`, `*`, `&`: Selects the character, word or WORD under the cursor. Is case-sensitive, and does not jump to the next one.
-* `#`, `@`: As for `*` and `&`, but selecting only the approximate **local-scope**
+* `!`, `*`, `&`: Selects the character, word or WORD under the cursor. Is case-sensitive. Does not move the cursor.
+* `#`, `@`: As for `*` and `&`, but selects only the approximate **local-scope**
   instead of the entire file, using "significant ctag locations" as
   approximate scope boundaries.
-* `g/`, `g?`: As for `/` and `?`, but again selecting only the approximate local-scope
+* `g/`, `g?`: As for `/` and `?`, but again selects only the approximate local-scope
   instead of the entire file.
 * `d/`, `d*`, `d&`, `d#`, `d@`: **Deletes** the corresponding selection under the cursor,
   and moves to the next occurrence (`d/` just uses the last search pattern).
