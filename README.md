@@ -22,8 +22,6 @@ Also adds the following refactoring-related normal mode maps.
 * `!`: Selects for the single character under the cursor.
 * `*`, `&`: Selects the word or WORD under the cursor. Is case-sensitive, and does not
   jump to the next one.
-* `<Leader>*`, `<Leader>&`: Counts the number of words or WORDs under the cursor
-  in the file.
 * `#`, `@`: As for `*` and `&`, but selecting only the approximate **local-scope**
   instead of the entire file, using "significant ctag locations" as
   approximate scope boundaries.
@@ -43,6 +41,8 @@ Also adds the following refactoring-related normal mode maps.
   deletes **all occurrences** in the file or approximate local scope.
 * `ca/`, `ca*`, `ca&`, `ca#`, `ca@`: As with `c/`, `c*`, `c&`, `c#`, `c@`, but
   changes **all occurrences** in the file or approximate local scope.
+* `<Leader>*`, `<Leader>&`: Counts the number of words or WORDs under the cursor
+  in the file.
 
 See the source code for more details.
 <!-- Detailed description is coming soon. -->
