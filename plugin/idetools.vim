@@ -41,6 +41,7 @@
 "Check if possible
 call system("type ctags &>/dev/null")
 if v:shell_error "exit code
+  echom "Error: vim-idetools requires the command-line tool ctags, not found."
   finish
 endif
 augroup ctags
@@ -56,6 +57,13 @@ set cpoptions+=d
 if !exists('g:idetools_no_ctags')
   let g:idetools_no_ctags=['help', 'rst', 'qf', 'diff', 'man', 'nerdtree', 'tagbar']
 endif
+"List of files for which we only want not just the 'top level' tags (i.e. tags
+"that do not belong to another block, e.g. a program or subroutine)
+"Note: In future, may want to only filter tags belonging to specific
+"group, e.g. if tag belongs to a 'program', ignore it.
+if !exists('g:idetools_all_ctags')
+  let g:idetools_all_ctags=['fortran']
+endif
 "List of per-file/per-filetype tag categories that we define as 'scope-delimiters',
 "i.e. tags approximately denoting boundaries for variable scope of code block underneath cursor
 if !exists('g:idetools_top_ctags_map')
@@ -68,13 +76,6 @@ if !exists('g:idetools_top_ctags_map')
     \ 'default' : 'f',
     \ }
 endif
-"List of files for which we only want not just the 'top level' tags (i.e. tags
-"that do not belong to another block, e.g. a program or subroutine)
-"Note: In future, may want to only filter tags belonging to specific
-"group, e.g. if tag belongs to a 'program', ignore it.
-if !exists('g:idetools_all_ctags')
-  let g:idetools_all_ctags = ['fortran']
-endif
 
 "------------------------------------------------------------------------------"
 "The below contains super cool ctags functions that are way better than
@@ -83,6 +84,7 @@ endif
 "Handy autocommands to update and dislay tags
 nnoremap <silent> <Leader>c :DisplayTags<CR>:redraw!<CR>
 nnoremap <silent> <Leader>C :ReadTags<CR>
+nnoremap <silent> <Leader><Leader> :call fzf#run({'source': <sid>ctagmenu(b:ctags_alph), 'sink': function('<sid>ctagjump'), 'down': '~20%'})<CR>
 
 "Function for generating command-line exe that prints taglist to stdout
 "We call ctags in number mode (i.e. return line number instead of search pattern)
@@ -166,7 +168,6 @@ endfunction
 function! s:ctagjump(ctag) "split by multiple whitespace, get the line number (comes after the colon)
   exe split(a:ctag, '\s\+')[0][:-2]
 endfunction
-nnoremap <silent> <Leader><Leader> :call fzf#run({'source': <sid>ctagmenu(b:ctags_alph), 'sink': function('<sid>ctagjump'), 'down': '~20%'})<CR>
 
 "------------------------------------------------------------------------------"
 "Next tools for using ctags to approximate variable scope

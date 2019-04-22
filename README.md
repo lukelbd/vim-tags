@@ -15,27 +15,6 @@ very flexible.
 And it is on this basis that
 this plugin provides some neat refactoring tools.
 
-## Global plugin options
-
-* `g:idetools_no_ctags`: Vim-list of strings specifying the
-  filetypes for which we do not want to try to generate ctags.
-* `g:idetools_all_ctags`: Vim-list of strings specifying the
-  filetypes for which we want to use **not only** "top-level"
-  tags as scope delimiters, but also "child" tags -- for example, functions
-  declared inside of other functions. By default, this list is equal
-  to just `['fortran']`, since all Fortran subroutines and functions
-  must be declared inside of a "`program`" or "`module`", which have their own tags.
-* `g:idetools_top_ctags_map`: Vim-dictionary whose keys are
-  filetypes and whose values are lists of characters, corresponding to the ctags
-  **categories** used to approximate the "local scope" refactoring tools.
-  If the current filetype is not in the dictionary,
-  the `'default'` entry is used (by default, this is `f`, indicating
-  **function definition** locations).
-  
-  To generate a list of all possible ctags **categories** for all languages, run
-  `ctags --list-kinds` on the command line. For a specific language, use
-  e.g. `ctags --list-kinds=python`.
-
 ## Ctags maps
 
 * `<Leader>c`: Displays a condensed table of the `ctags`.
@@ -72,8 +51,25 @@ this plugin provides some neat refactoring tools.
   changes **all occurrences**.
 * `<Leader>*`, `<Leader>&`: Counts the number of words or WORDs under the cursor
 
-<!-- See the source code for more details. -->
-<!-- Detailed description is coming soon. -->
+## Global options
+* `g:idetools_no_ctags`: Vim-list of strings specifying the
+  filetypes for which we do not want to try to generate ctags.
+* `g:idetools_all_ctags`: Vim-list of strings specifying the
+  filetypes for which we want to use **not only** "top-level"
+  tags as scope delimiters, but also "child" tags -- for example, functions
+  declared inside of other functions. By default, this list is equal
+  to just `['fortran']`, since all Fortran subroutines and functions
+  must be declared inside of a "`program`" or "`module`", which have their own tags.
+* `g:idetools_top_ctags_map`: Vim-dictionary whose keys are
+  filetypes and whose values are lists of characters, corresponding to the ctags
+  **categories** used to approximate the "local scope" refactoring tools.
+  If the current filetype is not in the dictionary,
+  the `'default'` entry is used (by default, this is `f`, indicating
+  **function definition** locations).
+  
+  To generate a list of all possible ctags **categories** for all languages, run
+  `ctags --list-kinds` on the command line. For a specific language, use
+  e.g. `ctags --list-kinds=python`.
 
 
 # Installation
