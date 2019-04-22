@@ -60,7 +60,7 @@ this plugin provides some neat refactoring tools.
   declared inside of other functions. By default, this list is equal
   to just `['fortran']`, since all Fortran subroutines and functions
   must be declared inside of a "`program`" or "`module`", which have their own tags.
-* `g:idetools_top_ctags_map`: Vim-dictionary whose keys are
+* `g:idetools_top_ctags`: Vim-dictionary whose keys are
   filetypes and whose values are lists of characters, corresponding to the ctags
   **categories** used to approximate the "local scope" refactoring tools.
   If the current filetype is not in the dictionary,

@@ -66,8 +66,8 @@ if !exists('g:idetools_all_ctags')
 endif
 "List of per-file/per-filetype tag categories that we define as 'scope-delimiters',
 "i.e. tags approximately denoting boundaries for variable scope of code block underneath cursor
-if !exists('g:idetools_top_ctags_map')
-  let g:idetools_top_ctags_map = {
+if !exists('g:idetools_top_ctags')
+  let g:idetools_top_ctags = {
     \ '.vimrc'  : 'a',
     \ 'vim'     : 'afc',
     \ 'tex'     : 'bs',
@@ -141,12 +141,12 @@ function! s:ctagsread()
   let b:ctags_line=sort(deepcopy(ctags), 's:linesort') "sort alphabetically by *position 0* in the sub-arrays
   "Next filter the tags sorted by line to include only a few limited categories
   "Will also filter to pick only ***top-level*** items (i.e. tags with global scope)
-  if has_key(g:idetools_top_ctags_map, expand('%:t'))
-    let cats=g:idetools_top_ctags_map[expand('%:t')]
-  elseif has_key(g:idetools_top_ctags_map, &ft)
-    let cats=g:idetools_top_ctags_map[&ft]
+  if has_key(g:idetools_top_ctags, expand('%:t'))
+    let cats=g:idetools_top_ctags[expand('%:t')]
+  elseif has_key(g:idetools_top_ctags, &ft)
+    let cats=g:idetools_top_ctags[&ft]
   else
-    let cats=g:idetools_top_ctags_map['default']
+    let cats=g:idetools_top_ctags['default']
   endif
   let b:ctags_top=filter(deepcopy(b:ctags_line),
     \ 'v:val[2]=~"['.cats.']" && ('.index(g:idetools_all_ctags, &ft).'!=-1 || len(v:val)==3)')
