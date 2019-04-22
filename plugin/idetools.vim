@@ -44,15 +44,13 @@ if v:shell_error "exit code
   echom "Error: vim-idetools requires the command-line tool ctags, not found."
   finish
 endif
+"Autocommand
 augroup ctags
   au!
   au BufRead,BufWritePost * call <sid>ctagsread()
   au BufEnter * call <sid>ctagbracketmaps()
 augroup END
-set tags=./.vimtags "if ever go back to using files, want these settings
 set cpoptions+=d
-
-"Options
 "Files that we wish to ignore
 if !exists('g:idetools_no_ctags')
   let g:idetools_no_ctags=['help', 'rst', 'qf', 'diff', 'man', 'nerdtree', 'tagbar']
@@ -76,16 +74,21 @@ if !exists('g:idetools_top_ctags')
     \ 'default' : 'f',
     \ }
 endif
+"Maps
+if !exists('g:idetools_ctags_jump_map')
+  let g:idetools_ctags_jump_map='<Leader><Leader>'
+endif
+if !exists('g:idetools_ctags_backward_map')
+  let g:idetools_ctags_backward_map='[['
+endif
+if !exists('g:idetools_ctags_forward_map')
+  let g:idetools_ctags_forward_map=']]'
+endif
 
 "------------------------------------------------------------------------------"
 "The below contains super cool ctags functions that are way better than
 "any existing plugin; they power many of the features below
 "------------------------------------------------------------------------------"
-"Handy autocommands to update and dislay tags
-nnoremap <silent> <Leader>c :DisplayTags<CR>:redraw!<CR>
-nnoremap <silent> <Leader>C :ReadTags<CR>
-nnoremap <silent> <Leader><Leader> :call fzf#run({'source': <sid>ctagmenu(b:ctags_alph), 'sink': function('<sid>ctagjump'), 'down': '~20%'})<CR>
-
 "Function for generating command-line exe that prints taglist to stdout
 "We call ctags in number mode (i.e. return line number instead of search pattern)
 "To add global options, modify ~/.ctags
@@ -208,18 +211,19 @@ endfunction
 
 "Now define the maps
 "Declare another useful map to jump to definition of key under cursor
-nnoremap <CR> gd
+"Handy autocommands to update and dislay tags
 function! s:ctagbracketmaps()
   if index(g:idetools_no_ctags, &ft)!=-1
     return
   endif
-  " if exists('g:has_nowait') && g:has_nowait
-  " noremap <nowait> <expr> <buffer> <silent> [ <sid>ctagbracket(0,'.v:count.').'gg'
-  " noremap <nowait> <expr> <buffer> <silent> ] <sid>ctagbracket(1,'.v:count.').'gg'
-  noremap <expr> <buffer> <silent> [t <sid>ctagbracket(0,'.v:count.').'gg'
-  noremap <expr> <buffer> <silent> [[ <sid>ctagbracket(0,'.v:count.').'gg'
-  noremap <expr> <buffer> <silent> ]t <sid>ctagbracket(1,'.v:count.').'gg'
-  noremap <expr> <buffer> <silent> ]] <sid>ctagbracket(1,'.v:count.').'gg'
+  exe "noremap <expr> <buffer> <silent> ".g:idetools_ctags_backward_map
+   \ ." <sid>ctagbracket(0,'.v:count.').'gg'"
+  exe "noremap <expr> <buffer> <silent> ".g:idetools_ctags_forward_map
+   \ ." <sid>ctagbracket(1,'.v:count.').'gg'"
+  if exists('*fzf#run')
+    exe "nnoremap <buffer> <silent> ".g:idetools_ctags_jump_map
+     \ ." :call fzf#run({'source': <sid>ctagmenu(b:ctags_alph), 'sink': function('<sid>ctagjump'), 'down': '~20%'})<CR>"
+  endif
 endfunction
 
 "------------------------------------------------------------------------------"

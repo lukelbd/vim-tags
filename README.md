@@ -2,7 +2,7 @@
 This repo stores several IDE tools for **refactoring code**
 cleanly and easily, and for **jumping between syntactically-meaningful parts**
 of your code.
-It relies on [vim-repeat](https://github.com/tpope/vim-repeat), the [exuberant ctags](http://ctags.sourceforge.net/) command-line tool, and, optionally, the [FZF](https://github.com/junegunn/fzf) vim plugin.
+It relies on [vim-repeat](https://github.com/tpope/vim-repeat) and the [exuberant ctags](http://ctags.sourceforge.net/) command-line tool. It also optionally provides a very handy tool for jumping between tag locations, powered by the [FZF](https://github.com/junegunn/fzf) vim plugin.
 
 A fundamental feature of this plugin is the idea that `ctags` locations can
 be used to approximately **delimit variable scope boundaries**.
@@ -15,20 +15,15 @@ very flexible.
 And it is on this basis that
 this plugin provides some neat refactoring tools.
 
-## Ctags maps
+## Commands
+* `:DisplayTags`: Displays a nicely condensed table of tags for the current file.
+* `:ReadTags`: Manually refreshes the `b:ctags` variable. This is done automatically
+  whenever a file is read or written to disk.
 
-* `<Leader>c`: Displays a condensed table of the `ctags`.
-* `<Leader>C`: Manually refreshes the `b:ctags` variable (done automatically
-  on writing to file).
-* `<Leader><Leader>`: Brings up a fuzzy-completion menu of the ctags list, and
-  jumps to the selected location.
-* `<CR>`: Goes to the definition of the word under the cursor with `gd`.
-* `[[` and `]]`: Jumps to subsequent and preceding top-level "significant
-  ctag locations" -- that is, omitting variable definitions, import statements, etc.
-  Generally these are just function and class definition locations.
-
-## Refactoring maps
-
+## Maps
+* `<Leader><Leader>`: Brings up a fuzzy-completion menu of the ctags list, and jumps to the selected location. This is only defined if the [FZF](https://github.com/junegunn/fzf) plugin is installed. The map can be changed with `g:idetools_ctags_jump_map`.
+* `[[`, `]]`: Jumps to subsequent and preceding top-level "significant ctag locations" -- that is, omitting variable definitions, import statements, etc. Generally these are just function and class definition locations. The maps can be changed with `g:idetools_ctags_backward_map` and `g:idetools_ctags_forward_map`.
+* `<Leader>*`, `<Leader>&`: Counts the number of words or WORDs under the cursor in the file.
 * `!`, `*`, `&`: Selects the character, word or WORD under the cursor. Is case-sensitive. Does not move the cursor.
 * `#`, `@`: As for `*` and `&`, but selects only the approximate **local-scope**
   instead of the entire file, using "significant ctag locations" as
@@ -49,7 +44,6 @@ this plugin provides some neat refactoring tools.
   deletes **all occurrences**.
 * `ca/`, `ca*`, `ca&`, `ca#`, `ca@`: As with `c/`, `c*`, `c&`, `c#`, `c@`, but
   changes **all occurrences**.
-* `<Leader>*`, `<Leader>&`: Counts the number of words or WORDs under the cursor
 
 ## Global options
 * `g:idetools_no_ctags`: Vim-list of strings specifying the
