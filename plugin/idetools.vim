@@ -216,14 +216,14 @@ function! s:ctagbracketmaps()
   if index(g:idetools_no_ctags, &ft)!=-1
     return
   endif
-  exe "noremap <expr> <buffer> <silent> ".g:idetools_ctags_backward_map
-   \ ." <sid>ctagbracket(0,'.v:count.').'gg'"
-  exe "noremap <expr> <buffer> <silent> ".g:idetools_ctags_forward_map
-   \ ." <sid>ctagbracket(1,'.v:count.').'gg'"
   if exists('*fzf#run')
     exe "nnoremap <buffer> <silent> ".g:idetools_ctags_jump_map
      \ ." :call fzf#run({'source': <sid>ctagmenu(b:ctags_alph), 'sink': function('<sid>ctagjump'), 'down': '~20%'})<CR>"
   endif
+  exe "noremap <expr> <buffer> <silent> ".g:idetools_ctags_backward_map
+   \ ." <sid>ctagbracket(0,'.v:count.').'gg'"
+  exe "noremap <expr> <buffer> <silent> ".g:idetools_ctags_forward_map
+   \ ." <sid>ctagbracket(1,'.v:count.').'gg'"
 endfunction
 
 "------------------------------------------------------------------------------"
