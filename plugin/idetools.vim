@@ -269,8 +269,9 @@ endfunction
 "Magical refactoring tools
 "------------------------------------------------------------------------------"
 "Display number of occurrences of word under cursor
-nnoremap <silent> <Leader>* :echo 'Number of occurences: '.system('grep -c "\b'.expand('<cword>').'\b" '.expand('%').' \| xargs')<CR>
-nnoremap <silent> <Leader>& :echo 'Number of occurences: '.system('grep -c "[ \n\t]'.expand('<cWORD>').'[ \n\t]" '.expand('%').' \| xargs')<CR>
+nnoremap <silent> <Leader>* :echom 'Number of "'.expand('<cword>').'" occurences: '.system('grep -c "\b"'.shellescape(expand('<cword>')).'"\b" '.expand('%'))<CR>
+nnoremap <silent> <Leader>& :echom 'Number of "'.expand('<cWORD>').'" occurences: '.system('grep -c "[ \n\t]"'.shellescape(expand('<cWORD>')).'"[ \n\t]" '.expand('%'))<CR>
+nnoremap <silent> <Leader>. :echom 'Number of "'.@/.'" occurences: '.system('grep -c '.shellescape(@/).' '.expand('%'))<CR>
 
 "Make */# search global/function-local <cword>, and &/@ the same for <cWORD>s
 "Note by default '&' repeats last :s command
