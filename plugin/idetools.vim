@@ -36,7 +36,7 @@
 "   https://www.reddit.com/r/vim/comments/2p6jqr/quick_replace_useful_refactoring_and_editing_tool/
 " * For repeat.vim usage see: http://vimcasts.org/episodes/creating-repeatable-mappings-with-repeat-vim/
 "Todo: Make sure python2 and python3 shebangs work
-"Maybe re-implement: if getline(1)=~"#!.*python[23]" | let force="--language=python"
+"Maybe re-implement: if getline(1)=~"#!.*python[23]" | let force = "--language=python"
 "------------------------------------------------------------------------------"
 "Check if possible
 call system("type ctags &>/dev/null")
@@ -53,14 +53,14 @@ augroup END
 set cpoptions+=d
 "Files that we wish to ignore
 if !exists('g:idetools_no_ctags')
-  let g:idetools_no_ctags=['help', 'rst', 'qf', 'diff', 'man', 'nerdtree', 'tagbar']
+  let g:idetools_no_ctags = ['help', 'rst', 'qf', 'diff', 'man', 'nerdtree', 'tagbar']
 endif
 "List of files for which we only want not just the 'top level' tags (i.e. tags
 "that do not belong to another block, e.g. a program or subroutine)
 "Note: In future, may want to only filter tags belonging to specific
 "group, e.g. if tag belongs to a 'program', ignore it.
 if !exists('g:idetools_all_ctags')
-  let g:idetools_all_ctags=['fortran']
+  let g:idetools_all_ctags = ['fortran']
 endif
 "List of per-file/per-filetype tag categories that we define as 'scope-delimiters',
 "i.e. tags approximately denoting boundaries for variable scope of code block underneath cursor
@@ -76,13 +76,13 @@ if !exists('g:idetools_top_ctags')
 endif
 "Maps
 if !exists('g:idetools_ctags_jump_map')
-  let g:idetools_ctags_jump_map='<Leader><Leader>'
+  let g:idetools_ctags_jump_map = '<Leader><Leader>'
 endif
 if !exists('g:idetools_ctags_backward_map')
-  let g:idetools_ctags_backward_map='[['
+  let g:idetools_ctags_backward_map = '[['
 endif
 if !exists('g:idetools_ctags_forward_map')
-  let g:idetools_ctags_forward_map=']]'
+  let g:idetools_ctags_forward_map = ']]'
 endif
 
 "------------------------------------------------------------------------------"
@@ -93,7 +93,7 @@ endif
 "We call ctags in number mode (i.e. return line number instead of search pattern)
 "To add global options, modify ~/.ctags
 function! s:ctagcmd(...)
-  let flags=(a:0 ? a:1 : '') "extra flags
+  let flags = (a:0 ? a:1 : '') "extra flags
   return "ctags ".flags." ".shellescape(expand('%:p'))." 2>/dev/null | cut -d '\t' -f1,3-5 "
   " \." | command grep '^[^\t]*\t".expand('%:p')."' "this filters to only tags from 'this file'
 endfunction
@@ -111,13 +111,13 @@ command! DisplayTags call <sid>ctagsdisplay()
 "Note multiple tags on same line is *very* common; try the below in a model src folder:
 "for f in <pattern>; do echo $f:; ctags -f - -n $f | cut -d $'\t' -f3 | cut -d\; -f1 | sort -n | uniq -c | cut -d' ' -f4 | uniq; done
 function! s:linesort(tag1, tag2) "default sorting is always alphabetical, with type coercion; must use this!
-  let num1=a:tag1[1]
-  let num2=a:tag2[1]
+  let num1 = a:tag1[1]
+  let num2 = a:tag2[1]
   return num1 - num2 "fits requirements
 endfunc
 function! s:alphsort(tag1, tag2) "from this page: https://vi.stackexchange.com/a/11237/8084
-  let str1=a:tag1[0]
-  let str2=a:tag2[0]
+  let str1 = a:tag1[0]
+  let str2 = a:tag2[0]
   return (str1<str2 ? -1 : str1==str2 ? 0 : 1) "equality, lesser, and greater
 endfunction
 function! s:ctagsread()
@@ -128,30 +128,30 @@ function! s:ctagsread()
   if index(g:idetools_no_ctags, &ft)!=-1
     return
   endif
-  let flags=(getline(1)=~'#!.*python[23]' ? '--language-force=python' : '')
+  let flags = (getline(1)=~'#!.*python[23]' ? '--language-force=python' : '')
   "Call system command
   "Warning: In MacVim, instead what gets called is:
   "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/ctags"
   "and then for some reason ctags can't accept -n flag or --excmd=number flag.
   "Warning: To test if ctags worked, want exit status of *first* command in pipeline (i.e. ctags)
   "but instead we get cut/sed statuses. If ctags returns error
-  let ctags=map(split(system(s:ctagcmd(flags)." | sed 's/;\"\t/\t/g'"), '\n'), "split(v:val,'\t')")
+  let ctags = map(split(system(s:ctagcmd(flags)." | sed 's/;\"\t/\t/g'"), '\n'), "split(v:val,'\t')")
   if len(ctags)==0 || len(ctags[0])==0 "don't want warning message for files without tags!
     return
     "echohl WarningMsg | echom "Warning: ctags unavailable." | echohl None
   endif
-  let b:ctags_alph=sort(deepcopy(ctags), 's:alphsort') "sort numerically by *position 1* in the sub-arrays
-  let b:ctags_line=sort(deepcopy(ctags), 's:linesort') "sort alphabetically by *position 0* in the sub-arrays
+  let b:ctags_alph = sort(deepcopy(ctags), 's:alphsort') "sort numerically by *position 1* in the sub-arrays
+  let b:ctags_line = sort(deepcopy(ctags), 's:linesort') "sort alphabetically by *position 0* in the sub-arrays
   "Next filter the tags sorted by line to include only a few limited categories
   "Will also filter to pick only ***top-level*** items (i.e. tags with global scope)
   if has_key(g:idetools_top_ctags, expand('%:t'))
-    let cats=g:idetools_top_ctags[expand('%:t')]
+    let cats = g:idetools_top_ctags[expand('%:t')]
   elseif has_key(g:idetools_top_ctags, &ft)
-    let cats=g:idetools_top_ctags[&ft]
+    let cats = g:idetools_top_ctags[&ft]
   else
-    let cats=g:idetools_top_ctags['default']
+    let cats = g:idetools_top_ctags['default']
   endif
-  let b:ctags_top=filter(deepcopy(b:ctags_line),
+  let b:ctags_top = filter(deepcopy(b:ctags_line),
     \ 'v:val[2]=~"['.cats.']" && ('.index(g:idetools_all_ctags, &ft).'!=-1 || len(v:val)==3)')
 endfunction
 command! ReadTags call <sid>ctagsread()
@@ -181,23 +181,23 @@ function! s:ctagbracket(foreward, n)
     echohl WarningMsg | echom "Warning: ctags unavailable." | echohl None
     return line('.') "stay on current line if failed
   endif
-  let ctaglines=map(deepcopy(b:ctags_top),'v:val[1]')
-  let njumps=(a:n==0 ? 1 : a:n)
+  let ctaglines = map(deepcopy(b:ctags_top),'v:val[1]')
+  let njumps = (a:n==0 ? 1 : a:n)
   for i in range(njumps)
-    let lnum=line('.')
+    let lnum = line('.')
     "Edge cases; at bottom or top of document
     if lnum<b:ctags_top[0][1] || lnum>b:ctags_top[-1][1]
-      let idx=(a:foreward ? 0 : -1)
+      let idx = (a:foreward ? 0 : -1)
     "Extra case not handled in main loop
     elseif lnum==b:ctags_top[-1][1]
-      let idx=(a:foreward ? 0 : -2)
+      let idx = (a:foreward ? 0 : -2)
     "Main loop
     else
       for i in range(len(b:ctags_top)-1)
         if lnum==b:ctags_top[i][1]
-          let idx=(a:foreward ? i+1 : i-1) | break
+          let idx = (a:foreward ? i+1 : i-1) | break
         elseif lnum>b:ctags_top[i][1] && lnum<b:ctags_top[i+1][1]
-          let idx=(a:foreward ? i+1 : i) | break
+          let idx = (a:foreward ? i+1 : i) | break
         endif
         if i==len(b:ctags_top)-1
           echohl WarningMsg | "Error: Bracket jump failed." | echohl None | return line('.')
@@ -236,23 +236,23 @@ endfunction
 "   renaming, and do it by confirming every single instance
 function! s:scopesearch(command)
   "Test out scopesearch
-  let ntext=10 "text length
+  let ntext = 10 "text length
   if !exists("b:ctags_top") || len(b:ctags_top)==0
     echohl WarningMsg | echo "Warning: Tags unavailable, so cannot limit search scope." | echohl None
     return ""
   endif
-  let start=line('.')
-  let ctaglines=map(deepcopy(b:ctags_top), 'v:val[1]') "just pick out the line number
-  let ctaglines=ctaglines+[line('$')]
+  let start = line('.')
+  let ctaglines = map(deepcopy(b:ctags_top), 'v:val[1]') "just pick out the line number
+  let ctaglines = ctaglines+[line('$')]
   "Return values
   "%% is literal % character
   "Check out %l atom documentation; note it last atom selects *above* that line (so increment by one)
   "and first atom selects *below* that line (so decrement by 1)
   for i in range(0,len(ctaglines)-2)
     if ctaglines[i]<=start && ctaglines[i+1]>start "must be line above start of next function
-      let text=b:ctags_top[i][0]
+      let text = b:ctags_top[i][0]
       if len(text)>=ntext
-        let text=text[:ntext-1].'...'
+        let text = text[:ntext-1].'...'
       endif
       " echom 'Scopesearch selected lines '.ctaglines[i].' to '.(ctaglines[i+1]-1).'.'
       echom 'Scopesearch selected line '.ctaglines[i].' ('.text.') to '.(ctaglines[i+1]-1).'.'
@@ -277,14 +277,14 @@ nnoremap <silent> <Leader>. :echom 'Number of "'.@/.'" occurences: '.system('gre
 "Note by default '&' repeats last :s command
 " * Also give cWORDs their own 'boundaries' -- do this by using \_s
 "   which matches an EOL (from preceding line or this line) *or* whitespace
-" * Use ':let @/=STUFF<CR>' instead of '/<C-r>=STUFF<CR><CR>' because this prevents
+" * Use ':let @/ = STUFF<CR>' instead of '/<C-r>=STUFF<CR><CR>' because this prevents
 "   cursor from jumping around right away, which is more betterer
-nnoremap <silent> * :let @/='\<'.expand('<cword>').'\>\C'<CR>lb:set hlsearch<CR>
-nnoremap <silent> & :let @/='\_s\@<='.expand('<cWORD>').'\ze\_s\C'<CR>lB:set hlsearch<CR>
+nnoremap <silent> * :let @/ = '\<'.expand('<cword>').'\>\C'<CR>lb:set hlsearch<CR>
+nnoremap <silent> & :let @/ = '\_s\@<='.expand('<cWORD>').'\ze\_s\C'<CR>lB:set hlsearch<CR>
 "Equivalent of * and # (each one key to left), but limited to function scope
 "Note the @/ sets the 'last search' register to this string value
-nnoremap <silent> # :let @/=<sid>scopesearch(0).'\<'.expand('<cword>').'\>\C'<CR>lB:set hlsearch<CR>
-nnoremap <silent> @ :let @/='\_s\@<='.<sid>scopesearch(0).expand('<cWORD>').'\ze\_s\C'<CR>lB:set hlsearch<CR>
+nnoremap <silent> # :let @/ = <sid>scopesearch(0).'\<'.expand('<cword>').'\>\C'<CR>lB:set hlsearch<CR>
+nnoremap <silent> @ :let @/ = '\_s\@<='.<sid>scopesearch(0).expand('<cWORD>').'\ze\_s\C'<CR>lB:set hlsearch<CR>
 "Remap g/ for function-wide searching; similar convention to other commands
 "Note the <silent> will prevent beginning the search until another key is pressed
 nnoremap <silent> g/ /<C-r>=<sid>scopesearch(0)<CR>
@@ -302,16 +302,16 @@ augroup refactor_tool
 augroup END
 
 "First a function for jumping to next occurence automatically
-let g:inject_replace_occurences=0
-let g:iterate_occurences=0
+let g:inject_replace_occurences = 0
+let g:iterate_occurences = 0
 function! s:move_to_next()
   if g:iterate_occurences
-    let winview=winsaveview()
+    let winview = winsaveview()
     while search(@/, 'n') "while result is non-zero, i.e. matches exist
       exe 'normal .'
     endwhile
     echo "Replaced all occurences."
-    let g:iterate_occurences=0
+    let g:iterate_occurences = 0
     call winrestview(winview)
   elseif g:inject_replace_occurences
     " silent! call feedkeys("n")
@@ -322,7 +322,7 @@ function! s:move_to_next()
     "the <dot> key is pressed next -- but, the insert stuff will also be run
     "see the source code for more information
   endif
-  let g:inject_replace_occurences=0
+  let g:inject_replace_occurences = 0
 endfunction
 
 "Check if we are on top of an occurence
@@ -353,24 +353,24 @@ endfunction
 " * Note don't need 'c?', since if you want a function local string replacement, just
 "   run 'g/' to select your text, then c/, d/, ca/, da/, et cetera. Same exact result.
 nnoremap <silent> c/ :set hlsearch<CR>
-      \:let g:inject_replace_occurences=1<CR>cgn
-nnoremap <silent> c* :let @/='\<'.expand('<cword>').'\>\C'<CR>:set hlsearch<CR>
-      \:let g:inject_replace_occurences=1<CR>cgn
-nnoremap <silent> c& :let @/='\_s\@<='.expand('<cWORD>').'\ze\_s\C'<CR>:set hlsearch<CR>
-      \:let g:inject_replace_occurences=1<CR>cgn
-nnoremap <silent> c# :let @/=<sid>scopesearch(0).'\<'.expand('<cword>').'\>\C'<CR>:set hlsearch<CR>
-      \:let g:inject_replace_occurences=1<CR>cgn
-nnoremap <silent> c@ :let @/='\_s\@<='.<sid>scopesearch(0).expand('<cWORD>').'\ze\_s\C'<CR>:set hlsearch<CR>
-      \:let g:inject_replace_occurences=1<CR>cgn
+      \:let g:inject_replace_occurences = 1<CR>cgn
+nnoremap <silent> c* :let @/ = '\<'.expand('<cword>').'\>\C'<CR>:set hlsearch<CR>
+      \:let g:inject_replace_occurences = 1<CR>cgn
+nnoremap <silent> c& :let @/ = '\_s\@<='.expand('<cWORD>').'\ze\_s\C'<CR>:set hlsearch<CR>
+      \:let g:inject_replace_occurences = 1<CR>cgn
+nnoremap <silent> c# :let @/ = <sid>scopesearch(0).'\<'.expand('<cword>').'\>\C'<CR>:set hlsearch<CR>
+      \:let g:inject_replace_occurences = 1<CR>cgn
+nnoremap <silent> c@ :let @/ = '\_s\@<='.<sid>scopesearch(0).expand('<cWORD>').'\ze\_s\C'<CR>:set hlsearch<CR>
+      \:let g:inject_replace_occurences = 1<CR>cgn
 nnoremap <silent> <Plug>ReplaceOccurences :call <sid>replace_occurence()<CR>
 
 "Remap as above, but this time replace ***all*** occurrences
 "These ones I made all by myself! Added a block to move_to_next function
-nmap ca/ :let g:iterate_occurences=1<CR>c/
-nmap ca* :let g:iterate_occurences=1<CR>c*
-nmap ca& :let g:iterate_occurences=1<CR>c&
-nmap ca# :let g:iterate_occurences=1<CR>c#
-nmap ca@ :let g:iterate_occurences=1<CR>c@
+nmap ca/ :let g:iterate_occurences = 1<CR>c/
+nmap ca* :let g:iterate_occurences = 1<CR>c*
+nmap ca& :let g:iterate_occurences = 1<CR>c&
+nmap ca# :let g:iterate_occurences = 1<CR>c#
+nmap ca@ :let g:iterate_occurences = 1<CR>c@
 
 "------------------------------------------------------------------------------"
 "Next, similar to above, but use these for *deleting* text
@@ -388,7 +388,7 @@ nmap ca@ :let g:iterate_occurences=1<CR>c@
 function! s:delete_next()
   try "note the silent! feature fucks up try catch statements
     keepjumps normal! dgnn
-    let b:delete_done=0
+    let b:delete_done = 0
   catch
     echo "Replaced all occurences."
   endtry
@@ -407,7 +407,7 @@ nmap d@ <Plug>search5
 "Finally, remap as above, but for deleting everything
 "Make sure to use existing mappings (i.e. no 'normal!')
 function! s:delete_all(command)
-  let winview=winsaveview()
+  let winview = winsaveview()
   exe 'normal '.a:command
   while search(@/, 'n') "while result is non-zero, i.e. matches exist
     exe 'normal .'
