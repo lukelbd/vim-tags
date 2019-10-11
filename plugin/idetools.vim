@@ -118,7 +118,7 @@ endfunc
 function! s:alphsort(tag1, tag2) " from this page: https://vi.stackexchange.com/a/11237/8084
   let str1 = a:tag1[0]
   let str2 = a:tag2[0]
-  return (str1<str2 ? -1 : str1==str2 ? 0 : 1) " equality, lesser, and greater
+  return (str1<str2 ? -1 : str1 == str2 ? 0 : 1) " equality, lesser, and greater
 endfunction
 function! s:ctagsread()
   " First get simple list of lists; tag properties sorted alphabetically by
@@ -136,7 +136,7 @@ function! s:ctagsread()
   " Warning: To test if ctags worked, want exit status of *first* command in pipeline (i.e. ctags)
   " but instead we get cut/sed statuses. If ctags returns error
   let ctags = map(split(system(s:ctagcmd(flags)." | sed 's/;\"\t/\t/g'"), '\n'), "split(v:val,'\t')")
-  if len(ctags)==0 || len(ctags[0])==0 " don't want warning message for files without tags!
+  if len(ctags) == 0 || len(ctags[0]) == 0 " don't want warning message for files without tags!
     return
     " echohl WarningMsg | echom "Warning: ctags unavailable." | echohl None
   endif
@@ -152,7 +152,7 @@ function! s:ctagsread()
     let cats = g:idetools_top_ctags['default']
   endif
   let b:ctags_top = filter(deepcopy(b:ctags_line),
-    \ 'v:val[2]=~"['.cats.']" && ('.index(g:idetools_all_ctags, &ft).'!=-1 || len(v:val)==3)')
+    \ 'v:val[2]=~"['.cats.']" && ('.index(g:idetools_all_ctags, &ft).'!=-1 || len(v:val) == 3)')
 endfunction
 command! ReadTags call <sid>ctagsread()
 
@@ -177,12 +177,12 @@ endfunction
 "------------------------------------------------------------------------------"
 " Define simple function for jumping between these boundaries
 function! s:ctagbracket(foreward, n)
-  if !exists("b:ctags_top") || len(b:ctags_top)==0
+  if !exists("b:ctags_top") || len(b:ctags_top) == 0
     echohl WarningMsg | echom "Warning: ctags unavailable." | echohl None
     return line('.') " stay on current line if failed
   endif
   let ctaglines = map(deepcopy(b:ctags_top),'v:val[1]')
-  let njumps = (a:n==0 ? 1 : a:n)
+  let njumps = (a:n == 0 ? 1 : a:n)
   for i in range(njumps)
     let lnum = line('.')
     " Edge cases; at bottom or top of document
@@ -194,7 +194,7 @@ function! s:ctagbracket(foreward, n)
     " Main loop
     else
       for i in range(len(b:ctags_top)-1)
-        if lnum==b:ctags_top[i][1]
+        if lnum == b:ctags_top[i][1]
           let idx = (a:foreward ? i+1 : i-1) | break
         elseif lnum>b:ctags_top[i][1] && lnum<b:ctags_top[i+1][1]
           let idx = (a:foreward ? i+1 : i) | break
@@ -237,7 +237,7 @@ endfunction
 function! s:scopesearch(command)
   " Test out scopesearch
   let ntext = 10 " text length
-  if !exists("b:ctags_top") || len(b:ctags_top)==0
+  if !exists("b:ctags_top") || len(b:ctags_top) == 0
     echohl WarningMsg | echo "Warning: Tags unavailable, so cannot limit search scope." | echohl None
     return ""
   endif
@@ -249,9 +249,9 @@ function! s:scopesearch(command)
   " Check out %l atom documentation; note it last atom selects *above* that line (so increment by one)
   " and first atom selects *below* that line (so decrement by 1)
   for i in range(0,len(ctaglines)-2)
-    if ctaglines[i]<=start && ctaglines[i+1]>start " must be line above start of next function
+    if ctaglines[i] <= start && ctaglines[i+1]>start " must be line above start of next function
       let text = b:ctags_top[i][0]
-      if len(text)>=ntext
+      if len(text) >= ntext
         let text = text[:ntext-1].'...'
       endif
       " echom 'Scopesearch selected lines '.ctaglines[i].' to '.(ctaglines[i+1]-1).'.'
@@ -339,7 +339,7 @@ function! s:replace_occurence()
   call setreg('"', save_reg, save_regmode)
   call winrestview(winview)
   " If we are on top of an occurence, replace it
-  if lnum_cur>=lnum1 && lnum_cur<=lnum2 && col_cur>=col1 && col_cur<=col2
+  if lnum_cur >= lnum1 && lnum_cur <= lnum2 && col_cur >= col1 && col_cur <= col2
     exe "silent! keepjumps normal! cgn\<C-a>\<Esc>"
   endif
   " silent! call feedkeys("n")
