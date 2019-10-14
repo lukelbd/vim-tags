@@ -47,8 +47,8 @@ endif
 " Autocommand
 augroup ctags
   au!
-  au BufRead,BufWritePost * call <sid>ctagsread()
-  au BufEnter * call <sid>ctagbracketmaps()
+  au BufRead,BufWritePost * call s:ctagsread()
+  au BufEnter * call s:ctagbracketmaps()
 augroup END
 set cpoptions+=d
 " Files that we wish to ignore
@@ -106,7 +106,7 @@ function! s:ctagsdisplay()
   exe "!clear; " . s:ctagcmd() . " "
    \ . " | tr -s '\t' | column -t -s '\t' | less"
 endfunction
-command! DisplayTags call <sid>ctagsdisplay()
+command! DisplayTags call s:ctagsdisplay()
 
 " Next a function that generates ctags and parses them into list of lists
 " Note multiple tags on same line is *very* common; try the below in a model src folder:
@@ -155,7 +155,7 @@ function! s:ctagsread()
     \ 'v:val[2] =~ "[' . cats . ']" && ('
     \ . index(g:idetools_all_ctags, &ft) . ' != -1 || len(v:val) == 3)')
 endfunction
-command! ReadTags call <sid>ctagsread()
+command! ReadTags call s:ctagsread()
 
 "------------------------------------------------------------------------------"
 " Selecting tags by regex
@@ -234,10 +234,8 @@ function! s:ctagbracketmaps()
     exe "nnoremap <silent> <buffer> " . g:idetools_ctags_jump_map
      \ ." :call fzf#run({'source': <sid>ctagmenu(b:ctags_alph), 'sink': function('<sid>ctagjump'), 'down': '~20%'})<CR>"
   endif
-  exe "noremap <silent> <buffer> " . g:idetools_ctags_backward_map
-   \ ." :<C-u>exe <sid>ctagbracket(0, v:count)<CR>"
-  exe "noremap <silent> <buffer> " . g:idetools_ctags_forward_map
-   \ ." :<C-u>exe <sid>ctagbracket(1, v:count)<CR>"
+  exe "noremap <silent> <buffer> " . g:idetools_ctags_backward_map . " :<C-u>exe <sid>ctagbracket(0, v:count)<CR>"
+  exe "noremap <silent> <buffer> " . g:idetools_ctags_forward_map . " :<C-u>exe <sid>ctagbracket(1, v:count)<CR>"
 endfunction
 
 "------------------------------------------------------------------------------"
@@ -253,7 +251,7 @@ function! s:scopesearch(command)
   let ntext = 10 " text length
   if !exists("b:ctags_top") || len(b:ctags_top) == 0
     echohl WarningMsg
-    echo "Warning: Tags unavailable, so cannot limit search scope."
+    echom "Warning: Tags unavailable, so cannot limit search scope."
     echohl None
     return ""
   endif
@@ -264,7 +262,7 @@ function! s:scopesearch(command)
   " %% is literal % character
   " Check out %l atom documentation; note it last atom selects *above* that line (so increment by one)
   " and first atom selects *below* that line (so decrement by 1)
-  for i in range(0,len(ctaglines)-2)
+  for i in range(0, len(ctaglines)-2)
     if ctaglines[i] <= init && ctaglines[i + 1] > init " must be line above start of next function
       let text = b:ctags_top[i][0]
       if len(text) >= ntext
@@ -317,7 +315,7 @@ nnoremap <silent> ! ylh/<C-r>=escape(@",'/\')<CR><CR>
 " Script referenced here: https://www.reddit.com/r/vim/comments/8k4p6v/what_are_your_best_mappings/
 augroup refactor_tool
   au!
-  au InsertLeave * call <sid>move_to_next() " magical c* searching function
+  au InsertLeave * call s:move_to_next() " magical c* searching function
 augroup END
 
 " First a function for jumping to next occurence automatically
@@ -372,15 +370,15 @@ endfunction
 " * Note don't need 'c?', since if you want a function local string replacement, just
 "   run 'g/' to select your text, then c/, d/, ca/, da/, et cetera. Same exact result.
 nnoremap <silent> c/ :set hlsearch<CR>
-      \:let g:inject_replace_occurences = 1<CR>cgn
+  \ :let g:inject_replace_occurences = 1<CR>cgn
 nnoremap <silent> c* :let @/ = '\<'.expand('<cword>').'\>\C'<CR>:set hlsearch<CR>
-      \:let g:inject_replace_occurences = 1<CR>cgn
+  \ :let g:inject_replace_occurences = 1<CR>cgn
 nnoremap <silent> c& :let @/ = '\_s\@<='.expand('<cWORD>').'\ze\_s\C'<CR>:set hlsearch<CR>
-      \:let g:inject_replace_occurences = 1<CR>cgn
+  \ :let g:inject_replace_occurences = 1<CR>cgn
 nnoremap <silent> c# :let @/ = <sid>scopesearch(0).'\<'.expand('<cword>').'\>\C'<CR>:set hlsearch<CR>
-      \:let g:inject_replace_occurences = 1<CR>cgn
+  \ :let g:inject_replace_occurences = 1<CR>cgn
 nnoremap <silent> c@ :let @/ = '\_s\@<='.<sid>scopesearch(0).expand('<cWORD>').'\ze\_s\C'<CR>:set hlsearch<CR>
-      \:let g:inject_replace_occurences = 1<CR>cgn
+  \ :let g:inject_replace_occurences = 1<CR>cgn
 nnoremap <silent> <Plug>ReplaceOccurences :call <sid>replace_occurence()<CR>
 
 " Remap as above, but this time replace ***all*** occurrences
@@ -402,7 +400,7 @@ nmap ca@ :let g:iterate_occurences = 1<CR>c@
 " * Use <C-r>=expand('<cword>')<CR> instead of <C-r><C-w> to avoid errors on empty lines
 " function! s:plugfactory(plugname, )
 " endfunction
-" command! -nargs=1 PlugFactory call <sid>plugfactory('<args>')
+" command! -nargs=1 PlugFactory call s:plugfactory('<args>')
 " Todo: Fix annoying issue where stuff still gets deleted after no more variables are left
 function! s:delete_next()
   try " note the silent! feature fucks up try catch statements
