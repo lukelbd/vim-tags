@@ -16,8 +16,8 @@ And it is on this basis that
 this plugin provides some neat refactoring tools.
 
 ## Commands
+* `:ReadTags`: Manually refreshes the `b:ctags_top`, `b:ctags_alph`, and `b:ctags_line` variables used by this plugin. This is called automatically whenever a file is read or written to disk.
 * `:DisplayTags`: Displays a nicely condensed table of tags for the current file.
-* `:ReadTags`: Manually refreshes the `b:ctags_top`, `b:ctags_alph`, and `b:ctags_line` variables used by this plugin. This is done automatically whenever a file is read or written to disk.
 
 ## Maps
 * `<Leader><Leader>`: Brings up a fuzzy-completion menu of the ctags list, and jumps to the selected location. This is only defined if the [FZF](https://github.com/junegunn/fzf) plugin is installed. The map can be changed with `g:idetools_ctags_jump_map`.

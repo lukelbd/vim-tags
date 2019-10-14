@@ -94,16 +94,17 @@ endif
 " To add global options, modify ~/.ctags
 function! s:ctagcmd(...)
   let flags = (a:0 ? a:1 : '') " extra flags
-  return "ctags ".flags." ".shellescape(expand('%:p'))." 2>/dev/null | cut -d '\t' -f1,3-5 "
-  " \." | command grep '^[^\t]*\t".expand('%:p')."' "this filters to only tags from 'this file'
+  return "ctags " . flags . " " . shellescape(expand('%:p')) . " 2>/dev/null "
+   \ . " | cut -d '\t' -f1,3-5 "
+  " \ ." | command grep '^[^\t]*\t".expand('%:p')."' "this filters to only tags from 'this file'
 endfunction
 
 " Miscellaneous tool; just provides a nice display of tags
 " Used to show the regexes instead of -n mode; the below sed was used to parse them nicely
 " | tr -s ' ' | sed '".'s$/\(.\{0,60\}\).*/;"$/\1.../$'."' "
 function! s:ctagsdisplay()
-  exe "!clear; ".s:ctagcmd()." "
-  \." | tr -s '\t' | column -t -s '\t' | less"
+  exe "!clear; " . s:ctagcmd() . " "
+   \ . " | tr -s '\t' | column -t -s '\t' | less"
 endfunction
 command! DisplayTags call <sid>ctagsdisplay()
 
@@ -125,20 +126,19 @@ function! s:ctagsread()
   " identifier, and numerically by line number
   " * To filter by category, use: filter(b:ctags, 'v:val[2]=="<category>"')
   " * First bail out if filetype is bad
-  if index(g:idetools_no_ctags, &ft)!=-1
+  if index(g:idetools_no_ctags, &ft) != -1
     return
   endif
-  let flags = (getline(1)=~'#!.*python[23]' ? '--language-force=python' : '')
+  let flags = (getline(1) =~ '#!.*python[23]' ? '--language-force=python' : '')
   " Call system command
   " Warning: In MacVim, instead what gets called is:
   " /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/ctags"
   " and then for some reason ctags can't accept -n flag or --excmd=number flag.
   " Warning: To test if ctags worked, want exit status of *first* command in pipeline (i.e. ctags)
   " but instead we get cut/sed statuses. If ctags returns error
-  let ctags = map(split(system(s:ctagcmd(flags)." | sed 's/;\"\t/\t/g'"), '\n'), "split(v:val,'\t')")
+  let ctags = map(split(system(s:ctagcmd(flags) . " | sed 's/;\"\t/\t/g'"), '\n'), "split(v:val,'\t')")
   if len(ctags) == 0 || len(ctags[0]) == 0 " don't want warning message for files without tags!
     return
-    " echohl WarningMsg | echom "Warning: ctags unavailable." | echohl None
   endif
   let b:ctags_alph = sort(deepcopy(ctags), 's:alphsort') " sort numerically by *position 1* in the sub-arrays
   let b:ctags_line = sort(deepcopy(ctags), 's:linesort') " sort alphabetically by *position 0* in the sub-arrays
@@ -152,7 +152,8 @@ function! s:ctagsread()
     let cats = g:idetools_top_ctags['default']
   endif
   let b:ctags_top = filter(deepcopy(b:ctags_line),
-    \ 'v:val[2]=~"['.cats.']" && ('.index(g:idetools_all_ctags, &ft).'!=-1 || len(v:val) == 3)')
+    \ 'v:val[2] =~ "[' . cats . ']" && ('
+    \ . index(g:idetools_all_ctags, &ft) . ' != -1 || len(v:val) == 3)')
 endfunction
 command! ReadTags call <sid>ctagsread()
 
@@ -165,7 +166,8 @@ command! ReadTags call <sid>ctagsread()
 " <line number>: name (type)
 " <line number>: name (type, scope)
 function! s:ctagmenu(ctaglist) " returns nicely formatted string
-  return map(deepcopy(a:ctaglist), 'printf("%4d", v:val[1]).": ".v:val[0]." (".join(v:val[2:],", ").")"')
+  return map(deepcopy(a:ctaglist), 
+    \ 'printf("%4d", v:val[1]) . ": " . v:val[0] . " (" . join(v:val[2:],", ") . ")"')
 endfunction
 " Next function to parse user's menu selection/get the line number, and jump to it
 function! s:ctagjump(ctag) " split by multiple whitespace, get the line number (comes after the colon)
@@ -176,54 +178,66 @@ endfunction
 " Next tools for using ctags to approximate variable scope
 "------------------------------------------------------------------------------"
 " Define simple function for jumping between these boundaries
-function! s:ctagbracket(foreward, n)
+" WARNING: Ctag lines are stored as strings and only get implicitly converted
+" to numbers on comparison with other numbers, so need to make sure in loop
+" that 'lnum' is always a number!
+function! s:ctagbracket(forward, n)
   if !exists("b:ctags_top") || len(b:ctags_top) == 0
-    echohl WarningMsg | echom "Warning: ctags unavailable." | echohl None
+    echohl WarningMsg
+    echom "Warning: ctags unavailable."
+    echohl None
     return line('.') " stay on current line if failed
   endif
-  let ctaglines = map(deepcopy(b:ctags_top),'v:val[1]')
-  let njumps = (a:n == 0 ? 1 : a:n)
-  for i in range(njumps)
-    let lnum = line('.')
+  let lnum = line('.')
+  let njump = (a:n == 0 ? 1 : a:n)
+  for j in range(njump)
     " Edge cases; at bottom or top of document
-    if lnum<b:ctags_top[0][1] || lnum>b:ctags_top[-1][1]
-      let idx = (a:foreward ? 0 : -1)
+    if lnum < b:ctags_top[0][1] || lnum > b:ctags_top[-1][1]
+      let idx = (a:forward ? 0 : -1)
     " Extra case not handled in main loop
-    elseif lnum==b:ctags_top[-1][1]
-      let idx = (a:foreward ? 0 : -2)
+    elseif lnum == b:ctags_top[-1][1]
+      let idx = (a:forward ? 0 : -2)
     " Main loop
     else
-      for i in range(len(b:ctags_top)-1)
+      for i in range(len(b:ctags_top) - 1)
         if lnum == b:ctags_top[i][1]
-          let idx = (a:foreward ? i+1 : i-1) | break
-        elseif lnum>b:ctags_top[i][1] && lnum<b:ctags_top[i+1][1]
-          let idx = (a:foreward ? i+1 : i) | break
+          let idx = (a:forward ? i + 1 : i - 1)
+          break
+        elseif lnum > b:ctags_top[i][1] && lnum < b:ctags_top[i + 1][1]
+          let idx = (a:forward ? i + 1 : i)
+          break
         endif
-        if i==len(b:ctags_top)-1
-          echohl WarningMsg | "Error: Bracket jump failed." | echohl None | return line('.')
+        if i == len(b:ctags_top) - 1
+          echohl WarningMsg
+          echom "Error: Bracket jump failed."
+          echohl None
+          return line('.')
         endif
       endfor
     endif
+    let ltag = b:ctags_top[idx][0]
+    let lnum = str2nr(b:ctags_top[idx][1])
   endfor
-  echo 'Tag: '.b:ctags_top[idx][0]
-  return b:ctags_top[idx][1]
+  echom 'Tag: ' . ltag
+  return lnum
 endfunction
 
 " Now define the maps
 " Declare another useful map to jump to definition of key under cursor
 " Handy autocommands to update and dislay tags
+" NOTE: Must use :n instead of <expr> ngg so we can use <C-u> to discard count!
 function! s:ctagbracketmaps()
-  if index(g:idetools_no_ctags, &ft)!=-1
+  if index(g:idetools_no_ctags, &ft) != -1
     return
   endif
   if exists('*fzf#run')
-    exe "nnoremap <buffer> <silent> ".g:idetools_ctags_jump_map
+    exe "nnoremap <silent> <buffer> " . g:idetools_ctags_jump_map
      \ ." :call fzf#run({'source': <sid>ctagmenu(b:ctags_alph), 'sink': function('<sid>ctagjump'), 'down': '~20%'})<CR>"
   endif
-  exe "noremap <expr> <buffer> <silent> ".g:idetools_ctags_backward_map
-   \ ." <sid>ctagbracket(0,'.v:count.').'gg'"
-  exe "noremap <expr> <buffer> <silent> ".g:idetools_ctags_forward_map
-   \ ." <sid>ctagbracket(1,'.v:count.').'gg'"
+  exe "noremap <silent> <buffer> " . g:idetools_ctags_backward_map
+   \ ." :<C-u>exe <sid>ctagbracket(0, v:count)<CR>"
+  exe "noremap <silent> <buffer> " . g:idetools_ctags_forward_map
+   \ ." :<C-u>exe <sid>ctagbracket(1, v:count)<CR>"
 endfunction
 
 "------------------------------------------------------------------------------"
@@ -238,10 +252,12 @@ function! s:scopesearch(command)
   " Test out scopesearch
   let ntext = 10 " text length
   if !exists("b:ctags_top") || len(b:ctags_top) == 0
-    echohl WarningMsg | echo "Warning: Tags unavailable, so cannot limit search scope." | echohl None
+    echohl WarningMsg
+    echo "Warning: Tags unavailable, so cannot limit search scope."
+    echohl None
     return ""
   endif
-  let start = line('.')
+  let init = line('.')
   let ctaglines = map(deepcopy(b:ctags_top), 'v:val[1]') " just pick out the line number
   let ctaglines = ctaglines+[line('$')]
   " Return values
@@ -249,20 +265,23 @@ function! s:scopesearch(command)
   " Check out %l atom documentation; note it last atom selects *above* that line (so increment by one)
   " and first atom selects *below* that line (so decrement by 1)
   for i in range(0,len(ctaglines)-2)
-    if ctaglines[i] <= start && ctaglines[i+1]>start " must be line above start of next function
+    if ctaglines[i] <= init && ctaglines[i + 1] > init " must be line above start of next function
       let text = b:ctags_top[i][0]
       if len(text) >= ntext
-        let text = text[:ntext-1].'...'
+        let text = text[:ntext-1] . '...'
       endif
-      " echom 'Scopesearch selected lines '.ctaglines[i].' to '.(ctaglines[i+1]-1).'.'
-      echom 'Scopesearch selected line '.ctaglines[i].' ('.text.') to '.(ctaglines[i+1]-1).'.'
-      if a:command | return printf('%d,%ds', ctaglines[i]-1, ctaglines[i+1]) " range for :line1,line2s command
-      else | return printf('\%%>%dl\%%<%dl', ctaglines[i]-1, ctaglines[i+1])
+      echom 'Scopesearch selected line ' . ctaglines[i] . ' (' . text . ') to ' . (ctaglines[i + 1] - 1) . '.'
+      if a:command
+        return printf('%d,%ds', ctaglines[i] - 1, ctaglines[i + 1]) " range for :line1,line2s command
+      else
+        return printf('\%%>%dl\%%<%dl', ctaglines[i] - 1, ctaglines[i + 1])
       endif
     endif
   endfor
-  echohl WarningMsg | echom "Warning: Scopesearch failed to limit search scope." | echohl None
-  return "" "empty string; will not limit scope anymore
+  echohl WarningMsg
+  echom "Warning: Scopesearch failed to limit search scope."
+  echohl None
+  return ""
 endfunction
 
 "------------------------------------------------------------------------------"
