@@ -1,9 +1,6 @@
 "------------------------------------------------------------------------------"
 " Author: Luke Davis (lukelbd@gmail.com)
 " Date:   2018-09-09
-" Copy of unimpaired.vim from Tim Pope, and many custom features including
-" ctags integration, scope-searching, and refactoring tools.
-"------------------------------------------------------------------------------"
 " Tries to wrap a few related features into one plugin file,
 " including super cool and useful ***refactoring*** tools based on ctags:
 " * Ctags integration -- jumping between successive tags, jumping to a particular
@@ -38,34 +35,34 @@
 " Todo: Make sure python2 and python3 shebangs work
 " Maybe re-implement: if getline(1)=~"#!.*python[23]" | let force = "--language=python"
 "------------------------------------------------------------------------------"
-" Check if possible
-call system("type ctags &>/dev/null")
+" Initial stuff
+call system('type ctags &>/dev/null')
 if v:shell_error " exit code
-  echom "Error: vim-idetools requires the command-line tool ctags, not found."
+  echohl WarningMsg
+  echom 'Error: vim-idetools requires the command-line tool ctags, not found.'
+  echohl None
   finish
 endif
-" Autocommand
-augroup ctags
-  au!
-  au BufRead,BufWritePost * call s:ctagsread()
-  au BufEnter * call s:ctagbracketmaps()
-augroup END
 set cpoptions+=d
+augroup idetools
+  au!
+  au InsertLeave * call idetools#change_repeat() " magical c* searching function
+  au BufRead,BufWritePost * call idetools#ctags_read()
+augroup END
+
+" Next a magical function; performs n<dot>n<dot>n style replacement in one keystroke
+" Script found here: https://www.reddit.com/r/vim/comments/2p6jqr/quick_replace_useful_refactoring_and_editing_tool/
+" Script referenced here: https://www.reddit.com/r/vim/comments/8k4p6v/what_are_your_best_mappings/
+
 " Files that we wish to ignore
-if !exists('g:idetools_no_ctags')
-  let g:idetools_no_ctags = ['help', 'rst', 'qf', 'diff', 'man', 'nerdtree', 'tagbar']
+if !exists('g:idetools_filetypes_skip')
+  let g:idetools_filetypes_skip = ['qf', 'rst', 'man', 'help', 'diff', 'nerdtree', 'tagbar']
 endif
-" List of files for which we only want not just the 'top level' tags (i.e. tags
-" that do not belong to another block, e.g. a program or subroutine)
-" Note: In future, may want to only filter tags belonging to specific
-" group, e.g. if tag belongs to a 'program', ignore it.
-if !exists('g:idetools_all_ctags')
-  let g:idetools_all_ctags = ['fortran']
-endif
+
 " List of per-file/per-filetype tag categories that we define as 'scope-delimiters',
 " i.e. tags approximately denoting boundaries for variable scope of code block underneath cursor
-if !exists('g:idetools_top_ctags')
-  let g:idetools_top_ctags = {
+if !exists('g:idetools_filetypes_top_tags')
+  let g:idetools_filetypes_top_tags = {
     \ '.vimrc'  : 'a',
     \ 'vim'     : 'afc',
     \ 'tex'     : 'bs',
@@ -74,365 +71,113 @@ if !exists('g:idetools_top_ctags')
     \ 'default' : 'f',
     \ }
 endif
-" Maps
+
+" List of files for which we only want not just the 'top level' tags (i.e. tags
+" that do not belong to another block, e.g. a program or subroutine)
+if !exists('g:idetools_filetypes_all_tags')
+  let g:idetools_filetypes_all_tags = ['fortran']
+endif
+
+" Default map variables
 if !exists('g:idetools_ctags_jump_map')
   let g:idetools_ctags_jump_map = '<Leader><Leader>'
 endif
 if !exists('g:idetools_ctags_backward_map')
-  let g:idetools_ctags_backward_map = '[['
+  let g:idetools_ctags_backward_map = '[t'
 endif
 if !exists('g:idetools_ctags_forward_map')
-  let g:idetools_ctags_forward_map = ']]'
+  let g:idetools_ctags_forward_map = ']t'
+endif
+
+"-----------------------------------------------------------------------------"
+" Ctags commands and maps
+"-----------------------------------------------------------------------------"
+" Comamnds
+command! ReadTags call idetools#ctags_read()
+command! DisplayTags call idetools#ctags_display()
+
+" Jump and bracket maps
+" Note: Must use :n instead of <expr> ngg so we can use <C-u> to discard count!
+exe 'noremap <silent> ' . g:idetools_ctags_forward_map . ' :<C-u>exe idetools#ctagjump(1, v:count)<CR>'
+exe 'noremap <silent> ' . g:idetools_ctags_backward_map . ' :<C-u>exe idetools#ctagjump(0, v:count)<CR>'
+if exists('*fzf#run')
+  exe 'nnoremap <silent> ' . g:idetools_ctags_jump_map
+    \ . ' :call fzf#run({"source": idetools#ctagmenu(b:ctags_alph), "sink": function("idetools#ctagselect"), "down": "~20%"})<CR>'
 endif
 
 "------------------------------------------------------------------------------"
-" The below contains super cool ctags functions that are way better than
-" any existing plugin; they power many of the features below
+" Refactoring tool maps
 "------------------------------------------------------------------------------"
-" Function for generating command-line exe that prints taglist to stdout
-" We call ctags in number mode (i.e. return line number instead of search pattern)
-" To add global options, modify ~/.ctags
-function! s:ctagcmd(...)
-  let flags = (a:0 ? a:1 : '') " extra flags
-  return "ctags " . flags . " " . shellescape(expand('%:p')) . " 2>/dev/null "
-   \ . " | cut -d '\t' -f1,3-5 "
-  " \ ." | command grep '^[^\t]*\t".expand('%:p')."' "this filters to only tags from 'this file'
-endfunction
-
-" Miscellaneous tool; just provides a nice display of tags
-" Used to show the regexes instead of -n mode; the below sed was used to parse them nicely
-" | tr -s ' ' | sed '".'s$/\(.\{0,60\}\).*/;"$/\1.../$'."' "
-function! s:ctagsdisplay()
-  exe "!clear; " . s:ctagcmd() . " "
-   \ . " | tr -s '\t' | column -t -s '\t' | less"
-endfunction
-command! DisplayTags call s:ctagsdisplay()
-
-" Next a function that generates ctags and parses them into list of lists
-" Note multiple tags on same line is *very* common; try the below in a model src folder:
-" for f in <pattern>; do echo $f:; ctags -f - -n $f | cut -d $'\t' -f3 | cut -d\; -f1 | sort -n | uniq -c | cut -d' ' -f4 | uniq; done
-function! s:linesort(tag1, tag2) " default sorting is always alphabetical, with type coercion; must use this!
-  let num1 = a:tag1[1]
-  let num2 = a:tag2[1]
-  return num1 - num2 " fits requirements
-endfunc
-function! s:alphsort(tag1, tag2) " from this page: https://vi.stackexchange.com/a/11237/8084
-  let str1 = a:tag1[0]
-  let str2 = a:tag2[0]
-  return (str1<str2 ? -1 : str1 == str2 ? 0 : 1) " equality, lesser, and greater
-endfunction
-function! s:ctagsread()
-  " First get simple list of lists; tag properties sorted alphabetically by
-  " identifier, and numerically by line number
-  " * To filter by category, use: filter(b:ctags, 'v:val[2]=="<category>"')
-  " * First bail out if filetype is bad
-  if index(g:idetools_no_ctags, &ft) != -1
-    return
+" Driver function *must* be in here because cannot issue normal! in
+" autoload folder evidently
+function! s:replace_occurence()
+  " Get lines and columns for next occurence without messing up window/register
+  let [l0, c0] = getpos(".")[1:2] 
+  let reg = getreg('"')
+  let regmode = getregtype('"')
+  let winview = winsaveview()
+  normal! ygn
+  let [l1, c1] = getpos("'[")[1:2] " first char of yanked text
+  let [l2, c2] = getpos("']")[1:2] " last char of yanked text
+  call setreg('"', reg, regmode)
+  call winrestview(winview)
+  " Replace next occurence with previously inserted text
+  if l0 >= l1 && l0 <= l2 && c0 >= c1 && c0 <= c2
+    exe "silent! normal! cgn\<C-a>\<Esc>"
   endif
-  let flags = (getline(1) =~ '#!.*python[23]' ? '--language-force=python' : '')
-  " Call system command
-  " Warning: In MacVim, instead what gets called is:
-  " /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/ctags"
-  " and then for some reason ctags can't accept -n flag or --excmd=number flag.
-  " Warning: To test if ctags worked, want exit status of *first* command in pipeline (i.e. ctags)
-  " but instead we get cut/sed statuses. If ctags returns error
-  let ctags = map(split(system(s:ctagcmd(flags) . " | sed 's/;\"\t/\t/g'"), '\n'), "split(v:val,'\t')")
-  if len(ctags) == 0 || len(ctags[0]) == 0 " don't want warning message for files without tags!
-    return
-  endif
-  let b:ctags_alph = sort(deepcopy(ctags), 's:alphsort') " sort numerically by *position 1* in the sub-arrays
-  let b:ctags_line = sort(deepcopy(ctags), 's:linesort') " sort alphabetically by *position 0* in the sub-arrays
-  " Next filter the tags sorted by line to include only a few limited categories
-  " Will also filter to pick only ***top-level*** items (i.e. tags with global scope)
-  if has_key(g:idetools_top_ctags, expand('%:t'))
-    let cats = g:idetools_top_ctags[expand('%:t')]
-  elseif has_key(g:idetools_top_ctags, &ft)
-    let cats = g:idetools_top_ctags[&ft]
-  else
-    let cats = g:idetools_top_ctags['default']
-  endif
-  let b:ctags_top = filter(deepcopy(b:ctags_line),
-    \ 'v:val[2] =~ "[' . cats . ']" && ('
-    \ . index(g:idetools_all_ctags, &ft) . ' != -1 || len(v:val) == 3)')
+  silent! normal n
+  call repeat#set("\<Plug>replace_occurence")
 endfunction
-command! ReadTags call s:ctagsread()
+" Mapping for vim-repeat command
+nnoremap <silent> <Plug>replace_occurence :call <sid>replace_occurence()<CR>
 
-"------------------------------------------------------------------------------"
-" Selecting tags by regex
-"------------------------------------------------------------------------------"
-" Check out fzf examples page for how we designed the below function:
-" https://github.com/junegunn/fzf/wiki/Examples-(vim)
-" First generate list of strings that will be used for fzf menu; will be of either of these formats:
-" <line number>: name (type)
-" <line number>: name (type, scope)
-function! s:ctagmenu(ctaglist) " returns nicely formatted string
-  return map(deepcopy(a:ctaglist), 
-    \ 'printf("%4d", v:val[1]) . ": " . v:val[0] . " (" . join(v:val[2:],", ") . ")"')
-endfunction
-" Next function to parse user's menu selection/get the line number, and jump to it
-function! s:ctagjump(ctag) " split by multiple whitespace, get the line number (comes after the colon)
-  exe split(a:ctag, '\s\+')[0][:-2]
-endfunction
-
-"------------------------------------------------------------------------------"
-" Next tools for using ctags to approximate variable scope
-"------------------------------------------------------------------------------"
-" Define simple function for jumping between these boundaries
-" WARNING: Ctag lines are stored as strings and only get implicitly converted
-" to numbers on comparison with other numbers, so need to make sure in loop
-" that 'lnum' is always a number!
-function! s:ctagbracket(forward, n)
-  if !exists("b:ctags_top") || len(b:ctags_top) == 0
-    echohl WarningMsg
-    echom "Warning: ctags unavailable."
-    echohl None
-    return line('.') " stay on current line if failed
-  endif
-  let lnum = line('.')
-  let njump = (a:n == 0 ? 1 : a:n)
-  for j in range(njump)
-    " Edge cases; at bottom or top of document
-    if lnum < b:ctags_top[0][1] || lnum > b:ctags_top[-1][1]
-      let idx = (a:forward ? 0 : -1)
-    " Extra case not handled in main loop
-    elseif lnum == b:ctags_top[-1][1]
-      let idx = (a:forward ? 0 : -2)
-    " Main loop
-    else
-      for i in range(len(b:ctags_top) - 1)
-        if lnum == b:ctags_top[i][1]
-          let idx = (a:forward ? i + 1 : i - 1)
-          break
-        elseif lnum > b:ctags_top[i][1] && lnum < b:ctags_top[i + 1][1]
-          let idx = (a:forward ? i + 1 : i)
-          break
-        endif
-        if i == len(b:ctags_top) - 1
-          echohl WarningMsg
-          echom "Error: Bracket jump failed."
-          echohl None
-          return line('.')
-        endif
-      endfor
-    endif
-    let ltag = b:ctags_top[idx][0]
-    let lnum = str2nr(b:ctags_top[idx][1])
-  endfor
-  echom 'Tag: ' . ltag
-  return lnum
-endfunction
-
-" Now define the maps
-" Declare another useful map to jump to definition of key under cursor
-" Handy autocommands to update and dislay tags
-" NOTE: Must use :n instead of <expr> ngg so we can use <C-u> to discard count!
-function! s:ctagbracketmaps()
-  if index(g:idetools_no_ctags, &ft) != -1
-    return
-  endif
-  if exists('*fzf#run')
-    exe "nnoremap <silent> <buffer> " . g:idetools_ctags_jump_map
-     \ ." :call fzf#run({'source': <sid>ctagmenu(b:ctags_alph), 'sink': function('<sid>ctagjump'), 'down': '~20%'})<CR>"
-  endif
-  exe "noremap <silent> <buffer> " . g:idetools_ctags_backward_map . " :<C-u>exe <sid>ctagbracket(0, v:count)<CR>"
-  exe "noremap <silent> <buffer> " . g:idetools_ctags_forward_map . " :<C-u>exe <sid>ctagbracket(1, v:count)<CR>"
-endfunction
-
-"------------------------------------------------------------------------------"
-" Searching/replacing/changing in-between tags
-"------------------------------------------------------------------------------"
-" Searching within scope of current function or environment
-" * Search func idea came from: http://vim.wikia.com/wiki/Search_in_current_function
-" * Below is copied from: https://stackoverflow.com/a/597932/4970632
-" * Note jedi-vim 'variable rename' is sketchy and fails; should do my own
-"   renaming, and do it by confirming every single instance
-function! s:scopesearch(command)
-  " Test out scopesearch
-  let ntext = 10 " text length
-  if !exists("b:ctags_top") || len(b:ctags_top) == 0
-    echohl WarningMsg
-    echom "Warning: Tags unavailable, so cannot limit search scope."
-    echohl None
-    return ""
-  endif
-  let init = line('.')
-  let ctaglines = map(deepcopy(b:ctags_top), 'v:val[1]') " just pick out the line number
-  let ctaglines = ctaglines+[line('$')]
-  " Return values
-  " %% is literal % character
-  " Check out %l atom documentation; note it last atom selects *above* that line (so increment by one)
-  " and first atom selects *below* that line (so decrement by 1)
-  for i in range(0, len(ctaglines)-2)
-    if ctaglines[i] <= init && ctaglines[i + 1] > init " must be line above start of next function
-      let text = b:ctags_top[i][0]
-      if len(text) >= ntext
-        let text = text[:ntext-1] . '...'
-      endif
-      echom 'Scopesearch selected line ' . ctaglines[i] . ' (' . text . ') to ' . (ctaglines[i + 1] - 1) . '.'
-      if a:command
-        return printf('%d,%ds', ctaglines[i] - 1, ctaglines[i + 1]) " range for :line1,line2s command
-      else
-        return printf('\%%>%dl\%%<%dl', ctaglines[i] - 1, ctaglines[i + 1])
-      endif
-    endif
-  endfor
-  echohl WarningMsg
-  echom "Warning: Scopesearch failed to limit search scope."
-  echohl None
-  return ""
-endfunction
-
-"------------------------------------------------------------------------------"
-" Magical refactoring tools
-"------------------------------------------------------------------------------"
-" Display number of occurrences of word under cursor
+" Global and local <cword> and global and local <cWORD> searches, and
+" current character, respectively
+nnoremap <silent> <expr> * idetools#set_search('*')
+nnoremap <silent> <expr> & idetools#set_search('&')
+nnoremap <silent> <expr> # idetools#set_search('#')
+nnoremap <silent> <expr> @ idetools#set_search('@')
+nnoremap <silent> <expr> ! idetools#set_search('!')
+" Search within function scope
+nnoremap <silent> <expr> g/ '/'.idetools#get_scope()
+nnoremap <silent> <expr> g? '?'.idetools#get_scope()
+" Count number of occurrences for match under cursor
 nnoremap <silent> <Leader>* :echom 'Number of "'.expand('<cword>').'" occurences: '.system('grep -c "\b"'.shellescape(expand('<cword>')).'"\b" '.expand('%'))<CR>
 nnoremap <silent> <Leader>& :echom 'Number of "'.expand('<cWORD>').'" occurences: '.system('grep -c "[ \n\t]"'.shellescape(expand('<cWORD>')).'"[ \n\t]" '.expand('%'))<CR>
 nnoremap <silent> <Leader>. :echom 'Number of "'.@/.'" occurences: '.system('grep -c '.shellescape(@/).' '.expand('%'))<CR>
 
-" Make */# search global/function-local <cword>, and &/@ the same for <cWORD>s
-" Note by default '&' repeats last :s command
-" * Also give cWORDs their own 'boundaries' -- do this by using \_s
-"   which matches an EOL (from preceding line or this line) *or* whitespace
-" * Use ':let @/ = STUFF<CR>' instead of '/<C-r>=STUFF<CR><CR>' because this prevents
-"   cursor from jumping around right away, which is more betterer
-nnoremap <silent> * :let @/ = '\<'.expand('<cword>').'\>\C'<CR>lb:set hlsearch<CR>
-nnoremap <silent> & :let @/ = '\_s\@<='.expand('<cWORD>').'\ze\_s\C'<CR>lB:set hlsearch<CR>
-" Equivalent of * and # (each one key to left), but limited to function scope
-" Note the @/ sets the 'last search' register to this string value
-nnoremap <silent> # :let @/ = <sid>scopesearch(0).'\<'.expand('<cword>').'\>\C'<CR>lB:set hlsearch<CR>
-nnoremap <silent> @ :let @/ = '\_s\@<='.<sid>scopesearch(0).expand('<cWORD>').'\ze\_s\C'<CR>lB:set hlsearch<CR>
-" Remap g/ for function-wide searching; similar convention to other commands
-" Note the <silent> will prevent beginning the search until another key is pressed
-nnoremap <silent> g/ /<C-r>=<sid>scopesearch(0)<CR>
-nnoremap <silent> g? ?<C-r>=<sid>scopesearch(0)<CR>
-" Map to search by character; never use default ! map so why not!
-" by default ! waits for a motion, then starts :<range> command
-nnoremap <silent> ! ylh/<C-r>=escape(@",'/\')<CR><CR>
+" Remaps that replicate :d/regex/ behavior and that can be repeated
+" with the '.' map
+nmap d/ <Plug>d/
+nmap d* <Plug>d*
+nmap d& <Plug>d&
+nmap d# <Plug>d#
+nmap d@ <Plug>d@
+nnoremap <silent> <expr> <Plug>d/ idetools#delete_next('d/')
+nnoremap <silent> <expr> <Plug>d* idetools#delete_next('d*')
+nnoremap <silent> <expr> <Plug>d& idetools#delete_next('d&')
+nnoremap <silent> <expr> <Plug>d# idetools#delete_next('d#')
+nnoremap <silent> <expr> <Plug>d@ idetools#delete_next('d@')
 
-" Next a magical function; performs n<dot>n<dot>n style replacement in one keystroke
-" Script found here: https://www.reddit.com/r/vim/comments/2p6jqr/quick_replace_useful_refactoring_and_editing_tool/
-" Script referenced here: https://www.reddit.com/r/vim/comments/8k4p6v/what_are_your_best_mappings/
-augroup refactor_tool
-  au!
-  au InsertLeave * call s:move_to_next() " magical c* searching function
-augroup END
+" Similar to the above, but replicates :s/regex/sub/ behavior -- the substitute
+" value is determined by what user enters in insert mode, and the cursor jumps
+" to the next map after leaving insert mode
+nnoremap <silent> <expr> c/ idetools#change_next('c/')
+nnoremap <silent> <expr> c* idetools#change_next('c*')
+nnoremap <silent> <expr> c& idetools#change_next('c&')
+nnoremap <silent> <expr> c# idetools#change_next('c#')
+nnoremap <silent> <expr> c@ idetools#change_next('c@')
 
-" First a function for jumping to next occurence automatically
-let g:inject_replace_occurences = 0
-let g:iterate_occurences = 0
-function! s:move_to_next()
-  if g:iterate_occurences
-    let winview = winsaveview()
-    while search(@/, 'n') " while result is non-zero, i.e. matches exist
-      exe 'normal .'
-    endwhile
-    echo "Replaced all occurences."
-    let g:iterate_occurences = 0
-    call winrestview(winview)
-  elseif g:inject_replace_occurences
-    " silent! call feedkeys("n")
-    keepjumps silent! normal n
-    call repeat#set("\<Plug>ReplaceOccurences")
-    " n is not a 'dot' command, so the default last operation was the changing
-    " inner word action. calling repeat#set says this plug map will be run when
-    " the <dot> key is pressed next -- but, the insert stuff will also be run
-    " see the source code for more information
-  endif
-  let g:inject_replace_occurences = 0
-endfunction
+" Remap as above, but this time delete or replace *all* occurrences
+" Added a block to next_occurence function
+nmap <silent> da/ :call idetools#delete_all('d/')<CR>
+nmap <silent> da* :call idetools#delete_all('d*')<CR>
+nmap <silent> da& :call idetools#delete_all('d&')<CR>
+nmap <silent> da# :call idetools#delete_all('d#')<CR>
+nmap <silent> da@ :call idetools#delete_all('d@')<CR>
+nmap <silent> ca/ :let g:iterate_occurences = 1<CR>c/
+nmap <silent> ca* :let g:iterate_occurences = 1<CR>c*
+nmap <silent> ca& :let g:iterate_occurences = 1<CR>c&
+nmap <silent> ca# :let g:iterate_occurences = 1<CR>c#
+nmap <silent> ca@ :let g:iterate_occurences = 1<CR>c@
 
-" Check if we are on top of an occurence
-" '[ and '] are first/last characters of previously yanked or changed text
-" Ctrl-a in insert mode types the same text as when you were last in insert mode; see :help i_
-function! s:replace_occurence()
-  let winview = winsaveview()
-  let save_reg = getreg('"')
-  let save_regmode = getregtype('"')
-  let [lnum_cur, col_cur] = getpos(".")[1:2] 
-  keepjumps normal! ygn
-  let [lnum1, col1] = getpos("'[")[1:2]
-  let [lnum2, col2] = getpos("']")[1:2]
-  call setreg('"', save_reg, save_regmode)
-  call winrestview(winview)
-  " If we are on top of an occurence, replace it
-  if lnum_cur >= lnum1 && lnum_cur <= lnum2 && col_cur >= col1 && col_cur <= col2
-    exe "silent! keepjumps normal! cgn\<C-a>\<Esc>"
-  endif
-  " silent! call feedkeys("n")
-  silent! normal n
-  call repeat#set("\<Plug>ReplaceOccurences")
-endfunction
-
-" Remaps using black magic
-" * First one just uses last search, the other ones use word under cursor
-" * Note gn and gN move to next hlsearch, then *visually selects it*, so cgn says to change in this selection
-" * Note don't need 'c?', since if you want a function local string replacement, just
-"   run 'g/' to select your text, then c/, d/, ca/, da/, et cetera. Same exact result.
-nnoremap <silent> c/ :set hlsearch<CR>
-  \ :let g:inject_replace_occurences = 1<CR>cgn
-nnoremap <silent> c* :let @/ = '\<'.expand('<cword>').'\>\C'<CR>:set hlsearch<CR>
-  \ :let g:inject_replace_occurences = 1<CR>cgn
-nnoremap <silent> c& :let @/ = '\_s\@<='.expand('<cWORD>').'\ze\_s\C'<CR>:set hlsearch<CR>
-  \ :let g:inject_replace_occurences = 1<CR>cgn
-nnoremap <silent> c# :let @/ = <sid>scopesearch(0).'\<'.expand('<cword>').'\>\C'<CR>:set hlsearch<CR>
-  \ :let g:inject_replace_occurences = 1<CR>cgn
-nnoremap <silent> c@ :let @/ = '\_s\@<='.<sid>scopesearch(0).expand('<cWORD>').'\ze\_s\C'<CR>:set hlsearch<CR>
-  \ :let g:inject_replace_occurences = 1<CR>cgn
-nnoremap <silent> <Plug>ReplaceOccurences :call <sid>replace_occurence()<CR>
-
-" Remap as above, but this time replace ***all*** occurrences
-" These ones I made all by myself! Added a block to move_to_next function
-nmap ca/ :let g:iterate_occurences = 1<CR>c/
-nmap ca* :let g:iterate_occurences = 1<CR>c*
-nmap ca& :let g:iterate_occurences = 1<CR>c&
-nmap ca# :let g:iterate_occurences = 1<CR>c#
-nmap ca@ :let g:iterate_occurences = 1<CR>c@
-
-"------------------------------------------------------------------------------"
-" Next, similar to above, but use these for *deleting* text
-" Doesn't require the fancy wrapper
-"------------------------------------------------------------------------------"
-" * Note that omitting the g means only *first* occurence is replaced
-"   if use %, would replace first occurence on every line
-" * Options for accessing register in vimscript, where we can't immitate user <C-r> keystroke combination:
-"     exe 's/'.@/.'//' OR exe 's/'.getreg('/').'//'
-" * Use <C-r>=expand('<cword>')<CR> instead of <C-r><C-w> to avoid errors on empty lines
-" function! s:plugfactory(plugname, )
-" endfunction
-" command! -nargs=1 PlugFactory call s:plugfactory('<args>')
-" Todo: Fix annoying issue where stuff still gets deleted after no more variables are left
-function! s:delete_next()
-  try " note the silent! feature fucks up try catch statements
-    keepjumps normal! dgnn
-    let b:delete_done = 0
-  catch
-    echo "Replaced all occurences."
-  endtry
-endfunction
-nnoremap <silent> <Plug>search1 :set hlsearch<CR>:call <sid>delete_next()<CR>:call repeat#set("\<Plug>search1",v:count)<CR>
-nnoremap <silent> <Plug>search2 /\<<C-r>=expand('<cword>')<CR>\>\C<CR>``:call <sid>delete_next()<CR>:call repeat#set("\<Plug>search2",v:count)<CR>
-nnoremap <silent> <Plug>search3 /\_s\@<=<C-r>=expand('<cWORD>')<CR>\ze\_s\C<CR>``:call <sid>delete_next()<CR>:call repeat#set("\<Plug>search3",v:count)<CR>
-nnoremap <silent> <Plug>search4 /<C-r>=<sid>scopesearch(0)<CR>\<<C-r>=expand('<cword>')<CR>\>\C<CR>``:call <sid>delete_next()<CR>:call repeat#set("\<Plug>search4",v:count)<CR>
-nnoremap <silent> <Plug>search5 /\_s\@<=<C-r>=<sid>scopesearch(0)<CR><C-r>=expand('<cWORD>')<CR>\ze\_s\C<CR>``:call <sid>delete_next()<CR>:call repeat#set("\<Plug>search5",v:count)<CR>
-nmap d/ <Plug>search1
-nmap d* <Plug>search2
-nmap d& <Plug>search3
-nmap d# <Plug>search4
-nmap d@ <Plug>search5
-
-" Finally, remap as above, but for deleting everything
-" Make sure to use existing mappings (i.e. no 'normal!')
-function! s:delete_all(command)
-  let winview = winsaveview()
-  exe 'normal '.a:command
-  while search(@/, 'n') " while result is non-zero, i.e. matches exist
-    exe 'normal .'
-  endwhile
-  echo "Deleted all occurences."
-  call winrestview(winview)
-endfunction
-nmap da/ :call <sid>delete_all('d/')<CR>
-nmap da* :call <sid>delete_all('d*')<CR>
-nmap da& :call <sid>delete_all('d&')<CR>
-nmap da# :call <sid>delete_all('d#')<CR>
