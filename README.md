@@ -32,8 +32,8 @@ Some features in this plugin are based on the idea that `ctags` locations can be
 | Option | Description |
 | ---- | ---- |
 | `g:idetools_filetypes_skip` | List of filetypes for which we do not want to try to generate ctags. Fill this to prevent annoying error messages. |
+| `g:idetools_filetypes_top_tags` | Dictionary whose keys are filetypes and whose values are lists of characters, corresponding to the ctags categories used to approximate the local variable scope.  If the current filetype is not in the dictionary, the `'default'` entry is used. By default, this is `f`, indicating function definition locations. To generate a list of all possible ctags categories for a given language, call e.g. `ctags --list-kinds=python` on the command line. |
 | `g:idetools_filetypes_all_tags` | List of filetypes for which we want to use **not only** "top level" tags as scope delimiters, but also "child" tags -- for example, functions declared inside of other functions. By default, this list is equal to just `['fortran']`, since all Fortran subroutines and functions must be declared inside of a "`program`" or "`module`", which have their own tags. |
-| `g:idetools_filetypes_top_tags` | Dictionary whose keys are filetypes or file names and whose values are lists of characters, corresponding to the ctags categories used to approximate the local scope refactoring tools.  If the current filetype is not in the dictionary, the `'default'` entry is used. By default, this is `f`, indicating function definition locations. To generate a list of all possible ctags categories for a given language, call e.g. `ctags --list-kinds=pyghon` on the command line. |
 
 # Installation
 Install with your favorite [plugin manager](https://vi.stackexchange.com/questions/388/what-is-the-difference-between-the-vim-plugin-managers).

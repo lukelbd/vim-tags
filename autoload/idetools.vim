@@ -69,16 +69,14 @@ function! idetools#ctags_read()
   let b:ctags_line = sort(deepcopy(ctags), 's:linesort') " sort alphabetically by *position 0* in the sub-arrays
   " Next filter the tags sorted by line to include only a few limited categories
   " Will also filter to pick only ***top-level*** items (i.e. tags with global scope)
-  if has_key(g:idetools_top_tags, expand('%:t'))
-    let cats = g:idetools_top_tags[expand('%:t')]
-  elseif has_key(g:idetools_top_tags, &ft)
-    let cats = g:idetools_top_tags[&ft]
+  if has_key(g:idetools_filetypes_top_tags, &ft)
+    let cats = g:idetools_filetypes_top_tags[&ft]
   else
-    let cats = g:idetools_top_tags['default']
+    let cats = g:idetools_filetypes_top_tags['default']
   endif
   let b:ctags_top = filter(deepcopy(b:ctags_line),
     \ 'v:val[2] =~ "[' . cats . ']" && ('
-    \ . index(g:idetools_all_ctags, &ft) . ' != -1 || len(v:val) == 3)')
+    \ . index(g:idetools_filetypes_all_tags, &ft) . ' != -1 || len(v:val) == 3)')
 endfunction
 
 " Jump between top level ctags
@@ -86,9 +84,9 @@ endfunction
 " to numbers on comparison with other numbers, so need to make sure in loop
 " that 'lnum' is always a number!
 function! idetools#ctagjump(forward, n)
-  if !exists("b:ctags_top") || len(b:ctags_top) == 0
+  if !exists('b:ctags_top') || len(b:ctags_top) == 0
     echohl WarningMsg
-    echom "Warning: Bracket jump impossible because ctags unavailable."
+    echom 'Warning: Bracket jump impossible because ctags unavailable.'
     echohl None
     return line('.') " stay on current line if failed
   endif
@@ -113,7 +111,7 @@ function! idetools#ctagjump(forward, n)
         endif
         if i == len(b:ctags_top) - 1
           echohl WarningMsg
-          echom "Error: Bracket jump failed."
+          echom 'Error: Bracket jump failed.'
           echohl None
           return line('.')
         endif

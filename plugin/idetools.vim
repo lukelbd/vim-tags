@@ -63,7 +63,6 @@ endif
 " i.e. tags approximately denoting boundaries for variable scope of code block underneath cursor
 if !exists('g:idetools_filetypes_top_tags')
   let g:idetools_filetypes_top_tags = {
-    \ '.vimrc'  : 'a',
     \ 'vim'     : 'afc',
     \ 'tex'     : 'bs',
     \ 'python'  : 'fcm',
