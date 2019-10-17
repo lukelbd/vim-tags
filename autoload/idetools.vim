@@ -14,7 +14,7 @@ function! s:linesort(tag1, tag2)
   let num2 = a:tag2[1]
   return num1 - num2 " fits requirements
 endfunc
-" from this page: https://vi.stackexchange.com/a/11237/8084
+" From this page: https://vi.stackexchange.com/a/11237/8084
 function! s:alphsort(tag1, tag2)
   let str1 = a:tag1[0]
   let str2 = a:tag2[0]
