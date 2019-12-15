@@ -87,6 +87,12 @@ endif
 if !exists('g:idetools_ctags_forward_map')
   let g:idetools_ctags_forward_map = ']t'
 endif
+if !exists('g:idetools_ctags_backward_top_map')
+  let g:idetools_ctags_backward_top_map = '[T'
+endif
+if !exists('g:idetools_ctags_forward_top_map')
+  let g:idetools_ctags_forward_top_map = ']T'
+endif
 
 "-----------------------------------------------------------------------------"
 " Ctags commands and maps
@@ -97,8 +103,14 @@ command! DisplayTags call idetools#ctags_display()
 
 " Jump and bracket maps
 " Note: Must use :n instead of <expr> ngg so we can use <C-u> to discard count!
-exe 'noremap <silent> ' . g:idetools_ctags_forward_map . ' :<C-u>exe idetools#ctagjump(1, v:count)<CR>'
-exe 'noremap <silent> ' . g:idetools_ctags_backward_map . ' :<C-u>exe idetools#ctagjump(0, v:count)<CR>'
+exe 'noremap <silent> ' . g:idetools_ctags_forward_top_map
+      \ . ' :<C-u>exe idetools#ctagjump(1, v:count, 1)<CR>'
+exe 'noremap <silent> ' . g:idetools_ctags_backward_top_map
+      \ . ' :<C-u>exe idetools#ctagjump(0, v:count, 1)<CR>'
+exe 'noremap <silent> ' . g:idetools_ctags_forward_map
+      \ . ' :<C-u>exe idetools#ctagjump(1, v:count, 0)<CR>'
+exe 'noremap <silent> ' . g:idetools_ctags_backward_map
+      \ . ' :<C-u>exe idetools#ctagjump(0, v:count, 0)<CR>'
 if exists('*fzf#run')
   exe 'nnoremap <silent> ' . g:idetools_ctags_jump_map
     \ . ' :call fzf#run({"source": idetools#ctagmenu(b:ctags_alph), "sink": function("idetools#ctagselect"), "down": "~20%"})<CR>'

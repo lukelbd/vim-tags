@@ -17,7 +17,8 @@ Some features in this plugin are based on the idea that `ctags` locations can be
 | Mapping | Description |
 | ---- | ---- |
 | `<Leader><Leader>` | Brings up a fuzzy-completion menu of the ctags list, and jumps to the selected location. This is only defined if the [FZF](https://github.com/junegunn/fzf) plugin is installed. The map can be changed with `g:idetools_ctags_jump_map`. |
-| `[t`, `]t` | Jumps to subsequent and preceding top-level "significant ctag locations" -- that is, omitting variable definitions, import statements, etc. Generally these are just function and class definition locations. The maps can be changed with `g:idetools_ctags_backward_map` and `g:idetools_ctags_forward_map`. |
+| `[t`, `]t` | Jumps to subsequent and preceding ctags. The maps can be changed with `g:idetools_ctags_backward_map` and `g:idetools_ctags_forward_map`. |
+| `[T`, `]T` | Jumps to subsequent and preceding top-level "significant" ctags -- that is, omitting variable definitions, import statements, etc. Generally these are just function and class definition locations. The maps can be changed with `g:idetools_ctags_backward_top_map` and `g:idetools_ctags_forward_top_map`. |
 | `!`, `*`, `&` | Selects the character, word or WORD under the cursor. Unlike the vim `*` map, these do not move the cursor. |
 | `#`, `@` | As for `*` and `&`, but selects only the approximate local scope instead of the entire file, using "significant ctag locations" as approximate scope boundaries.
 | `g/`, `g?` | As for `/` and `?`, but again selects only the approximate local scope instead of the entire file.

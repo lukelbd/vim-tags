@@ -74,7 +74,7 @@ function! idetools#ctags_read()
   else
     let cats = g:idetools_filetypes_top_tags['default']
   endif
-  let b:ctags_top = filter(deepcopy(b:ctags_line),
+  let b:ctags_line_top = filter(deepcopy(b:ctags_line),
     \ 'v:val[2] =~ "[' . cats . ']" && ('
     \ . index(g:idetools_filetypes_all_tags, &ft) . ' != -1 || len(v:val) == 3)')
 endfunction
@@ -83,33 +83,35 @@ endfunction
 " Warning: Ctag lines are stored as strings and only get implicitly converted
 " to numbers on comparison with other numbers, so need to make sure in loop
 " that 'lnum' is always a number!
-function! idetools#ctagjump(forward, n)
-  if !exists('b:ctags_top') || len(b:ctags_top) == 0
+function! idetools#ctagjump(forward, repeat, top)
+  let ctags_name = a:top ? 'b:ctags_line_top' || 'b:ctags_line'
+  if !exists(ctags_name) || len(eval(ctags_name)) == 0
     echohl WarningMsg
     echom 'Warning: Bracket jump impossible because ctags unavailable.'
     echohl None
     return line('.') " stay on current line if failed
   endif
   let lnum = line('.')
-  let njump = (a:n == 0 ? 1 : a:n)
-  for j in range(njump)
+  let repeat = (a:repeat == 0 ? 1 : a:repeat)
+  let ctags_list = eval(ctags_name)
+  for j in range(repeat)
     " Edge cases; at bottom or top of document
-    if lnum < b:ctags_top[0][1] || lnum > b:ctags_top[-1][1]
+    if lnum < ctags_list[0][1] || lnum > ctags_list[-1][1]
       let idx = (a:forward ? 0 : -1)
     " Extra case not handled in main loop
-    elseif lnum == b:ctags_top[-1][1]
+    elseif lnum == ctags_list[-1][1]
       let idx = (a:forward ? 0 : -2)
     " Main loop
     else
-      for i in range(len(b:ctags_top) - 1)
-        if lnum == b:ctags_top[i][1]
+      for i in range(len(ctags_list) - 1)
+        if lnum == ctags_list[i][1]
           let idx = (a:forward ? i + 1 : i - 1)
           break
-        elseif lnum > b:ctags_top[i][1] && lnum < b:ctags_top[i + 1][1]
+        elseif lnum > ctags_list[i][1] && lnum < ctags_list[i + 1][1]
           let idx = (a:forward ? i + 1 : i)
           break
         endif
-        if i == len(b:ctags_top) - 1
+        if i == len(ctags_list) - 1
           echohl WarningMsg
           echom 'Error: Bracket jump failed.'
           echohl None
@@ -117,8 +119,8 @@ function! idetools#ctagjump(forward, n)
         endif
       endfor
     endif
-    let ltag = b:ctags_top[idx][0]
-    let lnum = str2nr(b:ctags_top[idx][1])
+    let ltag = ctags_list[idx][0]
+    let lnum = str2nr(ctags_list[idx][1])
   endfor
   echom 'Tag: ' . ltag
   return lnum
@@ -134,20 +136,20 @@ endfunction
 "   renaming, and do it by confirming every single instance
 function! idetools#get_scope()
   let ntext = 10 " text length
-  if !exists("b:ctags_top") || len(b:ctags_top) == 0
+  if !exists("b:ctags_line_top") || len(b:ctags_line_top) == 0
     echohl WarningMsg
     echom 'Warning: Tags unavailable so cannot limit search scope.'
     echohl None
     return ''
   endif
   let init = line('.')
-  let ctaglines = map(deepcopy(b:ctags_top), 'v:val[1]') " just pick out the line number
+  let ctaglines = map(deepcopy(b:ctags_line_top), 'v:val[1]') " just pick out the line number
   let ctaglines = ctaglines + [line('$')]
   for i in range(0, len(ctaglines) - 2)
     if ctaglines[i] > init || ctaglines[i + 1] <= init " must be line above start of next function
       continue
     endif
-    let text = b:ctags_top[i][0]
+    let text = b:ctags_line_top[i][0]
     if len(text) >= ntext
       let text = text[:ntext - 1] . '...'
     endif
