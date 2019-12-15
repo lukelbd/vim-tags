@@ -121,7 +121,7 @@ endif
 "------------------------------------------------------------------------------"
 " Driver function *must* be in here because cannot issue normal! in
 " autoload folder evidently
-function! s:replace_occurence()
+function! s:replace_occurence() abort
   " Get lines and columns for next occurence without messing up window/register
   let [l0, c0] = getpos(".")[1:2] 
   let reg = getreg('"')
