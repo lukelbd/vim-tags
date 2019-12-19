@@ -123,7 +123,16 @@ function! idetools#ctagjump(forward, repeat, top) abort
     let lnum = str2nr(ctags_list[idx][1])
   endfor
   echom 'Tag: ' . ltag
-  return lnum
+  " Cannot move cursor inside autoload function (???)
+  " Instead return vertical or horizontal lines to scroll
+  let lnum_current = line('.')
+  if lnum == lnum_current
+    return ''
+  elseif lnum > lnum_current
+    return (lnum - lnum_current) . 'j'
+  else
+    return (lnum_current - lnum) . 'k'
+  endif
 endfunction
 
 "-----------------------------------------------------------------------------"
