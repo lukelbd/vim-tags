@@ -124,15 +124,8 @@ function! idetools#ctagjump(forward, repeat, top) abort
   endfor
   echom 'Tag: ' . ltag
   " Cannot move cursor inside autoload function (???)
-  " Instead return vertical or horizontal lines to scroll
-  let lnum_current = line('.')
-  if lnum == lnum_current
-    return ''
-  elseif lnum > lnum_current
-    return (lnum - lnum_current) . 'j'
-  else
-    return (lnum_current - lnum) . 'k'
-  endif
+  " Instead return command for jumping to line
+  return lnum . 'G'
 endfunction
 
 "-----------------------------------------------------------------------------"
