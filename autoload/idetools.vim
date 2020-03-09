@@ -25,8 +25,7 @@ endfunction
 " Used to show the regexes instead of -n mode; the below sed was used to parse them nicely
 " | tr -s ' ' | sed '".'s$/\(.\{0,60\}\).*/;"$/\1.../$'."' "
 function! idetools#ctags_display() abort
-  exe '!clear; ' . s:ctagcmd()
-   \ . ' | tr -s ''\t'' | column -t -s ''\t'' | less'
+  echo system(s:ctagcmd() . ' | tr -s ''\t'' | column -t -s ''\t''')
 endfunction
 
 " Generate list of strings for fzf menu, looks like:
