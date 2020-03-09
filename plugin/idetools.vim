@@ -50,10 +50,6 @@ augroup idetools
   au BufRead,BufWritePost * call idetools#ctags_read()
 augroup END
 
-" Next a magical function; performs n<dot>n<dot>n style replacement in one keystroke
-" Script found here: https://www.reddit.com/r/vim/comments/2p6jqr/quick_replace_useful_refactoring_and_editing_tool/
-" Script referenced here: https://www.reddit.com/r/vim/comments/8k4p6v/what_are_your_best_mappings/
-
 " Files that we wish to ignore
 if !exists('g:idetools_filetypes_skip')
   let g:idetools_filetypes_skip = ['qf', 'rst', 'man', 'help', 'diff', 'nerdtree', 'tagbar']

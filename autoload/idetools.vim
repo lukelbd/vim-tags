@@ -73,9 +73,12 @@ function! idetools#ctags_read() abort
   else
     let cats = g:idetools_filetypes_top_tags['default']
   endif
-  let b:ctags_line_top = filter(deepcopy(b:ctags_line),
+  let b:ctags_line_top = filter(
+    \ deepcopy(b:ctags_line),
     \ 'v:val[2] =~ "[' . cats . ']" && ('
-    \ . index(g:idetools_filetypes_all_tags, &ft) . ' != -1 || len(v:val) == 3)')
+    \ . index(g:idetools_filetypes_all_tags, &ft)
+    \ . ' != -1 || len(v:val) == 3)'
+    \ )
 endfunction
 
 " Jump between top level ctags
