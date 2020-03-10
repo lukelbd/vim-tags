@@ -9,8 +9,8 @@ Some features in this plugin are based on the idea that `ctags` locations can be
 
 | Command | Description |
 | ---- | ---- |
-| `:ReadTags` | Manually refreshes the `b:ctags_top`, `b:ctags_alph`, and `b:ctags_line` variables used by this plugin. This is called automatically whenever a file is read or written to disk. |
-| `:DisplayTags` |  Displays a nicely condensed table of tags for the current file. |
+| `:CTagsUpdate` | Manually refreshes the `b:ctags_top`, `b:ctags_alph`, and `b:ctags_line` variables used by this plugin. This is called automatically whenever a file is read or written to disk. |
+| `:CTagsDisplay` |  Displays a nicely condensed table of tags for the current file. |
 
 ## Mappings
 

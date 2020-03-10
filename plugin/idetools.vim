@@ -94,22 +94,25 @@ endif
 " Ctags commands and maps
 "-----------------------------------------------------------------------------"
 " Comamnds
-command! ReadTags call idetools#ctags_read()
-command! DisplayTags call idetools#ctags_display()
+command! CTagsUpdate call idetools#ctags_update()
+command! CTagsDisplay call idetools#ctags_display()
 
 " Jump and bracket maps
 " Note: Must use :n instead of <expr> ngg so we can use <C-u> to discard count!
 exe 'noremap <expr> <silent> ' . g:idetools_ctags_forward_top_map
-      \ . ' idetools#ctagjump(1, v:count, 1)'
+  \ . ' idetools#ctagjump(1, v:count, 1)'
 exe 'noremap <expr> <silent> ' . g:idetools_ctags_backward_top_map
-      \ . ' idetools#ctagjump(0, v:count, 1)'
+  \ . ' idetools#ctagjump(0, v:count, 1)'
 exe 'noremap <expr> <silent> ' . g:idetools_ctags_forward_map
-      \ . ' idetools#ctagjump(1, v:count, 0)'
+  \ . ' idetools#ctagjump(1, v:count, 0)'
 exe 'noremap <expr> <silent> ' . g:idetools_ctags_backward_map
-      \ . ' idetools#ctagjump(0, v:count, 0)'
+  \ . ' idetools#ctagjump(0, v:count, 0)'
 if exists('*fzf#run')
   exe 'nnoremap <silent> ' . g:idetools_ctags_jump_map
-    \ . ' :call fzf#run({"source": idetools#ctagmenu(b:ctags_alph), "sink": function("idetools#ctagselect"), "down": "~20%"})<CR>'
+    \ . ' :call fzf#run({'
+    \ . '"source": idetools#ctags_menu(b:ctags_alph), '
+    \ . '"sink": function("idetools#ctags_select"), '
+    \ . '"down": "~20%"})<CR>'
 endif
 
 "------------------------------------------------------------------------------"
@@ -119,7 +122,7 @@ endif
 " autoload folder evidently
 function! s:replace_occurence() abort
   " Get lines and columns for next occurence without messing up window/register
-  let [l0, c0] = getpos(".")[1:2] 
+  let [l0, c0] = getpos('.')[1:2]
   let reg = getreg('"')
   let regmode = getregtype('"')
   let winview = winsaveview()
@@ -128,18 +131,19 @@ function! s:replace_occurence() abort
   let [l2, c2] = getpos("']")[1:2] " last char of yanked text
   call setreg('"', reg, regmode)
   call winrestview(winview)
+
   " Replace next occurence with previously inserted text
   if l0 >= l1 && l0 <= l2 && c0 >= c1 && c0 <= c2
     exe "silent! normal! cgn\<C-a>\<Esc>"
   endif
-  silent! normal n
+  silent! normal! n
   call repeat#set("\<Plug>replace_occurence")
 endfunction
+
 " Mapping for vim-repeat command
 nnoremap <silent> <Plug>replace_occurence :call <sid>replace_occurence()<CR>
 
-" Global and local <cword> and global and local <cWORD> searches, and
-" current character, respectively
+" Global and local <cword> and global and local <cWORD> searches, and current character
 nnoremap <silent> <expr> * idetools#set_search('*')
 nnoremap <silent> <expr> & idetools#set_search('&')
 nnoremap <silent> <expr> # idetools#set_search('#')
@@ -153,8 +157,7 @@ nnoremap <silent> <Leader>* :echom 'Number of "'.expand('<cword>').'" occurences
 nnoremap <silent> <Leader>& :echom 'Number of "'.expand('<cWORD>').'" occurences: '.system('grep -c "[ \n\t]"'.shellescape(expand('<cWORD>')).'"[ \n\t]" '.expand('%'))<CR>
 nnoremap <silent> <Leader>. :echom 'Number of "'.@/.'" occurences: '.system('grep -c '.shellescape(@/).' '.expand('%'))<CR>
 
-" Remaps that replicate :d/regex/ behavior and that can be repeated
-" with the '.' map
+" Maps that replicate :d/regex/ behavior and can be repeated with '.'
 nmap d/ <Plug>d/
 nmap d* <Plug>d*
 nmap d& <Plug>d&
@@ -175,7 +178,7 @@ nnoremap <silent> <expr> c& idetools#change_next('c&')
 nnoremap <silent> <expr> c# idetools#change_next('c#')
 nnoremap <silent> <expr> c@ idetools#change_next('c@')
 
-" Remap as above, but this time delete or replace *all* occurrences
+" Maps as above, but this time delete or replace *all* occurrences
 " Added a block to next_occurence function
 nmap <silent> da/ :call idetools#delete_all('d/')<CR>
 nmap <silent> da* :call idetools#delete_all('d*')<CR>
@@ -187,4 +190,3 @@ nmap <silent> ca* :let g:iterate_occurences = 1<CR>c*
 nmap <silent> ca& :let g:iterate_occurences = 1<CR>c&
 nmap <silent> ca# :let g:iterate_occurences = 1<CR>c#
 nmap <silent> ca@ :let g:iterate_occurences = 1<CR>c@
-

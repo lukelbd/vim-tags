@@ -1,19 +1,13 @@
 "------------------------------------------------------------------------------"
 " Ctag functions
 "------------------------------------------------------------------------------"
-" Generate command-line exe that prints taglist to stdout
-" We call ctags in number mode (i.e. return line number)
-function! s:ctagcmd(...) abort
-  let flags = (a:0 ? a:1 : '') " extra flags
-  return 'ctags ' . flags . ' ' . shellescape(expand('%:p')) . ' 2>/dev/null '
-   \ . " | cut -d '\t' -f1,3-5 "
-endfunction
 " Default sorting is always alphabetical, with type coercion
 function! s:linesort(tag1, tag2) abort
   let num1 = a:tag1[1]
   let num2 = a:tag2[1]
   return num1 - num2 " fits requirements
 endfunc
+
 " From this page: https://vi.stackexchange.com/a/11237/8084
 function! s:alphsort(tag1, tag2) abort
   let str1 = a:tag1[0]
@@ -21,31 +15,50 @@ function! s:alphsort(tag1, tag2) abort
   return (str1 < str2 ? -1 : str1 == str2 ? 0 : 1) " equality, lesser, and greater
 endfunction
 
+" Strip leading and trailing whitespace
+function! s:strip(text) abort
+  return substitute(a:text, '^\s*\(.\{-}\)\s*$', '\1', '')
+endfunction
+
+" Generate command-line exe that prints taglist to stdout
+" We call ctags in number mode (i.e. return line number)
+function! s:ctagcmd(...) abort
+  let flags = (a:0 ? a:1 : '') " extra flags
+  return 'ctags ' . flags . ' ' . shellescape(expand('%:p')) . ' 2>/dev/null '
+    \ . " | cut -d'\t' -f1,3-5 "  " note the \t is literal
+endfunction
+
 " Tool that provides a nice display of tags
-" Used to show the regexes instead of -n mode; the below sed was used to parse them nicely
-" | tr -s ' ' | sed '".'s$/\(.\{0,60\}\).*/;"$/\1.../$'."' "
 function! idetools#ctags_display() abort
-  echo system(s:ctagcmd() . ' | tr -s ''\t'' | column -t -s ''\t''')
+  let ctags = s:strip(system(s:ctagcmd() . " | tr -s '\t' | column -t -s '\t'"))
+  if len(ctags) == 0
+    echohl WarningMsg
+    echom "Warning: No ctags found for file '" . expand('%:p') . "'."
+    echohl None
+  else
+    echo "Ctags for file '" . expand('%:p') . "':\n" . ctags
+  endif
 endfunction
 
 " Generate list of strings for fzf menu, looks like:
 " <line number>: name (type)
 " <line number>: name (type, scope)
 " See: https://github.com/junegunn/fzf/wiki/Examples-(vim)
-function! idetools#ctagmenu(ctaglist) abort " returns nicely formatted string
+function! idetools#ctags_menu(ctaglist) abort " returns nicely formatted string
   return map(deepcopy(a:ctaglist),
     \ 'printf("%4d", v:val[1]) . ": " . v:val[0] . " (" . join(v:val[2:],", ") . ")"')
 endfunction
+
 " Parse user menu selection/get the line number
 " We split by whitespace, get the line num (comes before the colon)
-function! idetools#ctagselect(ctag) abort
+function! idetools#ctags_select(ctag) abort
   exe split(a:ctag, '\s\+')[0][:-2]
 endfunction
 
 " Generate ctags and parses them into list of lists
 " Note multiple tags on same line is *very* common, try the below in a model
 " src folder: for f in <pattern>; do echo $f:; ctags -f - -n $f | cut -d $'\t' -f3 | cut -d\; -f1 | sort -n | uniq -c | cut -d' ' -f4 | uniq; done
-function! idetools#ctags_read() abort
+function! idetools#ctags_update() abort
   " First get simple list of lists; tag properties sorted alphabetically by
   " identifier, and numerically by line number
   " * To filter by category, use: filter(b:ctags, 'v:val[2]=="<category>"')
@@ -54,6 +67,7 @@ function! idetools#ctags_read() abort
     return
   endif
   let flags = (getline(1) =~# '#!.*python[23]' ? '--language-force=python' : '')
+
   " Call system command
   " Warning: In MacVim, instead what gets called is:
   " /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/ctags"
@@ -66,6 +80,7 @@ function! idetools#ctags_read() abort
   endif
   let b:ctags_alph = sort(deepcopy(ctags), 's:alphsort') " sort numerically by *position 1* in the sub-arrays
   let b:ctags_line = sort(deepcopy(ctags), 's:linesort') " sort alphabetically by *position 0* in the sub-arrays
+
   " Next filter the tags sorted by line to include only a few limited categories
   " Will also filter to pick only ***top-level*** items (i.e. tags with global scope)
   if has_key(g:idetools_filetypes_top_tags, &ft)
