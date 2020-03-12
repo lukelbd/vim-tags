@@ -47,7 +47,7 @@ set cpoptions+=d
 augroup idetools
   au!
   au InsertLeave * call idetools#change_repeat() " magical c* searching function
-  au BufRead,BufWritePost * call idetools#ctags_read()
+  au BufRead,BufWritePost * call idetools#ctags_update()
 augroup END
 
 " Files that we wish to ignore
