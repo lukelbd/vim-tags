@@ -112,7 +112,9 @@ if exists('*fzf#run')
     \ . ' :call fzf#run({'
     \ . '"source": idetools#ctags_menu(b:ctags_alph), '
     \ . '"sink": function("idetools#ctags_select"), '
-    \ . '"down": "~20%"})<CR>'
+    \ . '"options": "--no-sort --prompt=''Ctag> ''",'
+    \ . '"down": "~20%"'
+    \ . '})<CR>'
 endif
 
 "------------------------------------------------------------------------------"
