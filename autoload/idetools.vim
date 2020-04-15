@@ -211,16 +211,16 @@ function! idetools#set_search(map) abort
       let @/ = escape(string[col('.') - 1], '/\')
     endif
   elseif a:map =~# '\*'
-    let @/ = '\<'.expand('<cword>').'\>\C'
+    let @/ = '\<' . expand('<cword>') . '\>\C'
     let motion = 'lb'
   elseif a:map =~# '&'
-    let @/ = '\_s\@<='.expand('<cWORD>').'\ze\_s\C'
+    let @/ = '\_s\@<=' . expand('<cWORD>') . '\ze\_s\C'
     let motion = 'lB'
   elseif a:map =~# '#'
-    let @/ = idetools#get_scope().'\<'.expand('<cword>').'\>\C'
+    let @/ = idetools#get_scope() . '\<' . expand('<cword>') . '\>\C'
     let motion = 'lb'
   elseif a:map =~# '@'
-    let @/ = '\_s\@<='.idetools#get_scope().expand('<cWORD>').'\ze\_s\C'
+    let @/ = '\_s\@<=' . idetools#get_scope() . expand('<cWORD>') . '\ze\_s\C'
     let motion = 'lB'
   elseif a:map !~# '/'
     echohl WarningMsg
