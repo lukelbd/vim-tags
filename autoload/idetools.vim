@@ -100,7 +100,7 @@ endfunction
 " Warning: Ctag lines are stored as strings and only get implicitly converted
 " to numbers on comparison with other numbers, so need to make sure in loop
 " that 'lnum' is always a number!
-function! idetools#ctagjump(forward, repeat, top) abort
+function! idetools#ctag_jump(forward, repeat, top) abort
   let ctags_name = a:top ? 'b:ctags_line_top' : 'b:ctags_line'
   if !exists(ctags_name) || len(eval(ctags_name)) == 0
     echohl WarningMsg

@@ -100,13 +100,13 @@ command! CTagsDisplay call idetools#ctags_display()
 " Jump and bracket maps
 " Note: Must use :n instead of <expr> ngg so we can use <C-u> to discard count!
 exe 'noremap <expr> <silent> ' . g:idetools_ctags_forward_top_map
-  \ . ' idetools#ctagjump(1, v:count, 1)'
+  \ . ' idetools#ctag_jump(1, v:count, 1)'
 exe 'noremap <expr> <silent> ' . g:idetools_ctags_backward_top_map
-  \ . ' idetools#ctagjump(0, v:count, 1)'
+  \ . ' idetools#ctag_jump(0, v:count, 1)'
 exe 'noremap <expr> <silent> ' . g:idetools_ctags_forward_map
-  \ . ' idetools#ctagjump(1, v:count, 0)'
+  \ . ' idetools#ctag_jump(1, v:count, 0)'
 exe 'noremap <expr> <silent> ' . g:idetools_ctags_backward_map
-  \ . ' idetools#ctagjump(0, v:count, 0)'
+  \ . ' idetools#ctag_jump(0, v:count, 0)'
 if exists('*fzf#run')
   exe 'nnoremap <silent> ' . g:idetools_ctags_jump_map
     \ . ' :call fzf#run({'
