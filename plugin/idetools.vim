@@ -52,7 +52,15 @@ augroup END
 
 " Files that we wish to ignore
 if !exists('g:idetools_filetypes_skip')
-  let g:idetools_filetypes_skip = ['qf', 'rst', 'man', 'help', 'diff', 'nerdtree', 'tagbar']
+  let g:idetools_filetypes_skip = [
+    \ 'qf',
+    \ 'rst',
+    \ 'man',
+    \ 'help',
+    \ 'diff',
+    \ 'nerdtree',
+    \ 'tagbar'
+    \ ]
 endif
 
 " List of per-file/per-filetype tag categories that we define as 'scope-delimiters',
@@ -70,10 +78,12 @@ endif
 " List of files for which we only want not just the 'top level' tags (i.e. tags
 " that do not belong to another block, e.g. a program or subroutine)
 if !exists('g:idetools_filetypes_all_tags')
-  let g:idetools_filetypes_all_tags = ['fortran']
+  let g:idetools_filetypes_all_tags = [
+    \ 'fortran'
+    \ ]
 endif
 
-" Default map variables
+" Default mappings
 if !exists('g:idetools_ctags_jump_map')
   let g:idetools_ctags_jump_map = '<Leader><Leader>'
 endif
@@ -89,6 +99,11 @@ endif
 if !exists('g:idetools_ctags_forward_top_map')
   let g:idetools_ctags_forward_top_map = ']T'
 endif
+exe 'nmap ' . g:idetools_ctags_jump_map . ' <Plug>CtagsJump'
+exe 'map <silent> ' . g:idetools_ctags_forward_map . ' <Plug>CtagsForwardAll'
+exe 'map <silent> ' . g:idetools_ctags_backward_map . ' <Plug>CtagsBackwardAll'
+exe 'map <silent> ' . g:idetools_ctags_forward_top_map . ' <Plug>CtagsForwardTop'
+exe 'map <silent> ' . g:idetools_ctags_backward_top_map . ' <Plug>CtagsBackwardTop'
 
 "-----------------------------------------------------------------------------"
 " Ctags commands and maps
@@ -97,24 +112,22 @@ endif
 command! CTagsUpdate call idetools#ctags_update()
 command! CTagsDisplay call idetools#ctags_display()
 
-" Jump and bracket maps
+" Mappings
 " Note: Must use :n instead of <expr> ngg so we can use <C-u> to discard count!
-exe 'noremap <expr> <silent> ' . g:idetools_ctags_forward_top_map
-  \ . ' idetools#ctag_jump(1, v:count, 1)'
-exe 'noremap <expr> <silent> ' . g:idetools_ctags_backward_top_map
-  \ . ' idetools#ctag_jump(0, v:count, 1)'
-exe 'noremap <expr> <silent> ' . g:idetools_ctags_forward_map
-  \ . ' idetools#ctag_jump(1, v:count, 0)'
-exe 'noremap <expr> <silent> ' . g:idetools_ctags_backward_map
-  \ . ' idetools#ctag_jump(0, v:count, 0)'
+noremap <expr> <silent> <Plug>CtagsForwardAll idetools#ctag_jump(1, v:count, 0)
+noremap <expr> <silent> <Plug>CtagsBackwardAll idetools#ctag_jump(0, v:count, 0)
+noremap <expr> <silent> <Plug>CtagsForwardTop idetools#ctag_jump(1, v:count, 1)
+noremap <expr> <silent> <Plug>CtagsBackwardTop idetools#ctag_jump(0, v:count, 1)
+
+" Jump map with FZF
 if exists('*fzf#run')
-  exe 'nnoremap <silent> ' . g:idetools_ctags_jump_map
-    \ . ' :call fzf#run({'
-    \ . '"source": idetools#ctags_menu(b:ctags_alph), '
-    \ . '"sink": function("idetools#ctags_select"), '
-    \ . '"options": "--no-sort --prompt=''Ctag> ''",'
-    \ . '"down": "~20%"'
-    \ . '})<CR>'
+  nnoremap <silent> <Plug>CtagsJump
+    \ :call fzf#run({
+    \ 'source': idetools#ctags_menu(get(b:, 'ctags_alph', [])),
+    \ 'sink': function('idetools#ctags_select'),
+    \ 'options': "--no-sort --prompt='Ctag> '",
+    \ 'down': '~20%',
+    \ })<CR>
 endif
 
 "------------------------------------------------------------------------------"
@@ -152,12 +165,12 @@ nnoremap <silent> <expr> # idetools#set_search('#')
 nnoremap <silent> <expr> @ idetools#set_search('@')
 nnoremap <silent> <expr> ! idetools#set_search('!')
 " Search within function scope
-nnoremap <silent> <expr> g/ '/'.idetools#get_scope()
-nnoremap <silent> <expr> g? '?'.idetools#get_scope()
+nnoremap <silent> <expr> g/ '/' . idetools#get_scope()
+nnoremap <silent> <expr> g? '?' . idetools#get_scope()
 " Count number of occurrences for match under cursor
-nnoremap <silent> <Leader>* :echom 'Number of "'.expand('<cword>').'" occurences: '.system('grep -c "\b"'.shellescape(expand('<cword>')).'"\b" '.expand('%'))<CR>
-nnoremap <silent> <Leader>& :echom 'Number of "'.expand('<cWORD>').'" occurences: '.system('grep -c "[ \n\t]"'.shellescape(expand('<cWORD>')).'"[ \n\t]" '.expand('%'))<CR>
-nnoremap <silent> <Leader>. :echom 'Number of "'.@/.'" occurences: '.system('grep -c '.shellescape(@/).' '.expand('%'))<CR>
+nnoremap <silent> <Leader>* :echom 'Number of "' . expand('<cword>') . '" occurences: ' . system('grep -c "\b"' . shellescape(expand('<cword>')) . '"\b" ' . expand('%'))<CR>
+nnoremap <silent> <Leader>& :echom 'Number of "' . expand('<cWORD>') . '" occurences: ' . system('grep -c "[ \n\t]"' . shellescape(expand('<cWORD>')) . '"[ \n\t]" ' . expand('%'))<CR>
+nnoremap <silent> <Leader>. :echom 'Number of "' . @/ . '" occurences: ' . system('grep -c ' . shellescape(@/) . ' ' . expand('%'))<CR>
 
 " Maps that replicate :d/regex/ behavior and can be repeated with '.'
 nmap d/ <Plug>d/

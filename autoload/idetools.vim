@@ -24,7 +24,9 @@ endfunction
 " We call ctags in number mode (i.e. return line number)
 function! s:ctagcmd(...) abort
   let flags = (a:0 ? a:1 : '') " extra flags
-  return 'ctags ' . flags . ' ' . shellescape(expand('%:p')) . ' 2>/dev/null '
+  return
+    \ 'ctags ' . flags . ' '
+    \ . shellescape(expand('%:p')) . ' 2>/dev/null '
     \ . " | cut -d'\t' -f1,3-5 "  " note the \t is literal
 endfunction
 
@@ -45,8 +47,10 @@ endfunction
 " <line number>: name (type, scope)
 " See: https://github.com/junegunn/fzf/wiki/Examples-(vim)
 function! idetools#ctags_menu(ctaglist) abort " returns nicely formatted string
-  return map(deepcopy(a:ctaglist),
-    \ 'printf("%4d", v:val[1]) . ": " . v:val[0] . " (" . join(v:val[2:],", ") . ")"')
+  return map(
+    \ deepcopy(a:ctaglist),
+    \ 'printf("%4d", v:val[1]) . ": " . v:val[0] . " (" . join(v:val[2:],", ") . ")"'
+    \ )
 endfunction
 
 " Parse user menu selection/get the line number
@@ -63,7 +67,7 @@ function! idetools#ctags_update() abort
   " identifier, and numerically by line number
   " * To filter by category, use: filter(b:ctags, 'v:val[2]=="<category>"')
   " * First bail out if filetype is bad
-  if index(g:idetools_filetypes_skip, &ft) != -1
+  if index(g:idetools_filetypes_skip, &filetype) != -1
     return
   endif
   let flags = (getline(1) =~# '#!.*python[23]' ? '--language-force=python' : '')
@@ -74,7 +78,10 @@ function! idetools#ctags_update() abort
   " and then for some reason ctags can't accept -n flag or --excmd=number flag.
   " Warning: To test if ctags worked, want exit status of *first* command in pipeline (i.e. ctags)
   " but instead we get cut/sed statuses. If ctags returns error
-  let ctags = map(split(system(s:ctagcmd(flags) . " | sed 's/;\"\t/\t/g'"), '\n'), "split(v:val,'\t')")
+  let ctags = map(
+    \ split(system(s:ctagcmd(flags) . " | sed 's/;\"\t/\t/g'"), '\n'),
+    \ "split(v:val,'\t')"
+    \ )
   if len(ctags) == 0 || len(ctags[0]) == 0 " don't want warning message for files without tags!
     return
   endif
@@ -83,16 +90,17 @@ function! idetools#ctags_update() abort
 
   " Next filter the tags sorted by line to include only a few limited categories
   " Will also filter to pick only ***top-level*** items (i.e. tags with global scope)
-  if has_key(g:idetools_filetypes_top_tags, &ft)
-    let cats = g:idetools_filetypes_top_tags[&ft]
+  if has_key(g:idetools_filetypes_top_tags, &filetype)
+    let cats = g:idetools_filetypes_top_tags[&filetype]
   else
     let cats = g:idetools_filetypes_top_tags['default']
   endif
   let b:ctags_line_top = filter(
     \ deepcopy(b:ctags_line),
     \ 'v:val[2] =~ "[' . cats . ']" && ('
-    \ . index(g:idetools_filetypes_all_tags, &ft)
-    \ . ' != -1 || len(v:val) == 3)'
+    \ . index(g:idetools_filetypes_all_tags, &filetype)
+    \ . ' != -1 || len(v:val) == 3'
+    \ . ')'
     \ )
 endfunction
 
@@ -111,6 +119,8 @@ function! idetools#ctag_jump(forward, repeat, top) abort
   let lnum = line('.')
   let repeat = (a:repeat == 0 ? 1 : a:repeat)
   let ctags_list = eval(ctags_name)
+
+  " Loop through repitition
   for j in range(repeat)
     " Edge cases; at bottom or top of document
     if lnum < ctags_list[0][1] || lnum > ctags_list[-1][1]
@@ -139,9 +149,10 @@ function! idetools#ctag_jump(forward, repeat, top) abort
     let ltag = ctags_list[idx][0]
     let lnum = str2nr(ctags_list[idx][1])
   endfor
-  echom 'Tag: ' . ltag
+
   " Cannot move cursor inside autoload function (???)
   " Instead return command for jumping to line
+  echom 'Tag: ' . ltag
   return lnum . 'G'
 endfunction
 
@@ -222,7 +233,10 @@ function! idetools#set_search(map) abort
   elseif a:map =~# '@'
     let @/ = '\_s\@<=' . idetools#get_scope() . expand('<cWORD>') . '\ze\_s\C'
     let motion = 'lB'
-  elseif a:map !~# '/'
+  elseif a:map =~# '/'
+    " No-op
+    exe
+  else
     echohl WarningMsg
     echom 'Error: Unknown mapping "' . a:map . '" for vim-idetools refactoring shortcut.'
     echohl None
@@ -247,7 +261,8 @@ function! idetools#delete_next(map) abort
   if action ==# ''
     return
   endif
-  return ":setlocal hlsearch\<CR>dgnn"
+  return
+    \ ":setlocal hlsearch\<CR>dgnn"
     \ . ':call repeat#set("\<Plug>' . a:map . '", ' . v:count . ")\<CR>"
 endfunction
 
