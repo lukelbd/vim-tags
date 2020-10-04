@@ -108,9 +108,9 @@ exe 'map <silent> ' . g:idetools_ctags_backward_top_map . ' <Plug>CtagsBackwardT
 "-----------------------------------------------------------------------------"
 " Ctags commands and maps
 "-----------------------------------------------------------------------------"
-" Comamnds
-command! CTagsUpdate call idetools#ctags_update()
-command! CTagsDisplay call idetools#ctags_display()
+" Commands
+command! CtagsUpdate call idetools#ctags_update()
+command! CtagsDisplay call idetools#ctags_display()
 
 " Mappings
 " Note: Must use :n instead of <expr> ngg so we can use <C-u> to discard count!

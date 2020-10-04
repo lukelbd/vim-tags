@@ -4,9 +4,10 @@ IDE tools
 This repo stores several IDE tools for refactoring code cleanly and easily, and for
 jumping between syntactically-meaningful parts of your code.  It relies on
 [vim-repeat](https://github.com/tpope/vim-repeat) and the
-[exuberant ctags](http://ctags.sourceforge.net/) command-line tool.
+[exuberant ctags](http://ctags.sourceforge.net/)
+or [universal-ctags](https://docs.ctags.io/en/latest/index.html) command-line tools.
 It also optionally provides a tool for jumping between tag locations, powered by the
-[FZF](https://github.com/junegunn/fzf) plugin.
+[fzf](https://github.com/junegunn/fzf) plugin.
 
 Some features in this plugin are based on the idea that `ctags` locations can be used to
 approximately delimit variable scope boundaries.  For example, for a series of function
@@ -23,15 +24,15 @@ Commands
 
 | Command | Description |
 | ---- | ---- |
-| `:CTagsUpdate` | Manually refreshes the `b:ctags_top`, `b:ctags_alph`, and `b:ctags_line` variables used by this plugin. This is called automatically whenever a file is read or written to disk. |
-| `:CTagsDisplay` |  Displays a nicely condensed table of tags for the current file. |
+| `:CtagsUpdate` | Manually refreshes the `b:ctags_top`, `b:ctags_alph`, and `b:ctags_line` variables used by this plugin. This is called automatically whenever a file is read or written to disk. |
+| `:CtagsDisplay` |  Displays a nicely condensed table of tags for the current file. |
 
 Mappings
 --------
 
 | Mapping | Description |
 | ---- | ---- |
-| `<Leader><Leader>` | Brings up a fuzzy-completion menu of the ctags list, and jumps to the selected location. This is only defined if the [FZF](https://github.com/junegunn/fzf) plugin is installed. The map can be changed with `g:idetools_ctags_jump_map`. |
+| `<Leader><Leader>` | Brings up a fuzzy-completion menu of the ctags list, and jumps to the selected location. This is only defined if the [fzf](https://github.com/junegunn/fzf) plugin is installed. The map can be changed with `g:idetools_ctags_jump_map`. |
 | `[t`, `]t` | Jumps to subsequent and preceding ctags. The maps can be changed with `g:idetools_ctags_backward_map` and `g:idetools_ctags_forward_map`. |
 | `[T`, `]T` | Jumps to subsequent and preceding top-level "significant" ctags -- that is, omitting variable definitions, import statements, etc. Generally these are just function and class definition locations. The maps can be changed with `g:idetools_ctags_backward_top_map` and `g:idetools_ctags_forward_top_map`. |
 | `!`, `*`, `&` | Selects the character, word or WORD under the cursor. Unlike the vim `*` map, these do not move the cursor. |
