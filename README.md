@@ -1,18 +1,33 @@
-# IDE tools
-This repo stores several IDE tools for refactoring code cleanly and easily, and for jumping between syntactically-meaningful parts of your code.  It relies on [vim-repeat](https://github.com/tpope/vim-repeat) and the [exuberant ctags](http://ctags.sourceforge.net/) command-line tool. It also optionally provides a tool for jumping between tag locations, powered by the [FZF](https://github.com/junegunn/fzf) plugin.
+IDE tools
+=========
 
-Some features in this plugin are based on the idea that `ctags` locations can be used to approximately delimit variable scope boundaries.  For example, for a series of function declarations in a python module with no top-level code between the declarations, the lines between each declaration approximately denote the scope for variables declared inside the function.  This approach is primitive and not always perfect, but very flexible and works for all file types.
+This repo stores several IDE tools for refactoring code cleanly and easily, and for
+jumping between syntactically-meaningful parts of your code.  It relies on
+[vim-repeat](https://github.com/tpope/vim-repeat) and the
+[exuberant ctags](http://ctags.sourceforge.net/) command-line tool.
+It also optionally provides a tool for jumping between tag locations, powered by the
+[FZF](https://github.com/junegunn/fzf) plugin.
 
-# Documentation
+Some features in this plugin are based on the idea that `ctags` locations can be used to
+approximately delimit variable scope boundaries.  For example, for a series of function
+declarations in a python module with no top-level code between the declarations, the
+lines between each declaration approximately denote the scope for variables declared
+inside the function.  This approach is primitive and not always perfect, but very
+flexible and works for all file types.
 
-## Commands
+Documentation
+=============
+
+Commands
+--------
 
 | Command | Description |
 | ---- | ---- |
 | `:CTagsUpdate` | Manually refreshes the `b:ctags_top`, `b:ctags_alph`, and `b:ctags_line` variables used by this plugin. This is called automatically whenever a file is read or written to disk. |
 | `:CTagsDisplay` |  Displays a nicely condensed table of tags for the current file. |
 
-## Mappings
+Mappings
+--------
 
 | Mapping | Description |
 | ---- | ---- |
@@ -28,7 +43,8 @@ Some features in this plugin are based on the idea that `ctags` locations can be
 | `ca/`, `ca*`, `ca&`, `ca#`, `ca@` | As with `c/`, `c*`, `c&`, `c#`, `c@`, but changes all occurrences.
 | `<Leader>.`, `<Leader>*`, `<Leader>&` | Counts the number of search patterns, words, or WORDs under the cursor in the file. |
 
-## Options
+Options
+-------
 
 | Option | Description |
 | ---- | ---- |
@@ -36,11 +52,13 @@ Some features in this plugin are based on the idea that `ctags` locations can be
 | `g:idetools_filetypes_top_tags` | Dictionary whose keys are filetypes and whose values are lists of characters, corresponding to the ctags categories used to approximate the local variable scope.  If the current filetype is not in the dictionary, the `'default'` entry is used. By default, this is `f`, indicating function definition locations. To generate a list of all possible ctags categories for a given language, call e.g. `ctags --list-kinds=python` on the command line. |
 | `g:idetools_filetypes_all_tags` | List of filetypes for which we want to use **not only** "top level" tags as scope delimiters, but also "child" tags -- for example, functions declared inside of other functions. By default, this list is equal to just `['fortran']`, since all Fortran subroutines and functions must be declared inside of a "`program`" or "`module`", which have their own tags. |
 
-# Installation
-Install with your favorite [plugin manager](https://vi.stackexchange.com/questions/388/what-is-the-difference-between-the-vim-plugin-managers).
-I highly recommend the [vim-plug](https://github.com/junegunn/vim-plug) manager. To install with vim-plug, add
+Installation
+============
+
+Install with your favorite [plugin manager](https://vi.stackexchange.com/q/388/8084).
+I highly recommend the [vim-plug](https://github.com/junegunn/vim-plug) manager.
+To install with vim-plug, add
 ```
 Plug 'lukelbd/vim-idetools'
 ```
 to your `~/.vimrc`.
-
