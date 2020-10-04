@@ -1,38 +1,39 @@
 "------------------------------------------------------------------------------"
 " Ctag functions
 "------------------------------------------------------------------------------"
+" Strip leading and trailing whitespace
+function! s:strip_whitespace(text) abort
+  return substitute(a:text, '^\_s*\(.\{-}\)\_s*$', '\1', '')
+endfunction
+
 " Default sorting is always alphabetical, with type coercion
-function! s:linesort(tag1, tag2) abort
+function! s:sort_line(tag1, tag2) abort
   let num1 = a:tag1[1]
   let num2 = a:tag2[1]
   return num1 - num2 " fits requirements
 endfunc
 
 " From this page: https://vi.stackexchange.com/a/11237/8084
-function! s:alphsort(tag1, tag2) abort
+function! s:sort_alph(tag1, tag2) abort
   let str1 = a:tag1[0]
   let str2 = a:tag2[0]
   return (str1 < str2 ? -1 : str1 == str2 ? 0 : 1) " equality, lesser, and greater
 endfunction
 
-" Strip leading and trailing whitespace
-function! s:strip(text) abort
-  return substitute(a:text, '^\s*\(.\{-}\)\s*$', '\1', '')
-endfunction
-
 " Generate command-line exe that prints taglist to stdout
 " We call ctags in number mode (i.e. return line number)
-function! s:ctagcmd(...) abort
-  let flags = (a:0 ? a:1 : '') " extra flags
+function! s:ctags_cmd(...) abort
+  let path = shellescape(expand('%:p'))
+  let flags = (a:0 ? a:1 : '')  " extra flags
   return
-    \ 'ctags ' . flags . ' '
-    \ . shellescape(expand('%:p')) . ' 2>/dev/null '
-    \ . " | cut -d'\t' -f1,3-5 "  " note the \t is literal
+    \ 'ctags -f - --excmd=number ' . flags . ' ' . path
+    \ . " 2>/dev/null | cut -d'\t' -f1,3-5 "
 endfunction
 
 " Tool that provides a nice display of tags
 function! idetools#ctags_display() abort
-  let ctags = s:strip(system(s:ctagcmd() . " | tr -s '\t' | column -t -s '\t'"))
+  let cmd = s:ctags_cmd() . " | tr -s '\t' | column -t -s '\t'"
+  let ctags = s:strip_whitespace(system(cmd))
   if len(ctags) == 0
     echohl WarningMsg
     echom "Warning: No ctags found for file '" . expand('%:p') . "'."
@@ -42,51 +43,51 @@ function! idetools#ctags_display() abort
   endif
 endfunction
 
-" Generate list of strings for fzf menu, looks like:
-" <line number>: name (type)
-" <line number>: name (type, scope)
-" See: https://github.com/junegunn/fzf/wiki/Examples-(vim)
-function! idetools#ctags_menu(ctaglist) abort " returns nicely formatted string
-  return map(
-    \ deepcopy(a:ctaglist),
-    \ 'printf("%4d", v:val[1]) . ": " . v:val[0] . " (" . join(v:val[2:],", ") . ")"'
-    \ )
-endfunction
-
 " Parse user menu selection/get the line number
 " We split by whitespace, get the line num (comes before the colon)
 function! idetools#ctags_select(ctag) abort
   exe split(a:ctag, '\s\+')[0][:-2]
 endfunction
 
+" Generate list of strings for fzf menu, looks like:
+" <line number>: name (type)
+" <line number>: name (type, scope)
+" See: https://github.com/junegunn/fzf/wiki/Examples-(vim)
+function! idetools#ctags_menu() abort
+  let ctags = get(b:, 'ctags_alph', [])
+  if empty(ctags)
+    echohl WarningMsg
+    echom 'Warning: Ctags unavailable.'
+    echohl None
+    return []
+  endif
+  return map(
+    \ deepcopy(ctags),
+    \ "printf('%4d', v:val[1]) . ': ' . v:val[0] . ' (' . join(v:val[2:], ', ') . ')'"
+    \ )
+endfunction
+
 " Generate ctags and parses them into list of lists
 " Note multiple tags on same line is *very* common, try the below in a model
 " src folder: for f in <pattern>; do echo $f:; ctags -f - -n $f | cut -d $'\t' -f3 | cut -d\; -f1 | sort -n | uniq -c | cut -d' ' -f4 | uniq; done
 function! idetools#ctags_update() abort
-  " First get simple list of lists; tag properties sorted alphabetically by
-  " identifier, and numerically by line number
-  " * To filter by category, use: filter(b:ctags, 'v:val[2]=="<category>"')
-  " * First bail out if filetype is bad
+  " First get simple list of lists. Tag properties sorted alphabetically by
+  " identifier, and numerically by line number.
+  " Warning: To test if ctags worked, want exit status of *first* command in pipeline (i.e. ctags)
+  " but instead we get cut/sed statuses. If ctags returns error
   if index(g:idetools_filetypes_skip, &filetype) != -1
     return
   endif
   let flags = (getline(1) =~# '#!.*python[23]' ? '--language-force=python' : '')
-
-  " Call system command
-  " Warning: In MacVim, instead what gets called is:
-  " /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/ctags"
-  " and then for some reason ctags can't accept -n flag or --excmd=number flag.
-  " Warning: To test if ctags worked, want exit status of *first* command in pipeline (i.e. ctags)
-  " but instead we get cut/sed statuses. If ctags returns error
   let ctags = map(
-    \ split(system(s:ctagcmd(flags) . " | sed 's/;\"\t/\t/g'"), '\n'),
+    \ split(system(s:ctags_cmd(flags) . " | sed 's/;\"\t/\t/g'"), '\n'),
     \ "split(v:val,'\t')"
     \ )
   if len(ctags) == 0 || len(ctags[0]) == 0 " don't want warning message for files without tags!
     return
   endif
-  let b:ctags_alph = sort(deepcopy(ctags), 's:alphsort') " sort numerically by *position 1* in the sub-arrays
-  let b:ctags_line = sort(deepcopy(ctags), 's:linesort') " sort alphabetically by *position 0* in the sub-arrays
+  let b:ctags_alph = sort(deepcopy(ctags), 's:sort_alph')  " sort numerically by *position 1* in the sub-arrays
+  let b:ctags_line = sort(deepcopy(ctags), 's:sort_line')  " sort alphabetically by *position 0* in the sub-arrays
 
   " Next filter the tags sorted by line to include only a few limited categories
   " Will also filter to pick only ***top-level*** items (i.e. tags with global scope)
@@ -112,9 +113,9 @@ function! idetools#ctag_jump(forward, repeat, top) abort
   let ctags_name = a:top ? 'b:ctags_line_top' : 'b:ctags_line'
   if !exists(ctags_name) || len(eval(ctags_name)) == 0
     echohl WarningMsg
-    echom 'Warning: Bracket jump impossible because ctags unavailable.'
+    echom 'Warning: Ctags unavailable.'
     echohl None
-    return line('.') " stay on current line if failed
+    return line('.')  " stay on current line if failed
   endif
   let lnum = line('.')
   let repeat = (a:repeat == 0 ? 1 : a:repeat)

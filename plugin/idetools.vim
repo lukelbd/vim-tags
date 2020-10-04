@@ -123,7 +123,7 @@ noremap <expr> <silent> <Plug>CtagsBackwardTop idetools#ctag_jump(0, v:count, 1)
 if exists('*fzf#run')
   nnoremap <silent> <Plug>CtagsJump
     \ :call fzf#run({
-    \ 'source': idetools#ctags_menu(get(b:, 'ctags_alph', [])),
+    \ 'source': idetools#ctags_menu(),
     \ 'sink': function('idetools#ctags_select'),
     \ 'options': "--no-sort --prompt='Ctag> '",
     \ 'down': '~20%',
