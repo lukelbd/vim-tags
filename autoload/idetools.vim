@@ -118,7 +118,7 @@ function! idetools#ctag_jump(forward, repeat, top) abort
     return line('.')  " stay on current line if failed
   endif
   let lnum = line('.')
-  let repeat = (a:repeat == 0 ? 1 : a:repeat)
+  let repeat = a:repeat == 0 ? 1 : a:repeat
   let ctags_list = eval(ctags_name)
 
   " Loop through repitition
