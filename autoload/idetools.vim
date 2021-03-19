@@ -78,12 +78,12 @@ function! idetools#ctags_update() abort
   if index(g:idetools_filetypes_skip, &filetype) != -1
     return
   endif
-  let flags = (getline(1) =~# '#!.*python[23]' ? '--language-force=python' : '')
+  let flags = getline(1) =~# '#!.*python[23]' ? '--language-force=python' : ''
   let ctags = map(
     \ split(system(s:ctags_cmd(flags) . " | sed 's/;\"\t/\t/g'"), '\n'),
     \ "split(v:val,'\t')"
     \ )
-  if len(ctags) == 0 || len(ctags[0]) == 0 " don't want warning message for files without tags!
+  if len(ctags) == 0 || len(ctags[0]) == 0  " don't want warning message for files without tags!
     return
   endif
   let b:ctags_alph = sort(deepcopy(ctags), 's:sort_alph')  " sort numerically by *position 1* in the sub-arrays
@@ -91,11 +91,7 @@ function! idetools#ctags_update() abort
 
   " Next filter the tags sorted by line to include only a few limited categories
   " Will also filter to pick only ***top-level*** items (i.e. tags with global scope)
-  if has_key(g:idetools_filetypes_top_tags, &filetype)
-    let cats = g:idetools_filetypes_top_tags[&filetype]
-  else
-    let cats = g:idetools_filetypes_top_tags['default']
-  endif
+  let cats = get(g:idetools_filetypes_top_tags, &filetype, 'f')
   let b:ctags_line_top = filter(
     \ deepcopy(b:ctags_line),
     \ 'v:val[2] =~ "[' . cats . ']" && ('

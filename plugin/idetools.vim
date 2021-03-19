@@ -52,35 +52,19 @@ augroup END
 
 " Files that we wish to ignore
 if !exists('g:idetools_filetypes_skip')
-  let g:idetools_filetypes_skip = [
-    \ 'qf',
-    \ 'rst',
-    \ 'man',
-    \ 'help',
-    \ 'diff',
-    \ 'nerdtree',
-    \ 'tagbar'
-    \ ]
+  let g:idetools_filetypes_skip = ['diff', 'help', 'man', 'qf']
 endif
 
 " List of per-file/per-filetype tag categories that we define as 'scope-delimiters',
 " i.e. tags approximately denoting boundaries for variable scope of code block underneath cursor
 if !exists('g:idetools_filetypes_top_tags')
-  let g:idetools_filetypes_top_tags = {
-    \ 'vim'     : 'afc',
-    \ 'tex'     : 'bs',
-    \ 'python'  : 'fcm',
-    \ 'fortran' : 'smfp',
-    \ 'default' : 'f',
-    \ }
+  let g:idetools_filetypes_top_tags = {}
 endif
 
 " List of files for which we only want not just the 'top level' tags (i.e. tags
 " that do not belong to another block, e.g. a program or subroutine)
 if !exists('g:idetools_filetypes_all_tags')
-  let g:idetools_filetypes_all_tags = [
-    \ 'fortran'
-    \ ]
+  let g:idetools_filetypes_all_tags = []
 endif
 
 " Default mappings
