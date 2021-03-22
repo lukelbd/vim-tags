@@ -1,7 +1,7 @@
 IDE tools
 =========
 
-This repo stores several IDE tools for refactoring code cleanly and easily, and for
+Vim plugin offering several IDE tools for refactoring code cleanly and easily, and for
 jumping between syntactically-meaningful parts of your code.  It relies on
 [vim-repeat](https://github.com/tpope/vim-repeat) and the
 [exuberant ctags](http://ctags.sourceforge.net/)
