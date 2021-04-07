@@ -104,15 +104,13 @@ noremap <expr> <silent> <Plug>CtagsForwardTop idetools#ctag_jump(1, v:count, 1)
 noremap <expr> <silent> <Plug>CtagsBackwardTop idetools#ctag_jump(0, v:count, 1)
 
 " Jump map with FZF
-if exists('*fzf#run')
-  nnoremap <silent> <Plug>CtagsJump
-    \ :call fzf#run({
-    \ 'source': idetools#ctags_menu(),
-    \ 'sink': function('idetools#ctags_select'),
-    \ 'options': "--no-sort --prompt='Ctag> '",
-    \ 'down': '~20%',
-    \ })<CR>
-endif
+nnoremap <silent> <Plug>CtagsJump
+  \ :if exists('*fzf#run') \| call fzf#run({
+  \ 'source': idetools#ctags_menu(),
+  \ 'sink': function('idetools#ctags_select'),
+  \ 'options': "--no-sort --prompt='Ctag> '",
+  \ 'down': '~20%',
+  \ }) \| endif<CR>
 
 "------------------------------------------------------------------------------"
 " Refactoring tool maps
