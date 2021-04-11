@@ -194,7 +194,7 @@ endfunction
 function! idetools#change_repeat() abort
   if exists('g:iterate_occurences') && g:iterate_occurences
     let winview = winsaveview()
-    exe 'silent! keepjumps %s/' . @/ . '/' . @. . '/g'
+    exe 'silent! keepjumps %s@' . @/ . '@' . escape(@., '\') . '@g'
     call winrestview(winview)
     echom 'Replaced all occurences.'
   elseif exists('g:inject_replace_occurences') && g:inject_replace_occurences
