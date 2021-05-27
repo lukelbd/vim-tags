@@ -1,12 +1,9 @@
 "------------------------------------------------------------------------------"
 " Author: Luke Davis (lukelbd@gmail.com)
 " Date:   2018-09-09
-" Tries to wrap a few related features into one plugin file,
-" including super cool and useful ***refactoring*** tools based on ctags:
-" * Ctags integration -- jumping between successive tags, jumping to a particular
-"   tag based on its regex, searching/replacing text blocks delimited by the
-"   lines on which tags appear (roughly results in function-local search).
-"   Each element of the b:ctags list (and similar lists) is as follows:
+" A collection of IDE-like tools for vim. See README.md for details.
+"------------------------------------------------------------------------------"
+" * Each element of the b:ctags list (and similar lists) is as follows:
 "     Index 0: Tag name.
 "     Index 1: Tag line number.
 "     Index 2: Tag type.
@@ -31,83 +28,80 @@
 " * For c* and c# map origin, see:
 "   https://www.reddit.com/r/vim/comments/8k4p6v/what_are_your_best_mappings/
 "   https://www.reddit.com/r/vim/comments/2p6jqr/quick_replace_useful_refactoring_and_editing_tool/
-" * For repeat.vim usage see: http://vimcasts.org/episodes/creating-repeatable-mappings-with-repeat-vim/
-" Todo: Make sure python2 and python3 shebangs work
-" Maybe re-implement: if getline(1)=~"#!.*python[23]" | let force = "--language=python"
-"------------------------------------------------------------------------------"
-" Initial stuff
+" * For repeat.vim usage see:
+"   http://vimcasts.org/episodes/creating-repeatable-mappings-with-repeat-vim/
 call system('type ctags &>/dev/null')
 if v:shell_error " exit code
   echohl WarningMsg
-  echom 'Error: vim-idetools requires the command-line tool ctags, not found.'
+  echom 'Error: vim-tagtools requires the command-line tool ctags, not found.'
   echohl None
   finish
 endif
 set cpoptions+=d
-augroup idetools
+augroup tagtools
   au!
-  au InsertLeave * call idetools#change_repeat() " magical c* searching function
-  au BufRead,BufWritePost * call idetools#ctags_update()
+  au InsertLeave * call tagtools#change_repeat() " magical c* searching function
+  au BufRead,BufWritePost * call tagtools#ctags_update()
 augroup END
 
 " Files that we wish to ignore
-if !exists('g:idetools_filetypes_skip')
-  let g:idetools_filetypes_skip = ['diff', 'help', 'man', 'qf']
+if !exists('g:tagtools_filetypes_skip')
+  let g:tagtools_filetypes_skip = ['diff', 'help', 'man', 'qf']
 endif
 
 " List of per-file/per-filetype tag categories that we define as 'scope-delimiters',
 " i.e. tags approximately denoting boundaries for variable scope of code block underneath cursor
-if !exists('g:idetools_filetypes_top_tags')
-  let g:idetools_filetypes_top_tags = {}
+if !exists('g:tagtools_filetypes_top_tags')
+  let g:tagtools_filetypes_top_tags = {}
 endif
 
 " List of files for which we only want not just the 'top level' tags (i.e. tags
 " that do not belong to another block, e.g. a program or subroutine)
-if !exists('g:idetools_filetypes_all_tags')
-  let g:idetools_filetypes_all_tags = []
+if !exists('g:tagtools_filetypes_all_tags')
+  let g:tagtools_filetypes_all_tags = []
 endif
 
 " Default mappings
-if !exists('g:idetools_ctags_jump_map')
-  let g:idetools_ctags_jump_map = '<Leader><Leader>'
+if !exists('g:tagtools_ctags_jump_map')
+  let g:tagtools_ctags_jump_map = '<Leader><Leader>'
 endif
-if !exists('g:idetools_ctags_backward_map')
-  let g:idetools_ctags_backward_map = '[t'
+if !exists('g:tagtools_ctags_backward_map')
+  let g:tagtools_ctags_backward_map = '[t'
 endif
-if !exists('g:idetools_ctags_forward_map')
-  let g:idetools_ctags_forward_map = ']t'
+if !exists('g:tagtools_ctags_forward_map')
+  let g:tagtools_ctags_forward_map = ']t'
 endif
-if !exists('g:idetools_ctags_backward_top_map')
-  let g:idetools_ctags_backward_top_map = '[T'
+if !exists('g:tagtools_ctags_backward_top_map')
+  let g:tagtools_ctags_backward_top_map = '[T'
 endif
-if !exists('g:idetools_ctags_forward_top_map')
-  let g:idetools_ctags_forward_top_map = ']T'
+if !exists('g:tagtools_ctags_forward_top_map')
+  let g:tagtools_ctags_forward_top_map = ']T'
 endif
-exe 'nmap ' . g:idetools_ctags_jump_map . ' <Plug>CtagsJump'
-exe 'map <silent> ' . g:idetools_ctags_forward_map . ' <Plug>CtagsForwardAll'
-exe 'map <silent> ' . g:idetools_ctags_backward_map . ' <Plug>CtagsBackwardAll'
-exe 'map <silent> ' . g:idetools_ctags_forward_top_map . ' <Plug>CtagsForwardTop'
-exe 'map <silent> ' . g:idetools_ctags_backward_top_map . ' <Plug>CtagsBackwardTop'
+exe 'nmap ' . g:tagtools_ctags_jump_map . ' <Plug>CtagsJump'
+exe 'map <silent> ' . g:tagtools_ctags_forward_map . ' <Plug>CtagsForwardAll'
+exe 'map <silent> ' . g:tagtools_ctags_backward_map . ' <Plug>CtagsBackwardAll'
+exe 'map <silent> ' . g:tagtools_ctags_forward_top_map . ' <Plug>CtagsForwardTop'
+exe 'map <silent> ' . g:tagtools_ctags_backward_top_map . ' <Plug>CtagsBackwardTop'
 
 "-----------------------------------------------------------------------------"
 " Ctags commands and maps
 "-----------------------------------------------------------------------------"
 " Commands
-command! CtagsUpdate call idetools#ctags_update()
-command! CtagsDisplay call idetools#ctags_display()
+command! CtagsUpdate call tagtools#ctags_update()
+command! CtagsDisplay call tagtools#ctags_display()
 
 " Mappings
 " Note: Must use :n instead of <expr> ngg so we can use <C-u> to discard count!
-noremap <expr> <silent> <Plug>CtagsForwardAll idetools#ctag_jump(1, v:count, 0)
-noremap <expr> <silent> <Plug>CtagsBackwardAll idetools#ctag_jump(0, v:count, 0)
-noremap <expr> <silent> <Plug>CtagsForwardTop idetools#ctag_jump(1, v:count, 1)
-noremap <expr> <silent> <Plug>CtagsBackwardTop idetools#ctag_jump(0, v:count, 1)
+noremap <expr> <silent> <Plug>CtagsForwardAll tagtools#ctag_jump(1, v:count, 0)
+noremap <expr> <silent> <Plug>CtagsBackwardAll tagtools#ctag_jump(0, v:count, 0)
+noremap <expr> <silent> <Plug>CtagsForwardTop tagtools#ctag_jump(1, v:count, 1)
+noremap <expr> <silent> <Plug>CtagsBackwardTop tagtools#ctag_jump(0, v:count, 1)
 
 " Jump map with FZF
 nnoremap <silent> <Plug>CtagsJump
   \ :if exists('*fzf#run') \| call fzf#run({
-  \ 'source': idetools#ctags_menu(),
-  \ 'sink': function('idetools#ctags_select'),
+  \ 'source': tagtools#ctags_menu(),
+  \ 'sink': function('tagtools#ctags_select'),
   \ 'options': "--no-sort --prompt='Ctag> '",
   \ 'down': '~20%',
   \ }) \| endif<CR>
@@ -141,14 +135,14 @@ endfunction
 nnoremap <silent> <Plug>replace_occurence :call <sid>replace_occurence()<CR>
 
 " Global and local <cword> and global and local <cWORD> searches, and current character
-nnoremap <silent> <expr> * idetools#set_search('*')
-nnoremap <silent> <expr> & idetools#set_search('&')
-nnoremap <silent> <expr> # idetools#set_search('#')
-nnoremap <silent> <expr> @ idetools#set_search('@')
-nnoremap <silent> <expr> ! idetools#set_search('!')
+nnoremap <silent> <expr> * tagtools#set_search('*')
+nnoremap <silent> <expr> & tagtools#set_search('&')
+nnoremap <silent> <expr> # tagtools#set_search('#')
+nnoremap <silent> <expr> @ tagtools#set_search('@')
+nnoremap <silent> <expr> ! tagtools#set_search('!')
 " Search within function scope
-nnoremap <silent> <expr> g/ '/' . idetools#get_scope()
-nnoremap <silent> <expr> g? '?' . idetools#get_scope()
+nnoremap <silent> <expr> g/ '/' . tagtools#get_scope()
+nnoremap <silent> <expr> g? '?' . tagtools#get_scope()
 " Count number of occurrences for match under cursor
 nnoremap <silent> <Leader>* :echom 'Number of "' . expand('<cword>') . '" occurences: ' . system('grep -c "\b"' . shellescape(expand('<cword>')) . '"\b" ' . expand('%'))<CR>
 nnoremap <silent> <Leader>& :echom 'Number of "' . expand('<cWORD>') . '" occurences: ' . system('grep -c "[ \n\t]"' . shellescape(expand('<cWORD>')) . '"[ \n\t]" ' . expand('%'))<CR>
@@ -160,28 +154,28 @@ nmap d* <Plug>d*
 nmap d& <Plug>d&
 nmap d# <Plug>d#
 nmap d@ <Plug>d@
-nnoremap <silent> <expr> <Plug>d/ idetools#delete_next('d/')
-nnoremap <silent> <expr> <Plug>d* idetools#delete_next('d*')
-nnoremap <silent> <expr> <Plug>d& idetools#delete_next('d&')
-nnoremap <silent> <expr> <Plug>d# idetools#delete_next('d#')
-nnoremap <silent> <expr> <Plug>d@ idetools#delete_next('d@')
+nnoremap <silent> <expr> <Plug>d/ tagtools#delete_next('d/')
+nnoremap <silent> <expr> <Plug>d* tagtools#delete_next('d*')
+nnoremap <silent> <expr> <Plug>d& tagtools#delete_next('d&')
+nnoremap <silent> <expr> <Plug>d# tagtools#delete_next('d#')
+nnoremap <silent> <expr> <Plug>d@ tagtools#delete_next('d@')
 
 " Similar to the above, but replicates :s/regex/sub/ behavior -- the substitute
 " value is determined by what user enters in insert mode, and the cursor jumps
 " to the next map after leaving insert mode
-nnoremap <silent> <expr> c/ idetools#change_next('c/')
-nnoremap <silent> <expr> c* idetools#change_next('c*')
-nnoremap <silent> <expr> c& idetools#change_next('c&')
-nnoremap <silent> <expr> c# idetools#change_next('c#')
-nnoremap <silent> <expr> c@ idetools#change_next('c@')
+nnoremap <silent> <expr> c/ tagtools#change_next('c/')
+nnoremap <silent> <expr> c* tagtools#change_next('c*')
+nnoremap <silent> <expr> c& tagtools#change_next('c&')
+nnoremap <silent> <expr> c# tagtools#change_next('c#')
+nnoremap <silent> <expr> c@ tagtools#change_next('c@')
 
 " Maps as above, but this time delete or replace *all* occurrences
 " Added a block to next_occurence function
-nmap <silent> da/ :call idetools#delete_all('d/')<CR>
-nmap <silent> da* :call idetools#delete_all('d*')<CR>
-nmap <silent> da& :call idetools#delete_all('d&')<CR>
-nmap <silent> da# :call idetools#delete_all('d#')<CR>
-nmap <silent> da@ :call idetools#delete_all('d@')<CR>
+nmap <silent> da/ :call tagtools#delete_all('d/')<CR>
+nmap <silent> da* :call tagtools#delete_all('d*')<CR>
+nmap <silent> da& :call tagtools#delete_all('d&')<CR>
+nmap <silent> da# :call tagtools#delete_all('d#')<CR>
+nmap <silent> da@ :call tagtools#delete_all('d@')<CR>
 nmap <silent> ca/ :let g:iterate_occurences = 1<CR>c/
 nmap <silent> ca* :let g:iterate_occurences = 1<CR>c*
 nmap <silent> ca& :let g:iterate_occurences = 1<CR>c&
