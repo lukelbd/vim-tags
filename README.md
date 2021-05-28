@@ -8,12 +8,12 @@ Includes the following features:
 
 * Jumping between tags or jumping to particular tags using fuzzy searching (via the
   [fzf](https://github.com/junegunn/fzf) plugin).
-* Intuitively changing or deleting words, WORDS, and regular expressions one-by-one
+* Quickly changing or deleting words, WORDS, and regular expressions one-by-one
   or all at once using insert mode rather than the `:s` command.
 * Changing or deleting words, WORDS, and regular expressions delimited by adjacent
   tags (e.g. function definitions).
 
-The last feature is motivated by the idea that certain `ctags` approximately delimit the
+The last feature is motivated by the idea that certain tags approximately delimit the
 variable scope boundaries. For example, given a consecutive series of function
 declarations in a python module, the lines between each declaration approximately denote
 the scope for variables declared inside the function. This approach is primitive and not
