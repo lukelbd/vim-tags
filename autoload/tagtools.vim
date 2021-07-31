@@ -31,7 +31,7 @@ function! s:ctags_cmd(...) abort
 endfunction
 
 " Tool that provides a nice display of tags
-function! tagtools#ctags_display() abort
+function! tagtools#ctags_show() abort
   let cmd = s:ctags_cmd() . " | tr -s '\t' | column -t -s '\t'"
   let ctags = s:strip_whitespace(system(cmd))
   if len(ctags) == 0
