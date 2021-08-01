@@ -35,7 +35,7 @@ Mappings
 
 | Mapping | Description |
 | ---- | ---- |
-| `<Leader><Leader>` | Show up a fuzzy-completion menu of the ctags and jump to the selected location. This is only defined if the [fzf](https://github.com/junegunn/fzf) plugin is installed. The map can be changed with `g:tagtools_ctags_jump_map`. |
+| `<Leader><Leader>` | Show a fuzzy-completion menu of the ctags and jump to the selected location. This is only defined if the [fzf](https://github.com/junegunn/fzf) plugin is installed. The map can be changed with `g:tagtools_ctags_jump_map`. |
 | `[t`, `]t` | Jump to subsequent and preceding ctags. The maps can be changed with `g:tagtools_ctags_backward_map` and `g:tagtools_ctags_forward_map`. |
 | `[T`, `]T` | Jump to subsequent and preceding top-level "significant" ctags -- that is, omitting variable definitions, import statements, etc. Generally these are just function and class definitions. The maps can be changed with `g:tagtools_ctags_backward_top_map` and `g:tagtools_ctags_forward_top_map`. |
 | `!`, `*`, `&` | Select the character, word or WORD under the cursor. Unlike the vim `*` map, these do not move the cursor. |
