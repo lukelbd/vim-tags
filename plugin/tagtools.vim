@@ -118,8 +118,8 @@ function! s:replace_occurence() abort
   let regmode = getregtype('"')
   let winview = winsaveview()
   normal! ygn
-  let [l1, c1] = getpos("'[")[1:2] " first char of yanked text
-  let [l2, c2] = getpos("']")[1:2] " last char of yanked text
+  let [l1, c1] = getpos("'[")[1:2]  " first char of yanked text
+  let [l2, c2] = getpos("']")[1:2]  " last char of yanked text
   call setreg('"', reg, regmode)
   call winrestview(winview)
 

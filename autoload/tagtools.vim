@@ -191,12 +191,15 @@ endfunction
 
 " Special function that jumps to next occurence automatically
 " This is called when InsertLeave is triggered
+" Warning: The @. register may contain keystrokes like <80>kb (i.e. backspace)
 function! tagtools#change_repeat() abort
   if exists('g:iterate_occurences') && g:iterate_occurences
-    let winview = winsaveview()
-    exe 'silent! keepjumps %s@' . @/ . '@' . escape(@., '\') . '@g'
-    call winrestview(winview)
-    echom 'Replaced all occurences.'
+    call feedkeys(
+      \ ':let winview = winsaveview() '
+      \ . '| silent! keepjumps %s@' . getreg('/') . '@' . getreg('.') . '@g '
+      \ . "| call winrestview(winview)\<CR>"
+      \ , 't'
+      \ )
   elseif exists('g:inject_replace_occurences') && g:inject_replace_occurences
     silent! normal! n
     call repeat#set("\<Plug>replace_occurence")
