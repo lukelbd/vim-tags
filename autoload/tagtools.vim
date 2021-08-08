@@ -196,7 +196,7 @@ function! tagtools#change_repeat() abort
   if exists('g:iterate_occurences') && g:iterate_occurences
     call feedkeys(
       \ ':let winview = winsaveview() '
-      \ . '| silent! keepjumps %s@' . getreg('/') . '@' . getreg('.') . '@g '
+      \ . '| keepjumps %s@' . getreg('/') . '@' . getreg('.') . '@ge '
       \ . "| call winrestview(winview)\<CR>"
       \ , 't'
       \ )
