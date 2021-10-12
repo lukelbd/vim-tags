@@ -105,15 +105,16 @@ endfunction
 " Warning: Ctag lines are stored as strings and only get implicitly converted
 " to numbers on comparison with other numbers, so need to make sure in loop
 " that 'lnum' is always a number!
-function! tagtools#ctag_jump(forward, repeat, top) abort
+function! tagtools#ctag_jump(forward, repeat, top, ...) abort
+  let cline = a:0 ? a:1 : line('.')
   let ctags_name = a:top ? 'b:ctags_line_top' : 'b:ctags_line'
   if !exists(ctags_name) || len(eval(ctags_name)) == 0
     echohl WarningMsg
     echom 'Warning: Ctags unavailable.'
     echohl None
-    return line('.')  " stay on current line if failed
+    return lnum  " stay on current line if failed
   endif
-  let lnum = line('.')
+  let lnum = cline
   let repeat = a:repeat == 0 ? 1 : a:repeat
   let ctags_list = eval(ctags_name)
 
@@ -139,7 +140,7 @@ function! tagtools#ctag_jump(forward, repeat, top) abort
           echohl WarningMsg
           echom 'Error: Bracket jump failed.'
           echohl None
-          return line('.')
+          return cline
         endif
       endfor
     endif
@@ -161,19 +162,19 @@ endfunction
 " * Below is copied from: https://stackoverflow.com/a/597932/4970632
 " * Note jedi-vim 'variable rename' is sketchy and fails; should do my own
 "   renaming, and do it by confirming every single instance
-function! tagtools#get_scope() abort
-  let ntext = 10 " text length
+function! tagtools#get_scope(...) abort
+  let cline = a:0 ? a:1 : line('.')
+  let ntext = 10  " text length
   if !exists('b:ctags_line_top') || len(b:ctags_line_top) == 0
     echohl WarningMsg
     echom 'Warning: Tags unavailable so cannot limit search scope.'
     echohl None
     return ''
   endif
-  let init = line('.')
-  let ctaglines = map(deepcopy(b:ctags_line_top), 'v:val[1]') " just pick out the line number
+  let ctaglines = map(deepcopy(b:ctags_line_top), 'v:val[1]')  " just pick out the line number
   let ctaglines = ctaglines + [line('$')]
   for i in range(0, len(ctaglines) - 2)
-    if ctaglines[i] > init || ctaglines[i + 1] <= init " must be line above start of next function
+    if ctaglines[i] > cline || ctaglines[i + 1] <= cline  " must be line above start of next function
       continue
     endif
     let text = b:ctags_line_top[i][0]
@@ -195,7 +196,7 @@ endfunction
 function! tagtools#change_repeat() abort
   if exists('g:iterate_occurences') && g:iterate_occurences
     call feedkeys(
-      \ ':let winview = winsaveview() '
+      \ ':silent undo | let winview = winsaveview() '
       \ . '| keepjumps %s@' . getreg('/') . '@' . getreg('.') . '@ge '
       \ . "| call winrestview(winview)\<CR>"
       \ , 't'
