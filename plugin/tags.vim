@@ -3,7 +3,7 @@
 " Date:   2018-09-09
 " A collection of IDE-like tools for vim. See README.md for details.
 "------------------------------------------------------------------------------"
-" * Each element of the b:ctags list (and similar lists) is as follows:
+" * Each element of the b:tags_by_line list (and similar lists) is as follows:
 "     Index 0: Tag name.
 "     Index 1: Tag line number.
 "     Index 2: Tag type.
@@ -33,75 +33,75 @@
 call system('type ctags &>/dev/null')
 if v:shell_error " exit code
   echohl WarningMsg
-  echom 'Error: vim-tagtools requires the command-line tool ctags, not found.'
+  echom 'Error: vim-tags requires the command-line tool ctags, not found.'
   echohl None
   finish
 endif
 set cpoptions+=d
-augroup tagtools
+augroup tags
   au!
-  au InsertLeave * call tagtools#change_repeat() " magical c* searching function
-  au BufRead,BufWritePost * call tagtools#ctags_update()
+  au InsertLeave * call tags#change_repeat() " magical c* searching function
+  au BufRead,BufWritePost * call tags#update_tags()
 augroup END
 
 " Files that we wish to ignore
-if !exists('g:tagtools_filetypes_skip')
-  let g:tagtools_filetypes_skip = ['diff', 'help', 'man', 'qf']
+if !exists('g:tags_skip_filetypes')
+  let g:tags_skip_filetypes = ['diff', 'help', 'man', 'qf']
 endif
 
 " List of per-file/per-filetype tag categories that we define as 'scope-delimiters',
 " i.e. tags approximately denoting boundaries for variable scope of code block underneath cursor
-if !exists('g:tagtools_filetypes_top_tags')
-  let g:tagtools_filetypes_top_tags = {}
+if !exists('g:tags_scope_filetypes')
+  let g:tags_scope_filetypes = {}
 endif
 
 " List of files for which we only want not just the 'top level' tags (i.e. tags
 " that do not belong to another block, e.g. a program or subroutine)
-if !exists('g:tagtools_filetypes_all_tags')
-  let g:tagtools_filetypes_all_tags = []
+if !exists('g:tags_nofilter_filetypes')
+  let g:tags_nofilter_filetypes = []
 endif
 
 " Default mappings
-if !exists('g:tagtools_ctags_jump_map')
-  let g:tagtools_ctags_jump_map = '<Leader><Leader>'
+if !exists('g:tags_jump_map')
+  let g:tags_jump_map = '<><Leader>'
 endif
-if !exists('g:tagtools_ctags_backward_map')
-  let g:tagtools_ctags_backward_map = '[t'
+if !exists('g:tags_backward_map')
+  let g:tags_backward_map = '[t'
 endif
-if !exists('g:tagtools_ctags_forward_map')
-  let g:tagtools_ctags_forward_map = ']t'
+if !exists('g:tags_forward_map')
+  let g:tags_forward_map = ']t'
 endif
-if !exists('g:tagtools_ctags_backward_top_map')
-  let g:tagtools_ctags_backward_top_map = '[T'
+if !exists('g:tags_backward_top_map')
+  let g:tags_backward_top_map = '[T'
 endif
-if !exists('g:tagtools_ctags_forward_top_map')
-  let g:tagtools_ctags_forward_top_map = ']T'
+if !exists('g:tags_forward_top_map')
+  let g:tags_forward_top_map = ']T'
 endif
-exe 'nmap ' . g:tagtools_ctags_jump_map . ' <Plug>CtagsJump'
-exe 'map <silent> ' . g:tagtools_ctags_forward_map . ' <Plug>CtagsForwardAll'
-exe 'map <silent> ' . g:tagtools_ctags_backward_map . ' <Plug>CtagsBackwardAll'
-exe 'map <silent> ' . g:tagtools_ctags_forward_top_map . ' <Plug>CtagsForwardTop'
-exe 'map <silent> ' . g:tagtools_ctags_backward_top_map . ' <Plug>CtagsBackwardTop'
+exe 'nmap ' . g:tags_jump_map . ' <Plug>TagsJump'
+exe 'map <silent> ' . g:tags_forward_map . ' <Plug>TagsForwardAll'
+exe 'map <silent> ' . g:tags_backward_map . ' <Plug>TagsBackwardAll'
+exe 'map <silent> ' . g:tags_forward_top_map . ' <Plug>TagsForwardTop'
+exe 'map <silent> ' . g:tags_backward_top_map . ' <Plug>TagsBackwardTop'
 
 "-----------------------------------------------------------------------------"
-" Ctags commands and maps
+" Tags commands and maps
 "-----------------------------------------------------------------------------"
 " Commands
-command! Ctags call tagtools#ctags_show()
-command! CtagsUpdate call tagtools#ctags_update()
+command! ShowTags call tags#show_tags()
+command! UpdateTags call tags#update_tags()
 
 " Mappings
 " Note: Must use :n instead of <expr> ngg so we can use <C-u> to discard count!
-noremap <expr> <silent> <Plug>CtagsForwardAll tagtools#ctag_jump(1, v:count, 0)
-noremap <expr> <silent> <Plug>CtagsBackwardAll tagtools#ctag_jump(0, v:count, 0)
-noremap <expr> <silent> <Plug>CtagsForwardTop tagtools#ctag_jump(1, v:count, 1)
-noremap <expr> <silent> <Plug>CtagsBackwardTop tagtools#ctag_jump(0, v:count, 1)
+noremap <expr> <silent> <Plug>TagsForwardAll tags#jump_tag(1, v:count, 0)
+noremap <expr> <silent> <Plug>TagsBackwardAll tags#jump_tag(0, v:count, 0)
+noremap <expr> <silent> <Plug>TagsForwardTop tags#jump_tag(1, v:count, 1)
+noremap <expr> <silent> <Plug>TagsBackwardTop tags#jump_tag(0, v:count, 1)
 
 " Jump map with FZF
-nnoremap <silent> <Plug>CtagsJump
+nnoremap <silent> <Plug>TagsJump
   \ :if exists('*fzf#run') \| call fzf#run({
-  \ 'source': tagtools#ctags_menu(),
-  \ 'sink': function('tagtools#ctags_select'),
+  \ 'source': tags#list_tags(),
+  \ 'sink': function('tags#select_tags'),
   \ 'options': "--no-sort --prompt='Ctag> '",
   \ 'down': '~20%',
   \ }) \| endif<CR>
@@ -135,14 +135,14 @@ endfunction
 nnoremap <silent> <Plug>replace_occurence :call <sid>replace_occurence()<CR>
 
 " Global and local <cword> and global and local <cWORD> searches, and current character
-nnoremap <silent> <expr> * tagtools#set_search('*')
-nnoremap <silent> <expr> & tagtools#set_search('&')
-nnoremap <silent> <expr> # tagtools#set_search('#')
-nnoremap <silent> <expr> @ tagtools#set_search('@')
-nnoremap <silent> <expr> ! tagtools#set_search('!')
+nnoremap <silent> <expr> * tags#set_search('*')
+nnoremap <silent> <expr> & tags#set_search('&')
+nnoremap <silent> <expr> # tags#set_search('#')
+nnoremap <silent> <expr> @ tags#set_search('@')
+nnoremap <silent> <expr> ! tags#set_search('!')
 " Search within function scope
-nnoremap <silent> <expr> g/ '/' . tagtools#get_scope()
-nnoremap <silent> <expr> g? '?' . tagtools#get_scope()
+nnoremap <silent> <expr> g/ '/' . tags#get_scope()
+nnoremap <silent> <expr> g? '?' . tags#get_scope()
 " Count number of occurrences for match under cursor
 nnoremap <silent> <Leader>* :echom 'Number of "' . expand('<cword>') . '" occurences: ' . system('grep -c "\b"' . shellescape(expand('<cword>')) . '"\b" ' . expand('%'))<CR>
 nnoremap <silent> <Leader>& :echom 'Number of "' . expand('<cWORD>') . '" occurences: ' . system('grep -c "[ \n\t]"' . shellescape(expand('<cWORD>')) . '"[ \n\t]" ' . expand('%'))<CR>
@@ -154,28 +154,28 @@ nmap d* <Plug>d*
 nmap d& <Plug>d&
 nmap d# <Plug>d#
 nmap d@ <Plug>d@
-nnoremap <silent> <expr> <Plug>d/ tagtools#delete_next('d/')
-nnoremap <silent> <expr> <Plug>d* tagtools#delete_next('d*')
-nnoremap <silent> <expr> <Plug>d& tagtools#delete_next('d&')
-nnoremap <silent> <expr> <Plug>d# tagtools#delete_next('d#')
-nnoremap <silent> <expr> <Plug>d@ tagtools#delete_next('d@')
+nnoremap <silent> <expr> <Plug>d/ tags#delete_next('d/')
+nnoremap <silent> <expr> <Plug>d* tags#delete_next('d*')
+nnoremap <silent> <expr> <Plug>d& tags#delete_next('d&')
+nnoremap <silent> <expr> <Plug>d# tags#delete_next('d#')
+nnoremap <silent> <expr> <Plug>d@ tags#delete_next('d@')
 
 " Similar to the above, but replicates :s/regex/sub/ behavior -- the substitute
 " value is determined by what user enters in insert mode, and the cursor jumps
 " to the next map after leaving insert mode
-nnoremap <silent> <expr> c/ tagtools#change_next('c/')
-nnoremap <silent> <expr> c* tagtools#change_next('c*')
-nnoremap <silent> <expr> c& tagtools#change_next('c&')
-nnoremap <silent> <expr> c# tagtools#change_next('c#')
-nnoremap <silent> <expr> c@ tagtools#change_next('c@')
+nnoremap <silent> <expr> c/ tags#change_next('c/')
+nnoremap <silent> <expr> c* tags#change_next('c*')
+nnoremap <silent> <expr> c& tags#change_next('c&')
+nnoremap <silent> <expr> c# tags#change_next('c#')
+nnoremap <silent> <expr> c@ tags#change_next('c@')
 
 " Maps as above, but this time delete or replace *all* occurrences
 " Added a block to next_occurence function
-nmap <silent> da/ :call tagtools#delete_all('d/')<CR>
-nmap <silent> da* :call tagtools#delete_all('d*')<CR>
-nmap <silent> da& :call tagtools#delete_all('d&')<CR>
-nmap <silent> da# :call tagtools#delete_all('d#')<CR>
-nmap <silent> da@ :call tagtools#delete_all('d@')<CR>
+nmap <silent> da/ :call tags#delete_all('d/')<CR>
+nmap <silent> da* :call tags#delete_all('d*')<CR>
+nmap <silent> da& :call tags#delete_all('d&')<CR>
+nmap <silent> da# :call tags#delete_all('d#')<CR>
+nmap <silent> da@ :call tags#delete_all('d@')<CR>
 nmap <silent> ca/ :let g:iterate_occurences = 1<CR>c/
 nmap <silent> ca* :let g:iterate_occurences = 1<CR>c*
 nmap <silent> ca& :let g:iterate_occurences = 1<CR>c&
