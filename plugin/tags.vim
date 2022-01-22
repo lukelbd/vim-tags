@@ -63,7 +63,7 @@ endif
 
 " Default mappings
 if !exists('g:tags_jump_map')
-  let g:tags_jump_map = '<><Leader>'
+  let g:tags_jump_map = '<Leader><Leader>'
 endif
 if !exists('g:tags_backward_map')
   let g:tags_backward_map = '[t'
