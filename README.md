@@ -27,7 +27,8 @@ Commands
 
 | Command | Description |
 | ---- | ---- |
-| `:ShowTags` |  Show a nicely condensed table of tags for the current file. |
+| `:Count` | Count the number of occurences of a search expression. |
+| `:ShowTags` | Show a nicely condensed table of tags for the current file. |
 | `:UpdateTags` | Manually refreshes the `b:tags_by_name`, `b:tags_by_line`, and `b:tags_for_scope`  variables used by this plugin. This is called automatically whenever a file is read or written to disk. |
 
 Mappings

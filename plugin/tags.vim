@@ -61,7 +61,7 @@ if !exists('g:tags_nofilter_filetypes')
   let g:tags_nofilter_filetypes = []
 endif
 
-" Default mappings
+" Default mapping settings
 if !exists('g:tags_jump_map')
   let g:tags_jump_map = '<Leader><Leader>'
 endif
@@ -77,42 +77,13 @@ endif
 if !exists('g:tags_forward_top_map')
   let g:tags_forward_top_map = ']T'
 endif
-exe 'nmap ' . g:tags_jump_map . ' <Plug>TagsJump'
-exe 'map <silent> ' . g:tags_forward_map . ' <Plug>TagsForwardAll'
-exe 'map <silent> ' . g:tags_backward_map . ' <Plug>TagsBackwardAll'
-exe 'map <silent> ' . g:tags_forward_top_map . ' <Plug>TagsForwardTop'
-exe 'map <silent> ' . g:tags_backward_top_map . ' <Plug>TagsBackwardTop'
 
 "-----------------------------------------------------------------------------"
-" Tags commands and maps
+" Tag commands and maps
 "-----------------------------------------------------------------------------"
-" Commands
-command! ShowTags call tags#show_tags()
-command! UpdateTags call tags#update_tags()
-
-" Mappings
-" Note: Must use :n instead of <expr> ngg so we can use <C-u> to discard count!
-noremap <expr> <silent> <Plug>TagsForwardAll tags#jump_tag(1, v:count, 0)
-noremap <expr> <silent> <Plug>TagsBackwardAll tags#jump_tag(0, v:count, 0)
-noremap <expr> <silent> <Plug>TagsForwardTop tags#jump_tag(1, v:count, 1)
-noremap <expr> <silent> <Plug>TagsBackwardTop tags#jump_tag(0, v:count, 1)
-
-" Jump map with FZF
-nnoremap <silent> <Plug>TagsJump
-  \ :if exists('*fzf#run') \| call fzf#run({
-  \ 'source': tags#list_tags(),
-  \ 'sink': function('tags#select_tags'),
-  \ 'options': "--no-sort --prompt='Ctag> '",
-  \ 'down': '~20%',
-  \ }) \| endif<CR>
-
-"------------------------------------------------------------------------------"
-" Refactoring tool maps
-"------------------------------------------------------------------------------"
-" Driver function *must* be in here because cannot issue normal! in
-" autoload folder evidently
+" Replace driver function
+" Warning: *Must* be in here because cannot issue normal! in autoload folder evidently
 function! s:replace_occurence() abort
-  " Get lines and columns for next occurence without messing up window/register
   let [l0, c0] = getpos('.')[1:2]
   let reg = getreg('"')
   let regmode = getregtype('"')
@@ -122,31 +93,65 @@ function! s:replace_occurence() abort
   let [l2, c2] = getpos("']")[1:2]  " last char of yanked text
   call setreg('"', reg, regmode)
   call winrestview(winview)
-
-  " Replace next occurence with previously inserted text
-  if l0 >= l1 && l0 <= l2 && c0 >= c1 && c0 <= c2
+  if l0 >= l1 && l0 <= l2 && c0 >= c1 && c0 <= c2  " replace next occurence with previously inserted text
     exe "silent! normal! cgn\<C-a>\<Esc>"
   endif
   silent! normal! n
   call repeat#set("\<Plug>replace_occurence")
 endfunction
 
-" Mapping for vim-repeat command
-nnoremap <silent> <Plug>replace_occurence :call <sid>replace_occurence()<CR>
+" Public commands
+command! ShowTags call tags#show_tags()
+command! UpdateTags call tags#update_tags()
 
-" Global and local <cword> and global and local <cWORD> searches, and current character
+" Tag search maps
+" Note: Must use :n instead of <expr> ngg so we can use <C-u> to discard count!
+exe 'map <silent> ' . g:tags_forward_map . ' <Plug>TagsForwardAll'
+exe 'map <silent> ' . g:tags_backward_map . ' <Plug>TagsBackwardAll'
+exe 'map <silent> ' . g:tags_forward_top_map . ' <Plug>TagsForwardTop'
+exe 'map <silent> ' . g:tags_backward_top_map . ' <Plug>TagsBackwardTop'
+noremap <expr> <silent> <Plug>TagsForwardAll tags#jump_tag(1, v:count, 0)
+noremap <expr> <silent> <Plug>TagsBackwardAll tags#jump_tag(0, v:count, 0)
+noremap <expr> <silent> <Plug>TagsForwardTop tags#jump_tag(1, v:count, 1)
+noremap <expr> <silent> <Plug>TagsBackwardTop tags#jump_tag(0, v:count, 1)
+
+" Tag jump map
+exe 'nmap ' . g:tags_jump_map . ' <Plug>TagsJump'
+nnoremap <silent> <Plug>TagsJump
+  \ :if exists('*fzf#run') \| call fzf#run({
+  \ 'source': tags#list_tags(),
+  \ 'sink': function('tags#select_tags'),
+  \ 'options': "--no-sort --prompt='Ctag> '",
+  \ 'down': '~20%',
+  \ }) \| endif<CR>
+
+"------------------------------------------------------------------------------"
+" Refactoring commands and maps
+"------------------------------------------------------------------------------"
+" Public commands
+command! -nargs=1 -range Count <line1>,<line2>call tags#count_occurence(<f-args>)
+
+" Global and local <cword> and global and local <cWORD> searches, current
+" character search, and forward and backward local scope search.
+nnoremap <silent> <Plug>replace_occurence :call <sid>replace_occurence()<CR>
 nnoremap <silent> <expr> * tags#set_search('*')
 nnoremap <silent> <expr> & tags#set_search('&')
 nnoremap <silent> <expr> # tags#set_search('#')
 nnoremap <silent> <expr> @ tags#set_search('@')
 nnoremap <silent> <expr> ! tags#set_search('!')
-" Search within function scope
 nnoremap <silent> <expr> g/ '/' . tags#get_scope()
 nnoremap <silent> <expr> g? '?' . tags#get_scope()
+
 " Count number of occurrences for match under cursor
-nnoremap <silent> <Leader>* :echom 'Number of "' . expand('<cword>') . '" occurences: ' . system('grep -c "\b"' . shellescape(expand('<cword>')) . '"\b" ' . expand('%'))<CR>
-nnoremap <silent> <Leader>& :echom 'Number of "' . expand('<cWORD>') . '" occurences: ' . system('grep -c "[ \n\t]"' . shellescape(expand('<cWORD>')) . '"[ \n\t]" ' . expand('%'))<CR>
-nnoremap <silent> <Leader>. :echom 'Number of "' . @/ . '" occurences: ' . system('grep -c ' . shellescape(@/) . ' ' . expand('%'))<CR>
+" Note: current character copied from https://stackoverflow.com/a/23323958/4970632
+noremap <Leader>*
+  \ :call tags#count_occurence('\<' . escape(expand('<cword>'), '[]\.*$~') . '\>')<CR>
+noremap <Leader>&
+  \ :call tags#count_occurence('\_s' . escape(expand('<cWORD>'), '[]\.*$~') . '\_s')<CR>
+noremap <Leader>!
+  \ :call tags#count_occurence(escape(matchstr(getline('.'), '\%' . col('.') . 'c.'), '[]\.*$~'))<CR>
+noremap <Leader>.
+  \ :call tags#count_occurence(@/)<CR>
 
 " Maps that replicate :d/regex/ behavior and can be repeated with '.'
 nmap d/ <Plug>d/

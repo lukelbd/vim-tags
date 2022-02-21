@@ -1,5 +1,5 @@
 "------------------------------------------------------------------------------"
-" Ctag functions
+" Tag-related functions
 "------------------------------------------------------------------------------"
 " Strip leading and trailing whitespace
 function! s:strip_whitespace(text) abort
@@ -89,7 +89,6 @@ function! tags#update_tags() abort
   endif
   let b:tags_by_name = sort(deepcopy(tags), 's:sort_by_name')  " sort alphabetically by *position 0* in the sub-arrays
   let b:tags_by_line = sort(deepcopy(tags), 's:sort_by_line')  " sort numerically by *position 1* in the sub-arrays
-
   " Next filter the tags sorted by line to include only a few limited categories
   " Will also filter to pick only *top-level* items (i.e. tags with global scope)
   let cats = get(g:tags_scope_filetypes, &filetype, 'f')
@@ -118,17 +117,12 @@ function! tags#jump_tag(forward, repeat, top, ...) abort
   let lnum = cline
   let repeat = a:repeat == 0 ? 1 : a:repeat
   let tags = eval(bufvar)
-
-  " Loop through repitition
-  for j in range(repeat)
-    " Edge cases; at bottom or top of document
-    if lnum < tags[0][1] || lnum > tags[-1][1]
+  for j in range(repeat)  " loop through repitition count
+    if lnum < tags[0][1] || lnum > tags[-1][1]  " case at bottom or top of document
       let idx = (a:forward ? 0 : -1)
-    " Extra case not handled in main loop
-    elseif lnum == tags[-1][1]
+    elseif lnum == tags[-1][1]  " case not handled in main loop
       let idx = (a:forward ? 0 : -2)
-    " Main loop
-    else
+    else  " main loop
       for i in range(len(tags) - 1)
         if lnum == tags[i][1]
           let idx = (a:forward ? i + 1 : i - 1)
@@ -148,16 +142,43 @@ function! tags#jump_tag(forward, repeat, top, ...) abort
     let ltag = tags[idx][0]
     let lnum = str2nr(tags[idx][1])
   endfor
-
-  " Cannot move cursor inside autoload function (???)
-  " Instead return command for jumping to line
   echom 'Tag: ' . ltag
-  return lnum . 'G'
+  return lnum . 'G'  " return command since cannot move cursor inside autoload function
 endfunction
 
 "-----------------------------------------------------------------------------"
-" Refactoring tools
+" Refactoring-related functions
 "-----------------------------------------------------------------------------"
+" Count occurrences inside file
+" See: https://vi.stackexchange.com/a/20661/8084
+function! tags#count_occurence(pattern) range abort
+  let range = a:firstline == a:lastline ? '%' : a:firstline . ',' . a:lastline
+  redir => text
+    silent exe range . 's/' . a:pattern . '//n'
+  redir END
+  let num = matchstr(text, '\d\+')
+  echom "Number of '" . a:pattern . "' occurences: " . num
+endfunction
+
+" Special function that jumps to next occurence automatically
+" This is called when InsertLeave is triggered
+" Warning: The @. register may contain keystrokes like <80>kb (i.e. backspace)
+function! tags#change_repeat() abort
+  if exists('g:iterate_occurences') && g:iterate_occurences
+    call feedkeys(
+      \ ':silent undo | let winview = winsaveview() '
+      \ . '| keepjumps %s@' . getreg('/') . '@' . getreg('.') . '@ge '
+      \ . "| call winrestview(winview)\<CR>"
+      \ , 't'
+      \ )
+  elseif exists('g:inject_replace_occurences') && g:inject_replace_occurences
+    silent! normal! n
+    call repeat#set("\<Plug>replace_occurence")
+  endif
+  let g:iterate_occurences = 0
+  let g:inject_replace_occurences = 0
+endfunction
+
 " Search within top level tags belonging to 'scope' kinds
 " * Search func idea came from: http://vim.wikia.com/wiki/Search_in_current_function
 " * Below is copied from: https://stackoverflow.com/a/597932/4970632
@@ -189,25 +210,6 @@ function! tags#get_scope(...) abort
   echom 'Warning: Failed to limit search scope.'
   echohl None
   return ''
-endfunction
-
-" Special function that jumps to next occurence automatically
-" This is called when InsertLeave is triggered
-" Warning: The @. register may contain keystrokes like <80>kb (i.e. backspace)
-function! tags#change_repeat() abort
-  if exists('g:iterate_occurences') && g:iterate_occurences
-    call feedkeys(
-      \ ':silent undo | let winview = winsaveview() '
-      \ . '| keepjumps %s@' . getreg('/') . '@' . getreg('.') . '@ge '
-      \ . "| call winrestview(winview)\<CR>"
-      \ , 't'
-      \ )
-  elseif exists('g:inject_replace_occurences') && g:inject_replace_occurences
-    silent! normal! n
-    call repeat#set("\<Plug>replace_occurence")
-  endif
-  let g:iterate_occurences = 0
-  let g:inject_replace_occurences = 0
 endfunction
 
 " Set the last search register to some 'current pattern' under cursor, and
@@ -279,4 +281,3 @@ function! tags#delete_all(map) abort
   call winrestview(winview)
   echom 'Deleted all occurences.'
 endfunction
-
