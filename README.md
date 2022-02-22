@@ -46,7 +46,7 @@ Mappings
 | `c/`, `c*`, `c&`, `c#`, `c@` | Replace the corresponding selection under the cursor with user input text by (1) deleting the selection and (2) entering insert mode and allowing the user to type something. `c/` uses the last search pattern. When you exit insert mode we jump to the next occurrence. Hitting `.` replaces this with the text you previously typed. This is like `:s/pattern/replacement/g` but cleaner.
 | `da/`, `da*`, `da&`, `da#`, `da@` | As with `d/`, `d*`, `d&`, `d#`, `d@`, but delete *all* occurrences.
 | `ca/`, `ca*`, `ca&`, `ca#`, `ca@` | As with `c/`, `c*`, `c&`, `c#`, `c@`, but change *all* occurrences.
-| `<Leader>.`, `<Leader>*`, `<Leader>&` | Show the number of search patterns, words, or WORDs under the cursor in the file. |
+| `<Leader>/`, `<Leader>!`, `<Leader>*`, `<Leader>&` | Show the number of search patterns, characters, words, or WORDs under the cursor in the file. |
 
 Options
 -------

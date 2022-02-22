@@ -40,8 +40,8 @@ endif
 set cpoptions+=d
 augroup tags
   au!
-  au InsertLeave * call tags#change_repeat() " magical c* searching function
-  au BufRead,BufWritePost * call tags#update_tags()
+  au InsertLeave * call tags#change_repeat()  " magical c* searching function
+  au BufReadPost,BufWritePost * call tags#update_tags()
 augroup END
 
 " Files that we wish to ignore
@@ -150,7 +150,7 @@ noremap <Leader>&
   \ :call tags#count_occurence('\_s' . escape(expand('<cWORD>'), '[]\.*$~') . '\_s')<CR>
 noremap <Leader>!
   \ :call tags#count_occurence(escape(matchstr(getline('.'), '\%' . col('.') . 'c.'), '[]\.*$~'))<CR>
-noremap <Leader>.
+noremap <Leader>/
   \ :call tags#count_occurence(@/)<CR>
 
 " Maps that replicate :d/regex/ behavior and can be repeated with '.'
