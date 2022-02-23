@@ -101,7 +101,8 @@ function! s:replace_occurence() abort
 endfunction
 
 " Public commands
-command! ShowTags call tags#show_tags()
+command! ShowTag echom 'Current tag: ' . tags#current_tag()
+command! ShowTags call tags#print_tags()
 command! UpdateTags call tags#update_tags()
 
 " Tag search maps
@@ -110,10 +111,10 @@ exe 'map <silent> ' . g:tags_forward_map . ' <Plug>TagsForwardAll'
 exe 'map <silent> ' . g:tags_backward_map . ' <Plug>TagsBackwardAll'
 exe 'map <silent> ' . g:tags_forward_top_map . ' <Plug>TagsForwardTop'
 exe 'map <silent> ' . g:tags_backward_top_map . ' <Plug>TagsBackwardTop'
-noremap <expr> <silent> <Plug>TagsForwardAll tags#jump_tag(1, v:count, 0)
-noremap <expr> <silent> <Plug>TagsBackwardAll tags#jump_tag(0, v:count, 0)
-noremap <expr> <silent> <Plug>TagsForwardTop tags#jump_tag(1, v:count, 1)
-noremap <expr> <silent> <Plug>TagsBackwardTop tags#jump_tag(0, v:count, 1)
+noremap <expr> <silent> <Plug>TagsForwardAll tags#jump_tag(v:count, 0, 1)
+noremap <expr> <silent> <Plug>TagsBackwardAll tags#jump_tag(v:count, 0, 0)
+noremap <expr> <silent> <Plug>TagsForwardTop tags#jump_tag(v:count, 1, 1)
+noremap <expr> <silent> <Plug>TagsBackwardTop tags#jump_tag(v:count, 1, 0)
 
 " Tag jump map
 exe 'nmap ' . g:tags_jump_map . ' <Plug>TagsJump'

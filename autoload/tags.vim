@@ -1,5 +1,5 @@
 "------------------------------------------------------------------------------"
-" Tag-related functions
+" General tag processing utiltiies
 "------------------------------------------------------------------------------"
 " Strip leading and trailing whitespace
 function! s:strip_whitespace(text) abort
@@ -31,26 +31,119 @@ function! s:tag_command(...) abort
     \ . " 2>/dev/null | cut -d'\t' -f1,3-5 "
 endfunction
 
-" Tool that provides a nice display of tags
-function! tags#show_tags() abort
+" Tool that prints the result of the tag command
+" Note: Just prints the output of the command
+function! tags#print_tags() abort
   let cmd = s:tag_command() . " | tr -s '\t' | column -t -s '\t'"
   let tags = s:strip_whitespace(system(cmd))
   if len(tags) == 0
     echohl WarningMsg
-    echom "Warning: No tags found for file '" . expand('%:p') . "'."
+    echom 'Warning: Tags not found or not available.'
     echohl None
   else
     echo "Tags for file '" . expand('%:p') . "':\n" . tags
   endif
 endfunction
 
-" Parse tags#list_tags user selection/get the line number
-" We split by whitespace, get the line num (comes before the colon)
-function! tags#select_tags(ctag) abort
-  exe split(a:ctag, '\s\+')[0][:-2]
+" Generate tags and parse them into list of lists
+" Note: Multiple tags on same line is *very* common, try the below in a model
+" src folder: for f in <pattern>; do echo $f:; ctags -f - -n $f | cut -d $'\t' -f3 | cut -d\; -f1 | sort -n | uniq -c | cut -d' ' -f4 | uniq; done
+function! tags#update_tags() abort
+  if index(g:tags_skip_filetypes, &filetype) != -1
+    return
+  endif
+  let flags = getline(1) =~# '#!.*python[23]' ? '--language-force=python' : ''
+  let tags = map(
+    \ split(system(s:tag_command(flags) . " | sed 's/;\"\t/\t/g'"), '\n'),
+    \ "split(v:val,'\t')"
+    \ )
+  if len(tags) == 0 || len(tags[0]) == 0  " no warning message for files without tags
+    return
+  endif
+  let b:tags_by_name = sort(deepcopy(tags), 's:sort_by_name')  " sort alphabetically by *position 0* in the sub-arrays
+  let b:tags_by_line = sort(deepcopy(tags), 's:sort_by_line')  " sort numerically by *position 1* in the sub-arrays
+  let idx_nofilter = index(g:tags_nofilter_filetypes, &filetype)
+  let kinds_scope = get(g:tags_scope_filetypes, &filetype, 'f')
+  let b:scope_tags_by_line = filter(
+    \ deepcopy(b:tags_by_line),
+    \ 'v:val[2] =~# "[' . kinds_scope . ']" && '
+    \ . '(' . idx_nofilter . ' != -1 || len(v:val) == 3)'
+    \ )  " filter to top-level tags belonging to a certain category
 endfunction
 
-" Generate list of strings for fzf menu, looks like:
+"-----------------------------------------------------------------------------"
+" Tag navigation utiltiies
+"-----------------------------------------------------------------------------"
+" Get the current tag from a list of tags
+" Note: This function searches exclusively (i.e. does not match the current line).
+" So only start at current line when jumping, otherwise start one line down.
+function! s:close_tag(line, level, forward, circular) abort
+  let bufvar = a:level ? 'b:scope_tags_by_line' : 'b:tags_by_line'
+  if !exists(bufvar) || len(eval(bufvar)) == 0
+    return []  " silent failure
+  endif
+  let lnum = a:line
+  let tags = eval(bufvar)
+  if a:circular && (lnum < tags[0][1] || lnum > tags[-1][1])  " bottom or top of file
+    let idx = a:forward ? 0 : -1
+  elseif a:circular && a:forward && lnum == tags[-1][1]  " case not handled in main loop
+    let idx = 0
+  elseif a:circular && !a:forward && lnum == tags[0][1]
+    let idx = -1
+  else  " main loop
+    let idxs = a:forward ? range(len(tags) - 1) : range(len(tags) - 2, 0, -1)
+    for i in idxs
+      if lnum == tags[i][1]
+        let idx = a:forward ? i + 1 : i - 1
+        break
+      elseif lnum > tags[i][1] && lnum < tags[i + 1][1]
+        let idx = a:forward ? i + 1 : i
+        break
+      endif
+      if i == idxs[-1]
+        return []  " silent failure
+      endif
+    endfor
+  endif
+  return tags[idx]
+endfunction
+
+" Get the 'current' tag defined as the tag under the cursor or preceding
+" Note: This is used with statusline
+function! tags#current_tag(...) abort
+  let tag = s:close_tag(line('.') + 1, 0, 0, 0)
+  let full = a:0 ? a:1 : 1  " print full tag
+  if empty(tag)
+    return ''
+  elseif full && len(tag) == 4  " indicates extra information
+    return substitute(tag[3], '^.*:', '', '')
+  else
+    return tag[0]
+  endif
+endfunction
+
+" Get the line of the next or previous tag excluding under the cursor
+" Note: This is used with bracket maps
+function! tags#jump_tag(repeat, ...) abort
+  let repeat = a:repeat == 0 ? 1 : a:repeat
+  let args = copy(a:000)
+  call add(args, 1)  " enable circular searching
+  call insert(args, line('.'))  " start on current line
+  for j in range(repeat)  " loop through repitition count
+    let tag = call('s:close_tag', args)
+    if empty(tag)
+      echohl WarningMsg
+      echom 'Error: Tag jump failed.'
+      echohl None
+      return ''
+    endif
+    let args[0] = str2nr(tag[1])  " adjust line number
+  endfor
+  echom 'Tag: ' . tag[0]
+  return tag[1] . 'G'  " return cmd since cannot move cursor inside autoload function
+endfunction
+
+" Return a list of strings for the an menu in the format:
 " <line number>: name (type)
 " <line number>: name (type, scope)
 " See: https://github.com/junegunn/fzf/wiki/Examples-(vim)
@@ -58,7 +151,7 @@ function! tags#list_tags() abort
   let tags = get(b:, 'tags_by_name', [])
   if empty(tags)
     echohl WarningMsg
-    echom "Warning: No tags available for file '" . expand('%:p') . "'."
+    echom 'Warning: Tags not found or not available.'
     echohl None
     return []
   endif
@@ -68,86 +161,14 @@ function! tags#list_tags() abort
     \ )
 endfunction
 
-" Generate tags and parse them into list of lists
-" Note multiple tags on same line is *very* common, try the below in a model
-" src folder: for f in <pattern>; do echo $f:; ctags -f - -n $f | cut -d $'\t' -f3 | cut -d\; -f1 | sort -n | uniq -c | cut -d' ' -f4 | uniq; done
-function! tags#update_tags() abort
-  " First get simple list of lists. Tag properties sorted alphabetically by
-  " identifier, and numerically by line number.
-  " Warning: To test if ctags worked, want exit status of *first*
-  " command in pipeline but instead we get cut/sed statuses.
-  if index(g:tags_skip_filetypes, &filetype) != -1
-    return
-  endif
-  let flags = getline(1) =~# '#!.*python[23]' ? '--language-force=python' : ''
-  let tags = map(
-    \ split(system(s:tag_command(flags) . " | sed 's/;\"\t/\t/g'"), '\n'),
-    \ "split(v:val,'\t')"
-    \ )
-  if len(tags) == 0 || len(tags[0]) == 0  " don't want warning message for files without tags!
-    return
-  endif
-  let b:tags_by_name = sort(deepcopy(tags), 's:sort_by_name')  " sort alphabetically by *position 0* in the sub-arrays
-  let b:tags_by_line = sort(deepcopy(tags), 's:sort_by_line')  " sort numerically by *position 1* in the sub-arrays
-  " Next filter the tags sorted by line to include only a few limited categories
-  " Will also filter to pick only *top-level* items (i.e. tags with global scope)
-  let cats = get(g:tags_scope_filetypes, &filetype, 'f')
-  let b:top_tags_by_line = filter(
-    \ deepcopy(b:tags_by_line),
-    \ 'v:val[2] =~ "[' . cats . ']" && ('
-    \ . index(g:tags_nofilter_filetypes, &filetype)
-    \ . ' != -1 || len(v:val) == 3'
-    \ . ')'
-    \ )
-endfunction
-
-" Jump between top level tags
-" Warning: Ctag lines are stored as strings and only get implicitly converted
-" to numbers on comparison with other numbers, so need to make sure in loop
-" that 'lnum' is always a number!
-function! tags#jump_tag(forward, repeat, top, ...) abort
-  let cline = a:0 ? a:1 : line('.')
-  let bufvar = a:top ? 'b:top_tags_by_line' : 'b:tags_by_line'
-  if !exists(bufvar) || len(eval(bufvar)) == 0
-    echohl WarningMsg
-    echom "Warning: No tags available for file '" . expand('%:p') . "'."
-    echohl None
-    return lnum  " stay on current line if failed
-  endif
-  let lnum = cline
-  let repeat = a:repeat == 0 ? 1 : a:repeat
-  let tags = eval(bufvar)
-  for j in range(repeat)  " loop through repitition count
-    if lnum < tags[0][1] || lnum > tags[-1][1]  " case at bottom or top of document
-      let idx = (a:forward ? 0 : -1)
-    elseif lnum == tags[-1][1]  " case not handled in main loop
-      let idx = (a:forward ? 0 : -2)
-    else  " main loop
-      for i in range(len(tags) - 1)
-        if lnum == tags[i][1]
-          let idx = (a:forward ? i + 1 : i - 1)
-          break
-        elseif lnum > tags[i][1] && lnum < tags[i + 1][1]
-          let idx = (a:forward ? i + 1 : i)
-          break
-        endif
-        if i == len(tags) - 1
-          echohl WarningMsg
-          echom 'Error: Bracket jump failed.'
-          echohl None
-          return cline
-        endif
-      endfor
-    endif
-    let ltag = tags[idx][0]
-    let lnum = str2nr(tags[idx][1])
-  endfor
-  echom 'Tag: ' . ltag
-  return lnum . 'G'  " return command since cannot move cursor inside autoload function
+" Parse tags#list_tags user selection/get the line number
+" We split by whitespace, get the line num (comes before the colon)
+function! tags#select_tags(ctag) abort
+  exe split(a:ctag, '\s\+')[0][:-2]
 endfunction
 
 "-----------------------------------------------------------------------------"
-" Refactoring-related functions
+" Refactoring-related utilities
 "-----------------------------------------------------------------------------"
 " Count occurrences inside file
 " See: https://vi.stackexchange.com/a/20661/8084
@@ -187,19 +208,19 @@ endfunction
 function! tags#get_scope(...) abort
   let cline = a:0 ? a:1 : line('.')
   let ntext = 10  " text length
-  if !exists('b:top_tags_by_line') || len(b:top_tags_by_line) == 0
+  if !exists('b:scope_tags_by_line') || len(b:scope_tags_by_line) == 0
     echohl WarningMsg
     echom 'Warning: Tags unavailable so cannot limit search scope.'
     echohl None
     return ''
   endif
-  let ctaglines = map(deepcopy(b:top_tags_by_line), 'v:val[1]')  " just pick out the line number
+  let ctaglines = map(deepcopy(b:scope_tags_by_line), 'v:val[1]')  " just pick out the line number
   let ctaglines = ctaglines + [line('$')]
   for i in range(0, len(ctaglines) - 2)
     if ctaglines[i] > cline || ctaglines[i + 1] <= cline  " must be line above start of next function
       continue
     endif
-    let text = b:top_tags_by_line[i][0]
+    let text = b:scope_tags_by_line[i][0]
     if len(text) >= ntext
       let text = text[:ntext - 1] . '...'
     endif
