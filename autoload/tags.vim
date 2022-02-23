@@ -84,24 +84,22 @@ function! s:close_tag(line, level, forward, circular) abort
   endif
   let lnum = a:line
   let tags = eval(bufvar)
-  if a:circular && (lnum < tags[0][1] || lnum > tags[-1][1])  " bottom or top of file
-    let idx = a:forward ? 0 : -1
-  elseif a:circular && a:forward && lnum == tags[-1][1]  " case not handled in main loop
+  if a:circular && a:forward && lnum >= tags[-1][1]
     let idx = 0
-  elseif a:circular && !a:forward && lnum == tags[0][1]
+  elseif a:circular && !a:forward && lnum <= tags[0][1]
     let idx = -1
-  else  " main loop
-    let idxs = a:forward ? range(len(tags) - 1) : range(len(tags) - 2, 0, -1)
-    for i in idxs
-      if lnum == tags[i][1]
-        let idx = a:forward ? i + 1 : i - 1
-        break
-      elseif lnum > tags[i][1] && lnum < tags[i + 1][1]
-        let idx = a:forward ? i + 1 : i
+  else
+    for i in range(1, len(tags) - 1)  " endpoint inclusive
+      if a:forward && lnum >= tags[-i - 1][1]
+        let idx = -i
         break
       endif
-      if i == idxs[-1]
-        return []  " silent failure
+      if !a:forward && lnum <= tags[i][1]
+        let idx = i - 1
+        break
+      endif
+      if i == len(tags) - 1
+        let idx = a:forward ? 0 : -1
       endif
     endfor
   endif
