@@ -89,7 +89,7 @@ function! s:close_tag(line, level, forward, circular) abort
   elseif a:circular && !a:forward && lnum <= tags[0][1]
     let idx = -1
   else
-    for i in range(1, len(tags) - 1)  " endpoint inclusive
+    for i in range(1, len(tags) - 1)  " in-between tags (endpoint inclusive)
       if a:forward && lnum >= tags[-i - 1][1]
         let idx = -i
         break
@@ -98,10 +98,10 @@ function! s:close_tag(line, level, forward, circular) abort
         let idx = i - 1
         break
       endif
-      if i == len(tags) - 1
-        let idx = a:forward ? 0 : -1
-      endif
     endfor
+    if !exists('idx')  " single tag or first or last tag
+      let idx = a:forward ? 0 : -1
+    endif
   endif
   return tags[idx]
 endfunction
