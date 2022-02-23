@@ -146,11 +146,11 @@ nnoremap <silent> <expr> g? '?' . tags#get_scope()
 " Count number of occurrences for match under cursor
 " Note: current character copied from https://stackoverflow.com/a/23323958/4970632
 noremap <Leader>*
-  \ :call tags#count_occurence('\<' . escape(expand('<cword>'), '[]\.*$~') . '\>')<CR>
+  \ :call tags#count_occurence('\<' . escape(expand('<cword>'), '[]\/.*$~') . '\>')<CR>
 noremap <Leader>&
-  \ :call tags#count_occurence('\_s' . escape(expand('<cWORD>'), '[]\.*$~') . '\_s')<CR>
+  \ :call tags#count_occurence('\_s' . escape(expand('<cWORD>'), '[]\/.*$~') . '\_s')<CR>
 noremap <Leader>!
-  \ :call tags#count_occurence(escape(matchstr(getline('.'), '\%' . col('.') . 'c.'), '[]\.*$~'))<CR>
+  \ :call tags#count_occurence(escape(matchstr(getline('.'), '\%' . col('.') . 'c.'), '[]\/.*$~'))<CR>
 noremap <Leader>/
   \ :call tags#count_occurence(@/)<CR>
 
