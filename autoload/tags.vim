@@ -172,9 +172,11 @@ endfunction
 " See: https://vi.stackexchange.com/a/20661/8084
 function! tags#count_occurence(pattern) range abort
   let range = a:firstline == a:lastline ? '%' : a:firstline . ',' . a:lastline
+  let winview = winsaveview()
   redir => text
     silent exe range . 's/' . a:pattern . '//n'
   redir END
+  call winrestview(winview)
   let num = matchstr(text, '\d\+')
   echom "Number of '" . a:pattern . "' occurences: " . num
 endfunction
