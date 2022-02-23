@@ -116,9 +116,9 @@ function! tags#current_tag(...) abort
   if empty(tag)
     return ''
   elseif full && len(tag) == 4  " indicates extra information
-    return substitute(tag[3], '^.*:', '', '')
+    return tag[2] . ':' . substitute(tag[3], '^.*:', '', '')
   else
-    return tag[0]
+    return tag[2] . ':' . tag[0]
   endif
 endfunction
 
