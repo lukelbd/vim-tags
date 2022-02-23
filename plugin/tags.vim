@@ -117,14 +117,14 @@ noremap <expr> <silent> <Plug>TagsForwardTop tags#jump_tag(v:count, 1, 1)
 noremap <expr> <silent> <Plug>TagsBackwardTop tags#jump_tag(v:count, 1, 0)
 
 " Tag jump map
+" Note: If statement must be embedded in mapping to avoid race condition issues
 exe 'nmap ' . g:tags_jump_map . ' <Plug>TagsJump'
 nnoremap <silent> <Plug>TagsJump
-  \ :if exists('*fzf#run') \| call fzf#run({
+  \ :if exists('*fzf#run') \| call fzf#run(fzf#wrap({
   \ 'source': tags#list_tags(),
   \ 'sink': function('tags#select_tags'),
-  \ 'options': "--no-sort --prompt='Ctag> '",
-  \ 'down': '~20%',
-  \ }) \| endif<CR>
+  \ 'options': "--no-sort --prompt='Tag> '",
+  \ })) \| endif<CR>
 
 "------------------------------------------------------------------------------"
 " Refactoring commands and maps

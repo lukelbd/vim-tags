@@ -25,7 +25,7 @@ endfunction
 " We use ctags in number mode (i.e. return line number)
 function! s:tag_command(...) abort
   let path = shellescape(expand('%:p'))
-  let flags = (a:0 ? a:1 : '')  " extra flags
+  let flags = a:0 ? a:1 : ''  " extra flags
   return
     \ 'ctags -f - --excmd=number ' . flags . ' ' . path
     \ . " 2>/dev/null | cut -d'\t' -f1,3-5 "
