@@ -101,7 +101,7 @@ function! s:replace_occurence() abort
 endfunction
 
 " Public commands
-command! ShowTag echom 'Current tag: ' . tags#current_tag()
+command! ShowTag echom 'Current tag: ' . tags#print_tag()
 command! ShowTags call tags#print_tags()
 command! UpdateTags call tags#update_tags()
 

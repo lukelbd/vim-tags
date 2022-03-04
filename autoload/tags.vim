@@ -77,7 +77,7 @@ endfunction
 " Get the current tag from a list of tags
 " Note: This function searches exclusively (i.e. does not match the current line).
 " So only start at current line when jumping, otherwise start one line down.
-function! s:close_tag(line, level, forward, circular) abort
+function! tags#close_tag(line, level, forward, circular) abort
   let bufvar = a:level ? 'b:scope_tags_by_line' : 'b:tags_by_line'
   if !exists(bufvar) || len(eval(bufvar)) == 0
     return []  " silent failure
@@ -108,8 +108,8 @@ endfunction
 
 " Get the 'current' tag defined as the tag under the cursor or preceding
 " Note: This is used with statusline
-function! tags#current_tag(...) abort
-  let tag = s:close_tag(line('.') + 1, 0, 0, 0)
+function! tags#print_tag(...) abort
+  let tag = tags#close_tag(line('.') + 1, 0, 0, 0)
   let full = a:0 ? a:1 : 1  " print full tag
   if empty(tag)
     return ''
@@ -128,7 +128,7 @@ function! tags#jump_tag(repeat, ...) abort
   call add(args, 1)  " enable circular searching
   call insert(args, line('.'))  " start on current line
   for j in range(repeat)  " loop through repitition count
-    let tag = call('s:close_tag', args)
+    let tag = call('tags#close_tag', args)
     if empty(tag)
       echohl WarningMsg
       echom 'Error: Tag jump failed.'
