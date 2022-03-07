@@ -234,9 +234,9 @@ function! tags#get_scope(...) abort
 endfunction
 
 " Set the last search register to some 'current pattern' under cursor, and
-" return normal mode commands for highlighting that match
-" Warning: For some reason set hlsearch does not work inside function so
-" we must return command
+" return normal mode commands for highlighting that match (must return the
+" command because for some reason set hlsearch does not work inside function).
+" Note: Here '!' handles multi-byte characters using example in :help byteidx
 function! tags#set_search(map) abort
   let motion = ''
   if a:map =~# '!'
@@ -244,7 +244,7 @@ function! tags#set_search(map) abort
     if len(string) == 0
       let @/ = "\n"
     else
-      let @/ = escape(string[col('.') - 1], '/\')
+      let @/ = matchstr(string, '.', byteidx(string, col('.') - 1))
     endif
   elseif a:map =~# '\*'
     let @/ = '\<' . expand('<cword>') . '\>\C'
@@ -259,8 +259,7 @@ function! tags#set_search(map) abort
     let @/ = '\_s\@<=' . tags#get_scope() . expand('<cWORD>') . '\ze\_s\C'
     let motion = 'lB'
   elseif a:map =~# '/'
-    " No-op
-    exe
+    :
   else
     echohl WarningMsg
     echom 'Error: Unknown mapping "' . a:map . '" for vim-tags refactoring shortcut.'
