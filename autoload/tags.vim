@@ -173,11 +173,12 @@ endfunction
 function! tags#count_occurence(pattern) range abort
   let range = a:firstline == a:lastline ? '%' : a:firstline . ',' . a:lastline
   let winview = winsaveview()
-  redir => text
-    silent exe range . 's/' . a:pattern . '//n'
+  let text = ''  " initialize in case nothing found
+  redir =>> text
+    silent exe range . 's/' . a:pattern . '//ne'
   redir END
   call winrestview(winview)
-  let num = matchstr(text, '\d\+')
+  let num = empty(text) ? 0 : matchstr(text, '\d\+')
   echom "Number of '" . a:pattern . "' occurences: " . num
 endfunction
 
