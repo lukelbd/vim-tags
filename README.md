@@ -1,13 +1,13 @@
 Vim tags
 ========
 
-A set of tools integrating vim with
+A set of basic tools for integrating vim with
 [exuberant ctags](http://ctags.sourceforge.net/) and [universal-ctags](https://docs.ctags.io/en/latest/index.html)
 that help with refactoring and navigation in arbitrary file types.
 Includes the following features:
 
-* Jumping between tags or jumping to particular tags using fuzzy searching (via the
-  [fzf](https://github.com/junegunn/fzf) plugin).
+* Jumping between tags or jumping to particular tags using a fuzzy-search algorithm
+  (via the [fzf](https://github.com/junegunn/fzf) plugin).
 * Quickly changing or deleting words, WORDS, and regular expressions one-by-one
   or all at once using insert mode rather than the `:s` command.
 * Changing or deleting words, WORDS, and regular expressions delimited by adjacent
@@ -29,17 +29,17 @@ Commands
 | ---- | ---- |
 | `:Count` | Count the number of occurences of a search expression. |
 | `:ShowTag` | Show the "current" tag under or preceding the cursor. |
-| `:ShowTags` | Show a nicely condensed table of tags for the current file. |
-| `:UpdateTags` | Manually refreshes the `b:tags_by_name`, `b:tags_by_line`, and `b:tags_for_scope`  variables used by this plugin. This is called automatically whenever a file is read or written to disk. |
+| `:ShowTags` | Show a summary table of tags in the current file. |
+| `:UpdateTags` | Manually refresh the `b:tags_by_name`, `b:tags_by_line`, and `b:tags_for_scope`  variables used by this plugin. This is called automatically whenever a file is read or written to disk. |
 
 Mappings
 --------
 
 | Mapping | Description |
 | ---- | ---- |
-| `<Leader><Leader>` | Show a fuzzy-completion menu of the ctags and jump to the selected location. This is only defined if the [fzf](https://github.com/junegunn/fzf) plugin is installed. The map can be changed with `g:tags_jump_map`. |
-| `[t`, `]t` | Jump to subsequent and preceding ctags. The maps can be changed with `g:tags_backward_map` and `g:tags_forward_map`. |
-| `[T`, `]T` | Jump to subsequent and preceding top-level "significant" ctags -- that is, omitting variable definitions, import statements, etc. Generally these are just function and class definitions. The maps can be changed with `g:tags_backward_top_map` and `g:tags_forward_top_map`. |
+| `<Leader><Leader>` | Show a fuzzy-completion menu of the tags and jump to the selected location. This is only defined if the [fzf](https://github.com/junegunn/fzf) plugin is installed. The map can be changed with `g:tags_jump_map`. |
+| `[t`, `]t` | Jump to subsequent and preceding tags. The maps can be changed with `g:tags_backward_map` and `g:tags_forward_map`. |
+| `[T`, `]T` | Jump to subsequent and preceding top-level "significant" tags -- that is, omitting variable definitions, import statements, etc. Generally these are just function and class definitions. The maps can be changed with `g:tags_backward_top_map` and `g:tags_forward_top_map`. |
 | `!`, `*`, `&` | Select the character, word or WORD under the cursor. Unlike the vim `*` map, these do not move the cursor. |
 | `#`, `@` | As for `*` and `&`, but select only the approximate local scope instead of the entire file, using "significant ctag locations" as approximate scope boundaries.
 | `g/`, `g?` | As for `/` and `?`, but again select only the approximate local scope instead of the entire file.
@@ -54,8 +54,8 @@ Options
 
 | Option | Description |
 | ---- | ---- |
-| `g:tags_skip_filetypes` | List of filetypes for which we do not want to try to generate ctags. Fill this to prevent annoying error messages. |
-| `g:tags_scope_filetypes` | Dictionary whose keys are filetypes and whose values are lists of characters, corresponding to the ctags categories used to approximate the local variable scope. If the current filetype is not in the dictionary, the `'default'` entry is used. By default, this is `'f'`, indicating function definitions. To generate a list of all possible tag types for a given language, call e.g. `ctags --list-kinds=python` on the command line. |
+| `g:tags_skip_filetypes` | List of filetypes for which we do not want to try to generate tags. Fill this to prevent annoying error messages. |
+| `g:tags_scope_filetypes` | Dictionary whose keys are filetypes and whose values are lists of characters, corresponding to the tags categories used to approximate the local variable scope. If the current filetype is not in the dictionary, the `'default'` entry is used. By default, this is `'f'`, indicating function definitions. To generate a list of all possible tag types for a given language, call e.g. `ctags --list-kinds=python` on the command line. |
 | `g:tags_nofilter_filetypes` | List of filetypes for which we do *not* want to use only the "top level" tags as scope delimiters, but also "child" tags -- for example, functions declared inside of other functions. By default, this list is equal to just `['fortran']`, since all Fortran subroutines and functions must be declared inside of a "`program`" or "`module`", which have their own tags. |
 
 Installation

@@ -134,7 +134,7 @@ command! -nargs=1 -range Count <line1>,<line2>call tags#count_occurence(<f-args>
 
 " Global and local <cword> and global and local <cWORD> searches, current
 " character search, and forward and backward local scope search.
-nnoremap <silent> <Plug>replace_occurence :call <sid>replace_occurence()<CR>
+nnoremap <silent> <Plug>replace_occurence <Cmd>call <sid>replace_occurence()<CR>
 nnoremap <silent> <expr> * tags#set_search('*')
 nnoremap <silent> <expr> & tags#set_search('&')
 nnoremap <silent> <expr> # tags#set_search('#')
@@ -146,13 +146,13 @@ nnoremap <silent> <expr> g? '?' . tags#get_scope()
 " Count number of occurrences for match under cursor
 " Note: current character copied from https://stackoverflow.com/a/23323958/4970632
 noremap <Leader>*
-  \ :call tags#count_occurence('\<' . escape(expand('<cword>'), '[]\/.*$~') . '\>')<CR>
+  \ <Cmd>call tags#count_occurence('\<' . escape(expand('<cword>'), '[]\/.*$~') . '\>')<CR>
 noremap <Leader>&
-  \ :call tags#count_occurence('\_s' . escape(expand('<cWORD>'), '[]\/.*$~') . '\_s')<CR>
+  \ <Cmd>call tags#count_occurence('\_s' . escape(expand('<cWORD>'), '[]\/.*$~') . '\_s')<CR>
 noremap <Leader>!
-  \ :call tags#count_occurence(escape(matchstr(getline('.'), '\%' . col('.') . 'c.'), '[]\/.*$~'))<CR>
+  \ <Cmd>call tags#count_occurence(escape(matchstr(getline('.'), '\%' . col('.') . 'c.'), '[]\/.*$~'))<CR>
 noremap <Leader>/
-  \ :call tags#count_occurence(@/)<CR>
+  \ <Cmd>call tags#count_occurence(@/)<CR>
 
 " Maps that replicate :d/regex/ behavior and can be repeated with '.'
 nmap d/ <Plug>d/
@@ -160,30 +160,30 @@ nmap d* <Plug>d*
 nmap d& <Plug>d&
 nmap d# <Plug>d#
 nmap d@ <Plug>d@
-nnoremap <silent> <expr> <Plug>d/ tags#delete_next('d/')
-nnoremap <silent> <expr> <Plug>d* tags#delete_next('d*')
-nnoremap <silent> <expr> <Plug>d& tags#delete_next('d&')
-nnoremap <silent> <expr> <Plug>d# tags#delete_next('d#')
-nnoremap <silent> <expr> <Plug>d@ tags#delete_next('d@')
+nnoremap <expr> <Plug>d/ tags#delete_next('d/')
+nnoremap <expr> <Plug>d* tags#delete_next('d*')
+nnoremap <expr> <Plug>d& tags#delete_next('d&')
+nnoremap <expr> <Plug>d# tags#delete_next('d#')
+nnoremap <expr> <Plug>d@ tags#delete_next('d@')
 
 " Similar to the above, but replicates :s/regex/sub/ behavior -- the substitute
 " value is determined by what user enters in insert mode, and the cursor jumps
 " to the next map after leaving insert mode
-nnoremap <silent> <expr> c/ tags#change_next('c/')
-nnoremap <silent> <expr> c* tags#change_next('c*')
-nnoremap <silent> <expr> c& tags#change_next('c&')
-nnoremap <silent> <expr> c# tags#change_next('c#')
-nnoremap <silent> <expr> c@ tags#change_next('c@')
+nnoremap <expr> c/ tags#change_next('c/')
+nnoremap <expr> c* tags#change_next('c*')
+nnoremap <expr> c& tags#change_next('c&')
+nnoremap <expr> c# tags#change_next('c#')
+nnoremap <expr> c@ tags#change_next('c@')
 
 " Maps as above, but this time delete or replace *all* occurrences
 " Added a block to next_occurence function
-nmap <silent> da/ :call tags#delete_all('d/')<CR>
-nmap <silent> da* :call tags#delete_all('d*')<CR>
-nmap <silent> da& :call tags#delete_all('d&')<CR>
-nmap <silent> da# :call tags#delete_all('d#')<CR>
-nmap <silent> da@ :call tags#delete_all('d@')<CR>
-nmap <silent> ca/ :let g:iterate_occurences = 1<CR>c/
-nmap <silent> ca* :let g:iterate_occurences = 1<CR>c*
-nmap <silent> ca& :let g:iterate_occurences = 1<CR>c&
-nmap <silent> ca# :let g:iterate_occurences = 1<CR>c#
-nmap <silent> ca@ :let g:iterate_occurences = 1<CR>c@
+nmap da/ <Cmd>tags#delete_all('d/')<CR>
+nmap da* <Cmd>tags#delete_all('d*')<CR>
+nmap da& <Cmd>tags#delete_all('d&')<CR>
+nmap da# <Cmd>tags#delete_all('d#')<CR>
+nmap da@ <Cmd>tags#delete_all('d@')<CR>
+nmap ca/ <Cmd>let g:iterate_occurences = 1<CR>c/
+nmap ca* <Cmd>let g:iterate_occurences = 1<CR>c*
+nmap ca& <Cmd>let g:iterate_occurences = 1<CR>c&
+nmap ca# <Cmd>let g:iterate_occurences = 1<CR>c#
+nmap ca@ <Cmd>let g:iterate_occurences = 1<CR>c@
