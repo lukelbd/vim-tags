@@ -31,7 +31,7 @@ function! s:tag_command(...) abort
     \ . " 2>/dev/null | cut -d'\t' -f1,3-5 "
 endfunction
 
-" Tool that prints the result of the tag command
+" Function that simply prints the result of the tag command
 " Note: Just prints the output of the command
 function! tags#print_tags() abort
   let cmd = s:tag_command() . " | tr -s '\t' | column -t -s '\t'"
@@ -53,22 +53,16 @@ function! tags#update_tags() abort
     return
   endif
   let flags = getline(1) =~# '#!.*python[23]' ? '--language-force=python' : ''
-  let tags = map(
-    \ split(system(s:tag_command(flags) . " | sed 's/;\"\t/\t/g'"), '\n'),
-    \ "split(v:val,'\t')"
-    \ )
+  let tags = system(s:tag_command(flags) . " | sed 's/;\"\t/\t/g'")
+  let tags = map(split(tags, '\n'), "split(v:val, '\t')")
   if len(tags) == 0 || len(tags[0]) == 0  " no warning message for files without tags
     return
   endif
-  let b:tags_by_name = sort(deepcopy(tags), 's:sort_by_name')  " sort alphabetically by *position 0* in the sub-arrays
-  let b:tags_by_line = sort(deepcopy(tags), 's:sort_by_line')  " sort numerically by *position 1* in the sub-arrays
-  let idx_nofilter = index(g:tags_nofilter_filetypes, &filetype)
-  let kinds_scope = get(g:tags_scope_filetypes, &filetype, 'f')
-  let b:scope_tags_by_line = filter(
-    \ deepcopy(b:tags_by_line),
-    \ 'v:val[2] =~# "[' . kinds_scope . ']" && '
-    \ . '(' . idx_nofilter . ' != -1 || len(v:val) == 3)'
-    \ )  " filter to top-level tags belonging to a certain category
+  let b:tags_by_name = sort(deepcopy(tags), 's:sort_by_name')  " sort alphabetically by name
+  let b:tags_by_line = sort(deepcopy(tags), 's:sort_by_line')  " sort numerically by line
+  let cmd1 = "v:val[2] =~# '[" . get(g:tags_scope_filetypes, &filetype, 'f') . "]'"
+  let cmd2 = '(' . index(g:tags_nofilter_filetypes, &filetype) . ' != 1 || len(v:val) == 3)'
+  let b:scope_tags_by_line = filter(deepcopy(b:tags_by_line), cmd1 . ' && ' . cmd2)
 endfunction
 
 "-----------------------------------------------------------------------------"
@@ -108,7 +102,7 @@ endfunction
 
 " Get the 'current' tag defined as the tag under the cursor or preceding
 " Note: This is used with statusline
-function! tags#print_tag(...) abort
+function! tags#current_tag(...) abort
   let tag = tags#close_tag(line('.') + 1, 0, 0, 0)
   let full = a:0 ? a:1 : 1  " print full tag
   if empty(tag)
@@ -167,16 +161,17 @@ endfunction
 "-----------------------------------------------------------------------------"
 " Count occurrences inside file
 " See: https://vi.stackexchange.com/a/20661/8084
-function! tags#count_occurence(pattern) range abort
+function! tags#count_matches(key) range abort
+  call tags#set_search(a:key)
   let range = a:firstline == a:lastline ? '%' : a:firstline . ',' . a:lastline
   let winview = winsaveview()
-  let text = ''  " initialize in case nothing found
-  redir =>> text
-    silent exe range . 's/' . a:pattern . '//ne'
+  let result = ''  " initialize in case nothing found
+  redir =>> result
+    silent exe range . 's@' . @/ . '@@ne'
   redir END
   call winrestview(winview)
-  let cnt = empty(text) ? 0 : matchstr(text, '\d\+')
-  echom 'Found ' . cnt . ' occurences of pattern: ' . a:pattern
+  let cnt = empty(result) ? 0 : matchstr(result, '\d\+')
+  return "\<Cmd>echom 'Found " . cnt . ' occurences of pattern: ' . @/ . "'\<CR>"
 endfunction
 
 " Search within top level tags belonging to 'scope' kinds
@@ -185,7 +180,7 @@ endfunction
 " * Note jedi-vim 'variable rename' is sketchy and fails; should do my own
 "   renaming, and do it by confirming every single instance
 function! tags#set_scope(...) abort
-  let cline = a:0 ? a:1 : line('.')
+  let lnum = a:0 ? a:1 : line('.')
   let ntext = 10  " text length
   if !exists('b:scope_tags_by_line') || len(b:scope_tags_by_line) == 0
     echohl WarningMsg
@@ -196,7 +191,7 @@ function! tags#set_scope(...) abort
   let taglines = map(deepcopy(b:scope_tags_by_line), 'v:val[1]')  " just pick out the line number
   let taglines = taglines + [line('$')]
   for i in range(0, len(taglines) - 2)
-    if taglines[i] > cline || taglines[i + 1] <= cline  " must be line above start of next function
+    if taglines[i] > lnum || taglines[i + 1] <= lnum  " must be line above start of next function
       continue
     endif
     let text = b:scope_tags_by_line[i][0]
@@ -215,23 +210,24 @@ endfunction
 " command because for some reason set hlsearch does not work inside function).
 " Note: Here '!' handles multi-byte characters using example in :help byteidx
 function! tags#set_search(key, ...) abort
+  let mag = '[]\/.*$~'
   let motion = ''
   let inplace = a:0 && a:1 ? 1 : 0
   if a:key =~# '\*'
     let motion = 'lb'
-    let @/ = '\<' . expand('<cword>') . '\>\C'
+    let @/ = '\<' . escape(expand('<cword>'), mag) . '\>\C'
   elseif a:key =~# '&'
     let motion = 'lB'
-    let @/ = '\_s\@<=' . expand('<cWORD>') . '\ze\_s\C'
+    let @/ = '\_s\@<=' . escape(expand('<cWORD>'), mag) . '\ze\_s\C'
   elseif a:key =~# '#'
     let motion = 'lb'
-    let @/ = tags#set_scope() . '\<' . expand('<cword>') . '\>\C'
+    let @/ = tags#set_scope() . '\<' . escape(expand('<cword>'), mag) . '\>\C'
   elseif a:key =~# '@'
     let motion = 'lB'
-    let @/ = '\_s\@<=' . tags#set_scope() . expand('<cWORD>') . '\ze\_s\C'
+    let @/ = '\_s\@<=' . tags#set_scope() . escape(expand('<cWORD>'), mag) . '\ze\_s\C'
   elseif a:key =~# '!'
     let text = getline('.')
-    let @/ = empty(text) ? "\n" : matchstr(text, '.', byteidx(text, col('.') - 1))
+    let @/ = empty(text) ? "\n" : escape(matchstr(text, '.', byteidx(text, col('.') - 1)), mag)
   endif
   return "\<Cmd>setlocal hlsearch\<CR>" . (inplace ? motion : '')
 endfunction
@@ -263,8 +259,8 @@ endfunction
 
 " Function that sets things up for maps that change text
 " Note: Unlike tags#delete_next we wait until
-function! tags#change_next(map) abort
-  let cmd = tags#set_search(a:map)
+function! tags#change_next(key) abort
+  let cmd = tags#set_search(a:key)
   let g:change_next = 1
   call repeat#set("\<Plug>change_again")
   return cmd . 'cgn'
@@ -272,15 +268,15 @@ endfunction
 
 " Delete next match
 " Warning: hlsearch inside function fails: https://stackoverflow.com/q/1803539/4970632
-function! tags#delete_next(map) abort
-  let cmd = tags#set_search(a:map)
-  call repeat#set("\<Plug>" . a:map, v:count)
+function! tags#delete_next(key) abort
+  let cmd = tags#set_search(a:key)
+  call repeat#set("\<Plug>" . a:key, v:count)
   return cmd . 'dgnn'
 endfunction
 
 " Delete all of next matches
-function! tags#delete_all(map) abort
-  let cmd = tags#set_search(a:map)
+function! tags#delete_all(key) abort
+  call tags#set_search(a:key)
   let winview = winsaveview()
   exe 'keepjumps %s@' . @/ . '@@ge'
   call winrestview(winview)

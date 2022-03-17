@@ -82,7 +82,7 @@ endif
 " Tag commands and maps
 "-----------------------------------------------------------------------------"
 " Public commands
-command! ShowTag echom 'Current tag: ' . tags#print_tag()
+command! ShowTag echom 'Current tag: ' . tags#current_tag()
 command! ShowTags call tags#print_tags()
 command! UpdateTags call tags#update_tags()
 
@@ -111,7 +111,7 @@ nnoremap <Plug>TagsJump
 " Refactoring commands and maps
 "------------------------------------------------------------------------------"
 " Public commands
-command! -nargs=1 -range Count <line1>,<line2>call tags#count_occurence(<f-args>)
+command! -nargs=1 -range Count <line1>,<line2>call tags#count_matches(<f-args>)
 
 " Global and local <cword> and global and local <cWORD> searches, current
 " character search, and forward and backward local scope search.
@@ -126,14 +126,11 @@ nnoremap <silent> <expr> g? '?' . tags#get_scope()
 
 " Count number of occurrences for match under cursor
 " Note: current character copied from https://stackoverflow.com/a/23323958/4970632
-noremap <Leader>*
-  \ <Cmd>call tags#count_occurence('\<' . escape(expand('<cword>'), '[]\/.*$~') . '\>')<CR>
-noremap <Leader>&
-  \ <Cmd>call tags#count_occurence('\_s' . escape(expand('<cWORD>'), '[]\/.*$~') . '\_s')<CR>
-noremap <Leader>!
-  \ <Cmd>call tags#count_occurence(escape(matchstr(getline('.'), '\%' . col('.') . 'c.'), '[]\/.*$~'))<CR>
-noremap <Leader>/
-  \ <Cmd>call tags#count_occurence(@/)<CR>
+" Todo: Add scope-local matches? No because use those for other mappings.
+noremap <expr> <Leader>* tags#count_matches('*')
+noremap <expr> <Leader>& tags#count_matches('&')
+noremap <expr> <Leader>! tags#count_matches('!')
+noremap <expr> <Leader>/ tags#count_matches('/')
 
 " Normal mode mappings that replicate :s/regex/sub/ behavior and can be repeated
 " with '.'. The substitution is determined from the text inserted by the user and
