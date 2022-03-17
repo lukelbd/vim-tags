@@ -141,28 +141,25 @@ function! tags#jump_tag(repeat, ...) abort
   return tag[1] . 'G'  " return cmd since cannot move cursor inside autoload function
 endfunction
 
-" Return a list of strings for the an menu in the format:
-" <line number>: name (type)
-" <line number>: name (type, scope)
+" Return a list of strings for the an menu in the format: '<line number>: name (type)'
+" or the format '<line number>: name (type, scope)' if scope information is present.
 " See: https://github.com/junegunn/fzf/wiki/Examples-(vim)
 function! tags#list_tags() abort
   let tags = get(b:, 'tags_by_name', [])
+  let tags = deepcopy(tags)
   if empty(tags)
     echohl WarningMsg
     echom 'Warning: Tags not found or not available.'
     echohl None
     return []
   endif
-  return map(
-    \ deepcopy(tags),
-    \ "printf('%4d', v:val[1]) . ': ' . v:val[0] . ' (' . join(v:val[2:], ', ') . ')'"
-    \ )
+  return map(tags, "printf('%4d', v:val[1]) . ': ' . v:val[0] . ' (' . join(v:val[2:], ', ') . ')'")
 endfunction
 
 " Parse tags#list_tags user selection/get the line number
 " We split by whitespace, get the line num (comes before the colon)
-function! tags#select_tags(ctag) abort
-  exe split(a:ctag, '\s\+')[0][:-2]
+function! tags#select_tags(tag) abort
+  exe split(a:tag, '\s\+')[0][:-2]
 endfunction
 
 "-----------------------------------------------------------------------------"
@@ -178,27 +175,8 @@ function! tags#count_occurence(pattern) range abort
     silent exe range . 's/' . a:pattern . '//ne'
   redir END
   call winrestview(winview)
-  let num = empty(text) ? 0 : matchstr(text, '\d\+')
-  echom "Number of '" . a:pattern . "' occurences: " . num
-endfunction
-
-" Special function that jumps to next occurence automatically
-" This is called when InsertLeave is triggered
-" Warning: The @. register may contain keystrokes like <80>kb (i.e. backspace)
-function! tags#change_repeat() abort
-  if exists('g:iterate_occurences') && g:iterate_occurences
-    call feedkeys(
-      \ ':silent undo | let winview = winsaveview() '
-      \ . '| keepjumps %s@' . getreg('/') . '@' . getreg('.') . '@ge '
-      \ . "| call winrestview(winview)\<CR>"
-      \ , 't'
-      \ )
-  elseif exists('g:inject_replace_occurences') && g:inject_replace_occurences
-    silent! normal! n
-    call repeat#set("\<Plug>replace_occurence")
-  endif
-  let g:iterate_occurences = 0
-  let g:inject_replace_occurences = 0
+  let cnt = empty(text) ? 0 : matchstr(text, '\d\+')
+  echom 'Found ' . cnt . ' occurences of pattern: ' . a:pattern
 endfunction
 
 " Search within top level tags belonging to 'scope' kinds
@@ -206,7 +184,7 @@ endfunction
 " * Below is copied from: https://stackoverflow.com/a/597932/4970632
 " * Note jedi-vim 'variable rename' is sketchy and fails; should do my own
 "   renaming, and do it by confirming every single instance
-function! tags#get_scope(...) abort
+function! tags#set_scope(...) abort
   let cline = a:0 ? a:1 : line('.')
   let ntext = 10  " text length
   if !exists('b:scope_tags_by_line') || len(b:scope_tags_by_line) == 0
@@ -215,21 +193,19 @@ function! tags#get_scope(...) abort
     echohl None
     return ''
   endif
-  let ctaglines = map(deepcopy(b:scope_tags_by_line), 'v:val[1]')  " just pick out the line number
-  let ctaglines = ctaglines + [line('$')]
-  for i in range(0, len(ctaglines) - 2)
-    if ctaglines[i] > cline || ctaglines[i + 1] <= cline  " must be line above start of next function
+  let taglines = map(deepcopy(b:scope_tags_by_line), 'v:val[1]')  " just pick out the line number
+  let taglines = taglines + [line('$')]
+  for i in range(0, len(taglines) - 2)
+    if taglines[i] > cline || taglines[i + 1] <= cline  " must be line above start of next function
       continue
     endif
     let text = b:scope_tags_by_line[i][0]
-    if len(text) >= ntext
-      let text = text[:ntext - 1] . '...'
-    endif
-    echom 'Scopesearch selected line ' . ctaglines[i] . ' (' . text . ') to ' . (ctaglines[i + 1] - 1) . '.'
-    return printf('\%%>%dl\%%<%dl', ctaglines[i] - 1, ctaglines[i + 1])
+    if len(text) >= ntext | let text = text[:ntext - 1] . '...' | endif
+    echom 'Selected line ' . taglines[i] . ' (' . text . ') to ' . (taglines[i + 1] - 1) . '.'
+    return printf('\%%>%dl\%%<%dl', taglines[i] - 1, taglines[i + 1])
   endfor
   echohl WarningMsg
-  echom 'Warning: Failed to limit search scope.'
+  echom 'Warning: Failed to restrict the search scope.'
   echohl None
   return ''
 endfunction
@@ -238,67 +214,74 @@ endfunction
 " return normal mode commands for highlighting that match (must return the
 " command because for some reason set hlsearch does not work inside function).
 " Note: Here '!' handles multi-byte characters using example in :help byteidx
-function! tags#set_search(map) abort
+function! tags#set_search(key, ...) abort
   let motion = ''
-  if a:map =~# '!'
-    let string = getline('.')
-    if len(string) == 0
-      let @/ = "\n"
-    else
-      let @/ = matchstr(string, '.', byteidx(string, col('.') - 1))
-    endif
-  elseif a:map =~# '\*'
+  let inplace = a:0 && a:1 ? 1 : 0
+  if a:key =~# '\*'
+    let motion = 'lb'
     let @/ = '\<' . expand('<cword>') . '\>\C'
-    let motion = 'lb'
-  elseif a:map =~# '&'
+  elseif a:key =~# '&'
+    let motion = 'lB'
     let @/ = '\_s\@<=' . expand('<cWORD>') . '\ze\_s\C'
-    let motion = 'lB'
-  elseif a:map =~# '#'
-    let @/ = tags#get_scope() . '\<' . expand('<cword>') . '\>\C'
+  elseif a:key =~# '#'
     let motion = 'lb'
-  elseif a:map =~# '@'
-    let @/ = '\_s\@<=' . tags#get_scope() . expand('<cWORD>') . '\ze\_s\C'
+    let @/ = tags#set_scope() . '\<' . expand('<cword>') . '\>\C'
+  elseif a:key =~# '@'
     let motion = 'lB'
-  elseif a:map =~# '/'
-    :
-  else
-    echohl WarningMsg
-    echom 'Error: Unknown mapping "' . a:map . '" for vim-tags refactoring shortcut.'
-    echohl None
-    return motion
+    let @/ = '\_s\@<=' . tags#set_scope() . expand('<cWORD>') . '\ze\_s\C'
+  elseif a:key =~# '!'
+    let text = getline('.')
+    let @/ = empty(text) ? "\n" : matchstr(text, '.', byteidx(text, col('.') - 1))
   endif
-  return motion . ":setlocal hlsearch\<CR>"
+  return "\<Cmd>setlocal hlsearch\<CR>" . (inplace ? motion : '')
+endfunction
+
+" Repeat previous change
+" Warning: The 'cgn' command silently fails to trigger insert mode if no matches found
+" so we check for that. Putting <Esc> in feedkeys() cancels operation so must come
+" afterward (may be no-op) and the 'i' is necessary to insert <C-a> before <Esc>.
+function! tags#change_again() abort
+  let cmd = "\<Cmd>call feedkeys(mode() =~# 'i' ? '\<C-a>' : '', 'ni')\<CR>"
+  call feedkeys('cgn' . cmd . "\<Esc>n")  " add previously inserted if cgn succeeds
+  call repeat#set("\<Plug>change_again")  " re-apply this function for next repeat
+endfunction
+
+" Finish change after InsertLeave and automatically jump to next occurence.
+" Warning: The @. register may contain keystrokes like <80>kb (i.e. backspace)
+function! tags#change_finish() abort
+  if exists('g:change_all') && g:change_all
+    silent undo  " undo first change so subsequent undo reverts all changes
+    let b:winview = winsaveview()  " store window view as buffer variable
+    call feedkeys(':keepjumps %s@' . @/ . '@' . @. . "@ge | call winrestview(b:winview)\<CR>", 'nt')
+  elseif exists('g:change_next') && g:change_next
+    call feedkeys('n', 'nt')
+    call repeat#set("\<Plug>change_again")
+  endif
+  let g:change_all = 0
+  let g:change_next = 0
 endfunction
 
 " Function that sets things up for maps that change text
+" Note: Unlike tags#delete_next we wait until
 function! tags#change_next(map) abort
-  let action = tags#set_search(a:map)
-  if action ==# ''
-    return
-  endif
-  let g:inject_replace_occurences = 1
-  return ":setlocal hlsearch\<CR>cgn"
+  let cmd = tags#set_search(a:map)
+  let g:change_next = 1
+  call repeat#set("\<Plug>change_again")
+  return cmd . 'cgn'
 endfunction
 
 " Delete next match
+" Warning: hlsearch inside function fails: https://stackoverflow.com/q/1803539/4970632
 function! tags#delete_next(map) abort
-  let action = tags#set_search(a:map)
-  if action ==# ''
-    return
-  endif
-  return
-    \ ":setlocal hlsearch\<CR>dgnn"
-    \ . ':call repeat#set("\<Plug>' . a:map . '", ' . v:count . ")\<CR>"
+  let cmd = tags#set_search(a:map)
+  call repeat#set("\<Plug>" . a:map, v:count)
+  return cmd . 'dgnn'
 endfunction
 
 " Delete all of next matches
 function! tags#delete_all(map) abort
-  let action = tags#set_search(a:map)
-  if action ==# ''
-    return
-  endif
+  let cmd = tags#set_search(a:map)
   let winview = winsaveview()
-  exe 'silent! keepjumps %s/' . @/ . '//ge'
+  exe 'keepjumps %s@' . @/ . '@@ge'
   call winrestview(winview)
-  echom 'Deleted all occurences.'
 endfunction

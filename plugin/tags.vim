@@ -40,7 +40,7 @@ endif
 set cpoptions+=d
 augroup tags
   au!
-  au InsertLeave * call tags#change_repeat()  " magical c* searching function
+  au InsertLeave * call tags#change_finish()  " finish change operation and set repeat
   au BufReadPost,BufWritePost * call tags#update_tags()
 augroup END
 
@@ -81,25 +81,6 @@ endif
 "-----------------------------------------------------------------------------"
 " Tag commands and maps
 "-----------------------------------------------------------------------------"
-" Replace driver function
-" Warning: *Must* be in here because cannot issue normal! in autoload folder evidently
-function! s:replace_occurence() abort
-  let [l0, c0] = getpos('.')[1:2]
-  let reg = getreg('"')
-  let regmode = getregtype('"')
-  let winview = winsaveview()
-  normal! ygn
-  let [l1, c1] = getpos("'[")[1:2]  " first char of yanked text
-  let [l2, c2] = getpos("']")[1:2]  " last char of yanked text
-  call setreg('"', reg, regmode)
-  call winrestview(winview)
-  if l0 >= l1 && l0 <= l2 && c0 >= c1 && c0 <= c2  " replace next occurence with previously inserted text
-    exe "silent! normal! cgn\<C-a>\<Esc>"
-  endif
-  silent! normal! n
-  call repeat#set("\<Plug>replace_occurence")
-endfunction
-
 " Public commands
 command! ShowTag echom 'Current tag: ' . tags#print_tag()
 command! ShowTags call tags#print_tags()
@@ -119,8 +100,8 @@ noremap <expr> <silent> <Plug>TagsBackwardTop tags#jump_tag(v:count, 1, 0)
 " Tag jump map
 " Note: If statement must be embedded in mapping to avoid race condition issues
 exe 'nmap ' . g:tags_jump_map . ' <Plug>TagsJump'
-nnoremap <silent> <Plug>TagsJump
-  \ :if exists('*fzf#run') \| call fzf#run(fzf#wrap({
+nnoremap <Plug>TagsJump
+  \ <Cmd>if exists('*fzf#run') \| call fzf#run(fzf#wrap({
   \ 'source': tags#list_tags(),
   \ 'sink': function('tags#select_tags'),
   \ 'options': "--no-sort --prompt='Tag> '",
@@ -134,12 +115,12 @@ command! -nargs=1 -range Count <line1>,<line2>call tags#count_occurence(<f-args>
 
 " Global and local <cword> and global and local <cWORD> searches, current
 " character search, and forward and backward local scope search.
-nnoremap <silent> <Plug>replace_occurence <Cmd>call <sid>replace_occurence()<CR>
-nnoremap <silent> <expr> * tags#set_search('*')
-nnoremap <silent> <expr> & tags#set_search('&')
-nnoremap <silent> <expr> # tags#set_search('#')
-nnoremap <silent> <expr> @ tags#set_search('@')
-nnoremap <silent> <expr> ! tags#set_search('!')
+nnoremap <silent> <Plug>change_again <Cmd>call tags#change_again()<CR>
+nnoremap <silent> <expr> * tags#set_search('*', 1)
+nnoremap <silent> <expr> & tags#set_search('&', 1)
+nnoremap <silent> <expr> # tags#set_search('#', 1)
+nnoremap <silent> <expr> @ tags#set_search('@', 1)
+nnoremap <silent> <expr> ! tags#set_search('!', 1)
 nnoremap <silent> <expr> g/ '/' . tags#get_scope()
 nnoremap <silent> <expr> g? '?' . tags#get_scope()
 
@@ -154,36 +135,40 @@ noremap <Leader>!
 noremap <Leader>/
   \ <Cmd>call tags#count_occurence(@/)<CR>
 
-" Maps that replicate :d/regex/ behavior and can be repeated with '.'
+" Normal mode mappings that replicate :s/regex/sub/ behavior and can be repeated
+" with '.'. The substitution is determined from the text inserted by the user and
+" the cursor automatically jumps to the next match. The 'a' mappings change all matches.
+nmap c/ <Plug>c/
+nmap c* <Plug>c*
+nmap c& <Plug>c&
+nmap c# <Plug>c#
+nmap c@ <Plug>c@
+nmap ca/ <Cmd>let g:change_all = 1<CR><Plug>c/
+nmap ca* <Cmd>let g:change_all = 1<CR><Plug>c*
+nmap ca& <Cmd>let g:change_all = 1<CR><Plug>c&
+nmap ca# <Cmd>let g:change_all = 1<CR><Plug>c#
+nmap ca@ <Cmd>let g:change_all = 1<CR><Plug>c@
+nnoremap <expr> <Plug>c/ tags#change_next('c/')
+nnoremap <expr> <Plug>c* tags#change_next('c*')
+nnoremap <expr> <Plug>c& tags#change_next('c&')
+nnoremap <expr> <Plug>c# tags#change_next('c#')
+nnoremap <expr> <Plug>c@ tags#change_next('c@')
+
+" Normal mode mappings that replicate :d/regex/ behavior and can be repeated
+" with '.'. The cursuro automatically jumps to the next match. The 'a' mappings
+" delete all matches.
 nmap d/ <Plug>d/
 nmap d* <Plug>d*
 nmap d& <Plug>d&
 nmap d# <Plug>d#
 nmap d@ <Plug>d@
+nmap da/ <Cmd>call tags#delete_all('d/')<CR>
+nmap da* <Cmd>call tags#delete_all('d*')<CR>
+nmap da& <Cmd>call tags#delete_all('d&')<CR>
+nmap da# <Cmd>call tags#delete_all('d#')<CR>
+nmap da@ <Cmd>call tags#delete_all('d@')<CR>
 nnoremap <expr> <Plug>d/ tags#delete_next('d/')
 nnoremap <expr> <Plug>d* tags#delete_next('d*')
 nnoremap <expr> <Plug>d& tags#delete_next('d&')
 nnoremap <expr> <Plug>d# tags#delete_next('d#')
 nnoremap <expr> <Plug>d@ tags#delete_next('d@')
-
-" Similar to the above, but replicates :s/regex/sub/ behavior -- the substitute
-" value is determined by what user enters in insert mode, and the cursor jumps
-" to the next map after leaving insert mode
-nnoremap <expr> c/ tags#change_next('c/')
-nnoremap <expr> c* tags#change_next('c*')
-nnoremap <expr> c& tags#change_next('c&')
-nnoremap <expr> c# tags#change_next('c#')
-nnoremap <expr> c@ tags#change_next('c@')
-
-" Maps as above, but this time delete or replace *all* occurrences
-" Added a block to next_occurence function
-nmap da/ <Cmd>tags#delete_all('d/')<CR>
-nmap da* <Cmd>tags#delete_all('d*')<CR>
-nmap da& <Cmd>tags#delete_all('d&')<CR>
-nmap da# <Cmd>tags#delete_all('d#')<CR>
-nmap da@ <Cmd>tags#delete_all('d@')<CR>
-nmap ca/ <Cmd>let g:iterate_occurences = 1<CR>c/
-nmap ca* <Cmd>let g:iterate_occurences = 1<CR>c*
-nmap ca& <Cmd>let g:iterate_occurences = 1<CR>c&
-nmap ca# <Cmd>let g:iterate_occurences = 1<CR>c#
-nmap ca@ <Cmd>let g:iterate_occurences = 1<CR>c@
