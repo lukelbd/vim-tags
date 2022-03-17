@@ -111,26 +111,24 @@ nnoremap <Plug>TagsJump
 " Refactoring commands and maps
 "------------------------------------------------------------------------------"
 " Public commands
-command! -nargs=1 -range Count <line1>,<line2>call tags#count_matches(<f-args>)
+command! -nargs=1 -range Count let @/ = <q-args> | <line1>,<line2>call tags#count_matches('/')
 
-" Global and local <cword> and global and local <cWORD> searches, current
+" Global and local <cword>, global and local <cWORD>, local forward and backward,
+" and current character searches. Also include match counts.
 " character search, and forward and backward local scope search.
-nnoremap <silent> <Plug>change_again <Cmd>call tags#change_again()<CR>
-nnoremap <silent> <expr> * tags#set_search('*', 1)
-nnoremap <silent> <expr> & tags#set_search('&', 1)
-nnoremap <silent> <expr> # tags#set_search('#', 1)
-nnoremap <silent> <expr> @ tags#set_search('@', 1)
-nnoremap <silent> <expr> ! tags#set_search('!', 1)
-nnoremap <silent> <expr> g/ '/' . tags#get_scope()
-nnoremap <silent> <expr> g? '?' . tags#get_scope()
-
-" Count number of occurrences for match under cursor
 " Note: current character copied from https://stackoverflow.com/a/23323958/4970632
 " Todo: Add scope-local matches? No because use those for other mappings.
 noremap <expr> <Leader>* tags#count_matches('*')
 noremap <expr> <Leader>& tags#count_matches('&')
 noremap <expr> <Leader>! tags#count_matches('!')
 noremap <expr> <Leader>/ tags#count_matches('/')
+nnoremap <expr> * tags#set_match('*', 1)
+nnoremap <expr> & tags#set_match('&', 1)
+nnoremap <expr> # tags#set_match('#', 1)
+nnoremap <expr> @ tags#set_match('@', 1)
+nnoremap <expr> ! tags#set_match('!', 1)
+nnoremap <expr> g/ '/' . tags#get_scope()
+nnoremap <expr> g? '?' . tags#get_scope()
 
 " Normal mode mappings that replicate :s/regex/sub/ behavior and can be repeated
 " with '.'. The substitution is determined from the text inserted by the user and
@@ -150,6 +148,7 @@ nnoremap <expr> <Plug>c* tags#change_next('c*')
 nnoremap <expr> <Plug>c& tags#change_next('c&')
 nnoremap <expr> <Plug>c# tags#change_next('c#')
 nnoremap <expr> <Plug>c@ tags#change_next('c@')
+nnoremap <Plug>change_again <Cmd>call tags#change_again()<CR>
 
 " Normal mode mappings that replicate :d/regex/ behavior and can be repeated
 " with '.'. The cursuro automatically jumps to the next match. The 'a' mappings

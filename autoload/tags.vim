@@ -162,16 +162,10 @@ endfunction
 " Count occurrences inside file
 " See: https://vi.stackexchange.com/a/20661/8084
 function! tags#count_matches(key) range abort
-  call tags#set_search(a:key)
+  let cmd = tags#set_match(a:key)
+  let b:winview = winsaveview()  " store window as buffer variable
   let range = a:firstline == a:lastline ? '%' : a:firstline . ',' . a:lastline
-  let winview = winsaveview()
-  let result = ''  " initialize in case nothing found
-  redir =>> result
-    silent exe range . 's@' . @/ . '@@ne'
-  redir END
-  call winrestview(winview)
-  let cnt = empty(result) ? 0 : matchstr(result, '\d\+')
-  return "\<Cmd>echom 'Found " . cnt . ' occurences of pattern: ' . @/ . "'\<CR>"
+  return cmd . "\<Cmd>" . range . 's@' . @/ . "@@ne | call winrestview(b:winview)\<CR>"
 endfunction
 
 " Search within top level tags belonging to 'scope' kinds
@@ -209,7 +203,7 @@ endfunction
 " return normal mode commands for highlighting that match (must return the
 " command because for some reason set hlsearch does not work inside function).
 " Note: Here '!' handles multi-byte characters using example in :help byteidx
-function! tags#set_search(key, ...) abort
+function! tags#set_match(key, ...) abort
   let mag = '[]\/.*$~'
   let motion = ''
   let inplace = a:0 && a:1 ? 1 : 0
@@ -260,7 +254,7 @@ endfunction
 " Function that sets things up for maps that change text
 " Note: Unlike tags#delete_next we wait until
 function! tags#change_next(key) abort
-  let cmd = tags#set_search(a:key)
+  let cmd = tags#set_match(a:key)
   let g:change_next = 1
   call repeat#set("\<Plug>change_again")
   return cmd . 'cgn'
@@ -269,14 +263,14 @@ endfunction
 " Delete next match
 " Warning: hlsearch inside function fails: https://stackoverflow.com/q/1803539/4970632
 function! tags#delete_next(key) abort
-  let cmd = tags#set_search(a:key)
+  let cmd = tags#set_match(a:key)
   call repeat#set("\<Plug>" . a:key, v:count)
   return cmd . 'dgnn'
 endfunction
 
 " Delete all of next matches
 function! tags#delete_all(key) abort
-  call tags#set_search(a:key)
+  call tags#set_match(a:key)
   let winview = winsaveview()
   exe 'keepjumps %s@' . @/ . '@@ge'
   call winrestview(winview)
