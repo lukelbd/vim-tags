@@ -233,7 +233,9 @@ endfunction
 function! tags#change_again() abort
   let cmd = "\<Cmd>call feedkeys(mode() =~# 'i' ? '\<C-a>' : '', 'ni')\<CR>"
   call feedkeys('cgn' . cmd . "\<Esc>n")  " add previously inserted if cgn succeeds
-  call repeat#set("\<Plug>change_again")  " re-apply this function for next repeat
+  if exists('*repeat#set')
+    call repeat#set("\<Plug>change_again")  " re-apply this function for next repeat
+  endif
 endfunction
 
 " Finish change after InsertLeave and automatically jump to next occurence.
@@ -245,7 +247,9 @@ function! tags#change_finish() abort
     call feedkeys(':keepjumps %s@' . @/ . '@' . @. . "@ge | call winrestview(b:winview)\<CR>", 'nt')
   elseif exists('g:change_next') && g:change_next
     call feedkeys('n', 'nt')
-    call repeat#set("\<Plug>change_again")
+    if exists('*repeat#set')
+      call repeat#set("\<Plug>change_again")
+    endif
   endif
   let g:change_all = 0
   let g:change_next = 0
@@ -256,7 +260,9 @@ endfunction
 function! tags#change_next(key) abort
   let cmd = tags#set_match(a:key)
   let g:change_next = 1
-  call repeat#set("\<Plug>change_again")
+  if exists('*repeat#set')
+    call repeat#set("\<Plug>change_again")
+  endif
   return cmd . 'cgn'
 endfunction
 
@@ -264,7 +270,9 @@ endfunction
 " Warning: hlsearch inside function fails: https://stackoverflow.com/q/1803539/4970632
 function! tags#delete_next(key) abort
   let cmd = tags#set_match(a:key)
-  call repeat#set("\<Plug>" . a:key, v:count)
+  if exists('*repeat#set')
+    call repeat#set("\<Plug>" . a:key, v:count)
+  endif
   return cmd . 'dgnn'
 endfunction
 
