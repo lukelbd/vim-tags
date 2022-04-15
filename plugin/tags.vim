@@ -86,26 +86,18 @@ command! ShowTag echom 'Current tag: ' . tags#current_tag()
 command! ShowTags call tags#print_tags()
 command! UpdateTags call tags#update_tags()
 
-" Tag search maps
+" Tag select maps
 " Note: Must use :n instead of <expr> ngg so we can use <C-u> to discard count!
+exe 'nmap ' . g:tags_jump_map . ' <Plug>TagsJump'
 exe 'map <silent> ' . g:tags_forward_map . ' <Plug>TagsForwardAll'
 exe 'map <silent> ' . g:tags_backward_map . ' <Plug>TagsBackwardAll'
 exe 'map <silent> ' . g:tags_forward_top_map . ' <Plug>TagsForwardTop'
 exe 'map <silent> ' . g:tags_backward_top_map . ' <Plug>TagsBackwardTop'
+nnoremap <Plug>TagsJump <Cmd>call tags#select_tag()<CR>
 noremap <expr> <silent> <Plug>TagsForwardAll tags#jump_tag(v:count, 0, 1)
 noremap <expr> <silent> <Plug>TagsBackwardAll tags#jump_tag(v:count, 0, 0)
 noremap <expr> <silent> <Plug>TagsForwardTop tags#jump_tag(v:count, 1, 1)
 noremap <expr> <silent> <Plug>TagsBackwardTop tags#jump_tag(v:count, 1, 0)
-
-" Tag jump map
-" Note: If statement must be embedded in mapping to avoid race condition issues
-exe 'nmap ' . g:tags_jump_map . ' <Plug>TagsJump'
-nnoremap <Plug>TagsJump
-  \ <Cmd>if exists('*fzf#run') \| call fzf#run(fzf#wrap({
-  \ 'source': tags#list_tags(),
-  \ 'sink': function('tags#select_tags'),
-  \ 'options': "--no-sort --prompt='Tag> '",
-  \ })) \| endif<CR>
 
 "------------------------------------------------------------------------------"
 " Refactoring commands and maps

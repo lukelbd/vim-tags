@@ -36,13 +36,10 @@ endfunction
 function! tags#print_tags() abort
   let cmd = s:tag_command() . " | tr -s '\t' | column -t -s '\t'"
   let tags = s:strip_whitespace(system(cmd))
-  if len(tags) == 0
-    echohl WarningMsg
-    echom 'Warning: Tags not found or not available.'
-    echohl None
-  else
-    echo "Tags for file '" . expand('%:p') . "':\n" . tags
+  if empty(tags)
+    echohl WarningMsg | echom 'Warning: Tags not found or not available.' | echohl None | return ''
   endif
+  echo "Tags for file '" . expand('%:p') . "':\n" . tags
 endfunction
 
 " Generate tags and parse them into list of lists
@@ -135,25 +132,34 @@ function! tags#jump_tag(repeat, ...) abort
   return tag[1] . 'G'  " return cmd since cannot move cursor inside autoload function
 endfunction
 
-" Return a list of strings for the an menu in the format: '<line number>: name (type)'
-" or the format '<line number>: name (type, scope)' if scope information is present.
-" See: https://github.com/junegunn/fzf/wiki/Examples-(vim)
-function! tags#list_tags() abort
-  let tags = get(b:, 'tags_by_name', [])
-  let tags = deepcopy(tags)
+" Select a specific tag using fzf
+" Note: This matches construction of fzf mappings in vim-succinct.
+function! tags#select_tag() abort
+  let tags = s:tag_source()
   if empty(tags)
-    echohl WarningMsg
-    echom 'Warning: Tags not found or not available.'
-    echohl None
-    return []
+    echohl WarningMsg | echom 'Warning: Tags not found or not available.' | echohl None | return
   endif
-  return map(tags, "printf('%4d', v:val[1]) . ': ' . v:val[0] . ' (' . join(v:val[2:], ', ') . ')'")
+  if !exists('*fzf#run')
+    echohl WarningMsg | echom 'Warning: FZF plugin not found.' | echohl None | return
+  endif
+  call fzf#run(fzf#wrap({
+    \ 'source': tags,
+    \ 'sink': function('s:tag_sink'),
+    \ 'options': "--no-sort --prompt='Tag> '",
+    \ }))
 endfunction
 
-" Parse tags#list_tags user selection/get the line number
-" We split by whitespace, get the line num (comes before the colon)
-function! tags#select_tags(tag) abort
-  exe split(a:tag, '\s\+')[0][:-2]
+" Return a list of strings for the an menu in the format: '<line number>: name (type)'
+" or the format '<line number>: name (type, scope)' if scope information is present.
+" Then the sink function simply gets the line number before the colon.
+" See: https://github.com/junegunn/fzf/wiki/Examples-(vim)
+function! s:tag_sink(tag) abort
+  exe split(a:tag, ':')[0]
+endfunction
+function! s:tag_source() abort
+  let tags = get(b:, 'tags_by_name', [])
+  let tags = deepcopy(tags)
+  return map(tags, "printf('%4d', v:val[1]) . ': ' . v:val[0] . ' (' . join(v:val[2:], ', ') . ')'")
 endfunction
 
 "-----------------------------------------------------------------------------"
