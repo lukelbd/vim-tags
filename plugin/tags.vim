@@ -84,7 +84,7 @@ endif
 " Public commands
 command! ShowTag echom 'Current tag: ' . tags#current_tag()
 command! ShowTags call tags#print_tags()
-command! UpdateTags call tags#update_tags()
+command! UpdateTags echom tags#update_tags() ? 'Updated tags.' : 'Failed to update tags.'
 
 " Tag select maps
 " Note: Must use :n instead of <expr> ngg so we can use <C-u> to discard count!
