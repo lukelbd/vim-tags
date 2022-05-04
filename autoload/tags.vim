@@ -246,7 +246,8 @@ function! tags#change_again() abort
 endfunction
 
 " Finish change after InsertLeave and automatically jump to next occurence.
-" Warning: The @. register may contain keystrokes like <80>kb (i.e. backspace)
+" Warning: The @. register may contain keystrokes like <80>kb (i.e. backspace) so
+" must feed keys as if typed rather than as if from mapping.
 function! tags#change_finish() abort
   if exists('g:change_all') && g:change_all
     silent undo  " undo first change so subsequent undo reverts all changes

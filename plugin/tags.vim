@@ -40,8 +40,8 @@ endif
 set cpoptions+=d
 augroup tags
   au!
-  au InsertLeave * call tags#change_finish()  " finish change operation and set repeat
-  au BufReadPost,BufWritePost * call tags#update_tags()
+  au InsertLeave * silent call tags#change_finish()  " finish change operation and set repeat
+  au BufReadPost,BufWritePost * silent call tags#update_tags()
 augroup END
 
 " Files that we wish to ignore
