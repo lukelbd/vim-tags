@@ -130,7 +130,7 @@ function! tags#jump_tag(repeat, ...) abort
     let args[0] = str2nr(tag[1])  " adjust line number
   endfor
   echom 'Tag: ' . tag[0]
-  return tag[1] . 'G'  " return cmd since cannot move cursor inside autoload function
+  return "\<Esc>" . tag[1] . 'G'  " return cmd since cannot move cursor inside autoload function
 endfunction
 
 " Select a specific tag using fzf
