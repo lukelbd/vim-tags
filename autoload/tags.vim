@@ -230,7 +230,7 @@ function! tags#set_match(key, ...) abort
     let text = getline('.')
     let @/ = empty(text) ? "\n" : escape(matchstr(text, '.', byteidx(text, col('.') - 1)), mag)
   endif
-  return "\<Cmd>setlocal hlsearch\<CR>" . (inplace ? motion : '')
+  return "\<Cmd>setlocal hlsearch\<CR>" . (inplace ? motion : '') . 'hn'
 endfunction
 
 " Repeat previous change
