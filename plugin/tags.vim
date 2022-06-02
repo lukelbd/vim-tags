@@ -104,8 +104,9 @@ noremap <expr> <silent> <Plug>TagsBackwardTop tags#jump_tag(v:count, 1, 0)
 "------------------------------------------------------------------------------"
 " Public commands
 command! -nargs=1 -range Count
-  \ let @/ = <q-args> |
-  \ call feedkeys(tags#count_matches('/', <line1>, <line2>))
+  \ let @/ = <line1> == <line2> ? <q-args> :
+  \ printf('\%%>%dl\%%<%dl', <line1> - 1, <line2> + 1) . <q-args>
+  \ | call feedkeys(tags#count_matches('/'))
 
 " Global and local <cword>, global and local <cWORD>, local forward and backward,
 " and current character searches. Also include match counts.

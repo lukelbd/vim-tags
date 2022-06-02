@@ -168,12 +168,10 @@ endfunction
 "-----------------------------------------------------------------------------"
 " Count occurrences inside file
 " See: https://vi.stackexchange.com/a/20661/8084
-function! tags#count_matches(key, ...) range abort
+function! tags#count_matches(key) abort
   let cmd = tags#set_match(a:key)
   let b:winview = winsaveview()  " store window as buffer variable
-  let [firstline, lastline] = a:0 == 2 ? [a:1, a:2] : [0, 0]
-  let range = firstline == lastline ? '%' : firstline . ',' . lastline
-  return cmd . "\<Cmd>" . range . 's@' . @/ . "@@ne | call winrestview(b:winview)\<CR>"
+  return cmd . "\<Cmd>%s@" . @/ . "@@ne | call winrestview(b:winview)\<CR>"
 endfunction
 
 " Search within top level tags belonging to 'scope' kinds
