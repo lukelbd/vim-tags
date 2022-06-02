@@ -229,7 +229,10 @@ function! tags#set_match(key, ...) abort
     let text = getline('.')
     let @/ = empty(text) ? "\n" : escape(matchstr(text, '.', byteidx(text, col('.') - 1)), mag)
   endif
-  return "\<Cmd>setlocal hlsearch\<CR>" . (inplace ? motion : '') . 'hn'
+  let cmds = (inplace ? motion : '') . "\<Cmd>setlocal hlsearch\<CR>"
+  let cmds .= exists(':ShowSearchIndex') ? "\<Cmd>ShowSearchIndex\<CR>" : ''
+  let cmds .= !empty(maparg('<Plug>(indexed-search-after)')) ? "\<Plug>(indexed-search-after)" : ''
+  return cmds
 endfunction
 
 " Repeat previous change
