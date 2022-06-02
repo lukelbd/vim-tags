@@ -88,12 +88,12 @@ command! UpdateTags echom tags#update_tags() ? 'Updated tags.' : 'Failed to upda
 
 " Tag select maps
 " Note: Must use :n instead of <expr> ngg so we can use <C-u> to discard count!
-exe 'nmap ' . g:tags_jump_map . ' <Plug>TagsJump'
+exe 'map ' . g:tags_jump_map . ' <Plug>TagsJump'
 exe 'map <silent> ' . g:tags_forward_map . ' <Plug>TagsForwardAll'
 exe 'map <silent> ' . g:tags_backward_map . ' <Plug>TagsBackwardAll'
 exe 'map <silent> ' . g:tags_forward_top_map . ' <Plug>TagsForwardTop'
 exe 'map <silent> ' . g:tags_backward_top_map . ' <Plug>TagsBackwardTop'
-nnoremap <Plug>TagsJump <Cmd>call tags#select_tag()<CR>
+noremap <Plug>TagsJump <Cmd>call tags#select_tag()<CR>
 noremap <expr> <silent> <Plug>TagsForwardAll tags#jump_tag(v:count, 0, 1)
 noremap <expr> <silent> <Plug>TagsBackwardAll tags#jump_tag(v:count, 0, 0)
 noremap <expr> <silent> <Plug>TagsForwardTop tags#jump_tag(v:count, 1, 1)
@@ -110,17 +110,17 @@ command! -nargs=1 -range Count let @/ = <q-args> | <line1>,<line2>call tags#coun
 " character search, and forward and backward local scope search.
 " Note: current character copied from https://stackoverflow.com/a/23323958/4970632
 " Todo: Add scope-local matches? No because use those for other mappings.
+noremap <expr> * tags#set_match('*', 1)
+noremap <expr> & tags#set_match('&', 1)
+noremap <expr> # tags#set_match('#', 1)
+noremap <expr> @ tags#set_match('@', 1)
+noremap <expr> ! tags#set_match('!', 1)
+noremap <expr> g/ '/' . tags#get_scope()
+noremap <expr> g? '?' . tags#get_scope()
 noremap <expr> <Leader>* tags#count_matches('*')
 noremap <expr> <Leader>& tags#count_matches('&')
 noremap <expr> <Leader>! tags#count_matches('!')
 noremap <expr> <Leader>/ tags#count_matches('/')
-nnoremap <expr> * tags#set_match('*', 1)
-nnoremap <expr> & tags#set_match('&', 1)
-nnoremap <expr> # tags#set_match('#', 1)
-nnoremap <expr> @ tags#set_match('@', 1)
-nnoremap <expr> ! tags#set_match('!', 1)
-nnoremap <expr> g/ '/' . tags#get_scope()
-nnoremap <expr> g? '?' . tags#get_scope()
 
 " Normal mode mappings that replicate :s/regex/sub/ behavior and can be repeated
 " with '.'. The substitution is determined from the text inserted by the user and
