@@ -120,10 +120,6 @@ noremap <expr> @ tags#set_match('@', 1)
 noremap <expr> ! tags#set_match('!', 1)
 noremap <expr> g/ '/' . tags#get_scope()
 noremap <expr> g? '?' . tags#get_scope()
-noremap <expr> <Leader>* tags#count_matches('*')
-noremap <expr> <Leader>& tags#count_matches('&')
-noremap <expr> <Leader>! tags#count_matches('!')
-noremap <expr> <Leader>/ tags#count_matches('/')
 
 " Normal mode mappings that replicate :s/regex/sub/ behavior and can be repeated
 " with '.'. The substitution is determined from the text inserted by the user and
