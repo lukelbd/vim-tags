@@ -60,6 +60,9 @@ function! tags#update_tags() abort
   let cmd1 = index(g:tags_nofilter_filetypes, &filetype) . ' != -1'
   let cmd2 = "v:val[2] =~# '[" . get(g:tags_scope_filetypes, &filetype, 'f') . "]'"
   let b:tags_scope_by_line = filter(deepcopy(b:tags_by_line), cmd1 . ' || ' . cmd2)
+  let cmd1 = '(' . cmd1 . ' || ' . cmd2 . ')'  " enforce a scope delimiter
+  let cmd2 = 'len(v:val) == 3'  " enforce a top-level tag
+  let b:tags_top_by_line = filter(deepcopy(b:tags_by_line), cmd1 . ' && ' . cmd2)
   return 1
 endfunction
 
@@ -69,8 +72,8 @@ endfunction
 " Get the current tag from a list of tags
 " Note: This function searches exclusively (i.e. does not match the current line).
 " So only start at current line when jumping, otherwise start one line down.
-function! tags#close_tag(line, level, forward, circular) abort
-  let bufvar = a:level ? 'b:scope_tags_by_line' : 'b:tags_by_line'
+function! tags#close_tag(line, toplevel, forward, circular) abort
+  let bufvar = a:toplevel ? 'b:tags_top_by_line' : 'b:tags_by_line'
   if !exists(bufvar) || len(eval(bufvar)) == 0
     return []  " silent failure
   endif
