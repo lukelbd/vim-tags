@@ -59,7 +59,7 @@ function! tags#update_tags() abort
   let b:tags_by_line = sort(deepcopy(tags), 's:sort_by_line')  " sort numerically by line
   let cmd1 = index(g:tags_nofilter_filetypes, &filetype) . ' != -1'
   let cmd2 = "v:val[2] =~# '[" . get(g:tags_scope_filetypes, &filetype, 'f') . "]'"
-  let b:scope_tags_by_line = filter(deepcopy(b:tags_by_line), cmd1 . ' || ' . cmd2)
+  let b:tags_scope_by_line = filter(deepcopy(b:tags_by_line), cmd1 . ' || ' . cmd2)
   return 1
 endfunction
 
@@ -181,22 +181,25 @@ endfunction
 "   renaming, and do it by confirming every single instance
 function! tags#set_scope(...) abort
   let lnum = a:0 ? a:1 : line('.')
-  let ntext = 10  " text length
-  if !exists('b:scope_tags_by_line') || len(b:scope_tags_by_line) == 0
+  let ntext = 20  " maximum length of message indicating tag
+  let ntime = exists(':ShowSearchIndex') ? '800m' : ''  " so users have time to read
+  if !exists('b:tags_scope_by_line') || len(b:tags_scope_by_line) == 0
     echohl WarningMsg
     echom 'Warning: Tags unavailable so cannot limit search scope.'
     echohl None
+    exe ntime ? 'sleep ' . ntime : ''
     return ''
   endif
-  let taglines = map(deepcopy(b:scope_tags_by_line), 'v:val[1]')  " just pick out the line number
+  let taglines = map(deepcopy(b:tags_scope_by_line), 'v:val[1]')  " just pick out the line number
   let taglines = taglines + [line('$')]
   for i in range(0, len(taglines) - 2)
     if taglines[i] > lnum || taglines[i + 1] <= lnum  " must be line above start of next function
       continue
     endif
-    let text = b:scope_tags_by_line[i][0]
+    let text = b:tags_scope_by_line[i][0]
     if len(text) >= ntext | let text = text[:ntext - 1] . '...' | endif
     echom 'Selected line ' . taglines[i] . ' (' . text . ') to ' . (taglines[i + 1] - 1) . '.'
+    exe ntime ? 'sleep ' . ntime : ''
     return printf('\%%>%dl\%%<%dl', taglines[i] - 1, taglines[i + 1])
   endfor
   echohl WarningMsg
