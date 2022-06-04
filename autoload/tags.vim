@@ -256,18 +256,6 @@ function! tags#set_match(key, ...) abort
   return cmds
 endfunction
 
-" Repeat previous change
-" Warning: The 'cgn' command silently fails to trigger insert mode if no matches found
-" so we check for that. Putting <Esc> in feedkeys() cancels operation so must come
-" afterward (may be no-op) and the 'i' is necessary to insert <C-a> before <Esc>.
-function! tags#change_again() abort
-  let cmd = "\<Cmd>call feedkeys(mode() =~# 'i' ? '\<C-a>' : '', 'ni')\<CR>"
-  call feedkeys('cgn' . cmd . "\<Esc>n")  " add previously inserted if cgn succeeds
-  if exists('*repeat#set')
-    call repeat#set("\<Plug>change_again")  " re-apply this function for next repeat
-  endif
-endfunction
-
 " Finish change after InsertLeave and automatically jump to next occurence.
 " Warning: The @. register may contain keystrokes like <80>kb (i.e. backspace) so
 " must feed keys as if typed rather than as if from mapping.
@@ -295,6 +283,18 @@ function! tags#change_next(key) abort
     call repeat#set("\<Plug>change_again")
   endif
   return cmd . 'cgn'
+endfunction
+
+" Repeat previous change
+" Warning: The 'cgn' command silently fails to trigger insert mode if no matches found
+" so we check for that. Putting <Esc> in feedkeys() cancels operation so must come
+" afterward (may be no-op) and the 'i' is necessary to insert <C-a> before <Esc>.
+function! tags#change_again() abort
+  let cmd = "\<Cmd>call feedkeys(mode() =~# 'i' ? '\<C-a>' : '', 'ni')\<CR>"
+  call feedkeys('cgn' . cmd . "\<Esc>n")  " add previously inserted if cgn succeeds
+  if exists('*repeat#set')
+    call repeat#set("\<Plug>change_again")  " re-apply this function for next repeat
+  endif
 endfunction
 
 " Delete next match
