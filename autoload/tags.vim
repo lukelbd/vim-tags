@@ -177,6 +177,25 @@ function! tags#count_matches(key) abort
   return cmd . "\<Cmd>%s@" . @/ . "@@ne | call winrestview(b:winview)\<CR>"
 endfunction
 
+" Emit warning or success message message
+" Note: Try to do this before indexed-search is shown. Original idea was to
+" trigger hlsearch before the delay but seems this does not work.
+function! tags#check_scope(...) abort
+  if empty(a:1)
+    let info = a:2 == 0 ? 'tags unavailable' : 'outside of scope delimiters'
+    echohl WarningMsg
+    echom 'Warning: Failed to restrict the search scope (' . info . ').'
+    echohl None
+  else
+    let maxlen = 20
+    let [line1, text1, line2, text2] = a:000[1:]
+    let info1 = line1 . ' (' . text1[:maxlen] . ')'
+    let info2 = line2 . ' (' . text2[:maxlen] . ')'
+    echom 'Selected line ' . info1 . ' to line ' . info2 . '.'
+  endif
+  exe exists(':ShowSearchIndex') ? 'sleep 800m' : ''
+endfunction
+
 " Search within top level tags belonging to 'scope' kinds
 " * Search func idea came from: http://vim.wikia.com/wiki/Search_in_current_function
 " * Below is copied from: https://stackoverflow.com/a/597932/4970632
@@ -184,31 +203,23 @@ endfunction
 "   renaming, and do it by confirming every single instance
 function! tags#set_scope(...) abort
   let lnum = a:0 ? a:1 : line('.')
-  let ntext = 20  " maximum length of message indicating tag
-  let ntime = exists(':ShowSearchIndex') ? '800m' : ''  " so users have time to read
   if !exists('b:tags_scope_by_line') || len(b:tags_scope_by_line) == 0
-    echohl WarningMsg
-    echom 'Warning: Tags unavailable so cannot limit search scope.'
-    echohl None
-    exe ntime ? 'sleep ' . ntime : ''
-    return ''
+    return ['', 0]
   endif
-  let taglines = map(deepcopy(b:tags_scope_by_line), 'v:val[1]')  " just pick out the line number
-  let taglines = taglines + [line('$')]
+  let taglines = add(map(deepcopy(b:tags_scope_by_line), 'v:val[1]'), line('$'))
   for i in range(0, len(taglines) - 2)
     if taglines[i] > lnum || taglines[i + 1] <= lnum  " must be line above start of next function
       continue
     endif
-    let text = b:tags_scope_by_line[i][0]
-    if len(text) >= ntext | let text = text[:ntext - 1] . '...' | endif
-    echom 'Selected line ' . taglines[i] . ' (' . text . ') to ' . (taglines[i + 1] - 1) . '.'
-    exe ntime ? 'sleep ' . ntime : ''
-    return printf('\%%>%dl\%%<%dl', taglines[i] - 1, taglines[i + 1])
+    return [
+      \ printf('\%%>%dl\%%<%dl', taglines[i] - 1, taglines[i + 1]),
+      \ taglines[i],
+      \ b:tags_scope_by_line[i][0],
+      \ taglines[i + 1] - 1,
+      \ b:tags_scope_by_line[i + 1][0],
+      \ ]
   endfor
-  echohl WarningMsg
-  echom 'Warning: Failed to restrict the search scope.'
-  echohl None
-  return ''
+  return ['', 1]
 endfunction
 
 " Set the last search register to some 'current pattern' under cursor, and
@@ -227,15 +238,19 @@ function! tags#set_match(key, ...) abort
     let @/ = '\_s\@<=' . escape(expand('<cWORD>'), mag) . '\ze\_s\C'
   elseif a:key =~# '#'
     let motion = 'lb'
-    let @/ = tags#set_scope() . '\<' . escape(expand('<cword>'), mag) . '\>\C'
+    let args = tags#set_scope()
+    let @/ = args[0] . '\<' . escape(expand('<cword>'), mag) . '\>\C'
   elseif a:key =~# '@'
     let motion = 'lB'
-    let @/ = '\_s\@<=' . tags#set_scope() . escape(expand('<cWORD>'), mag) . '\ze\_s\C'
+    let args = tags#set_scope()
+    let @/ = '\_s\@<=' . args[0] . escape(expand('<cWORD>'), mag) . '\ze\_s\C'
   elseif a:key =~# '!'
     let text = getline('.')
     let @/ = empty(text) ? "\n" : escape(matchstr(text, '.', byteidx(text, col('.') - 1)), mag)
   endif
-  let cmds = (inplace ? motion : '') . "\<Cmd>setlocal hlsearch\<CR>"
+  let cmds = inplace ? motion : ''
+  let cmds .= "\<Cmd>setlocal hlsearch\<CR>"
+  let cmds .= a:key =~# '[#@]' ? "\<Cmd>call call('tags#check_scope', " . string(args) . ")\<CR>" : ''
   let cmds .= exists(':ShowSearchIndex') ? "\<Cmd>ShowSearchIndex\<CR>" : ''
   let cmds .= !empty(maparg('<Plug>(indexed-search-after)')) ? "\<Plug>(indexed-search-after)" : ''
   return cmds
