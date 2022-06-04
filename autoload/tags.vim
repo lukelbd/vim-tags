@@ -47,19 +47,19 @@ endfunction
 " src folder: for f in <pattern>; do echo $f:; ctags -f - -n $f | cut -d $'\t' -f3 | cut -d\; -f1 | sort -n | uniq -c | cut -d' ' -f4 | uniq; done
 function! tags#update_tags() abort
   if index(g:tags_skip_filetypes, &filetype) != -1
-    return 0
+    return 0  " silently skip file type
   endif
   let flags = getline(1) =~# '#!.*python[23]' ? '--language-force=python' : ''
   let tags = system(s:tag_command(flags) . " | sed 's/;\"\t/\t/g'")
   let tags = map(split(tags, '\n'), "split(v:val, '\t')")
-  if len(tags) == 0 || len(tags[0]) == 0  " no warning message for files without tags
-    return 0
+  if len(tags) == 0 || len(tags[0]) == 0
+    return 0  " no warning message outside of UpdateTags manual invocation
   endif
   let b:tags_by_name = sort(deepcopy(tags), 's:sort_by_name')  " sort alphabetically by name
   let b:tags_by_line = sort(deepcopy(tags), 's:sort_by_line')  " sort numerically by line
-  let cmd1 = "v:val[2] =~# '[" . get(g:tags_scope_filetypes, &filetype, 'f') . "]'"
-  let cmd2 = '(' . index(g:tags_nofilter_filetypes, &filetype) . ' != 1 || len(v:val) == 3)'
-  let b:scope_tags_by_line = filter(deepcopy(b:tags_by_line), cmd1 . ' && ' . cmd2)
+  let cmd1 = index(g:tags_nofilter_filetypes, &filetype) . ' != -1'
+  let cmd2 = "v:val[2] =~# '[" . get(g:tags_scope_filetypes, &filetype, 'f') . "]'"
+  let b:scope_tags_by_line = filter(deepcopy(b:tags_by_line), cmd1 . ' || ' . cmd2)
   return 1
 endfunction
 
