@@ -257,7 +257,7 @@ function! tags#set_match(key, ...) abort
   elseif a:key =~# '!'
     let text = getline('.')
     let @/ = empty(text) ? "\n" : escape(matchstr(text, '.', byteidx(text, col('.') - 1)), mag)
-  endif
+  endif  " otherwise keep current selection
   let cmds = inplace ? motion : ''
   let cmds .= "\<Cmd>setlocal hlsearch\<CR>"
   let cmds .= a:key =~# '[#@]' ? "\<Cmd>call call('tags#check_scope', " . string(args) . ")\<CR>" : ''

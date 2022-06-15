@@ -124,38 +124,44 @@ noremap <expr> g? '?' . tags#set_scope()
 " Normal mode mappings that replicate :s/regex/sub/ behavior and can be repeated
 " with '.'. The substitution is determined from the text inserted by the user and
 " the cursor automatically jumps to the next match. The 'a' mappings change all matches.
-nmap c/ <Plug>c/
 nmap c* <Plug>c*
 nmap c& <Plug>c&
 nmap c# <Plug>c#
 nmap c@ <Plug>c@
-nmap ca/ <Cmd>let g:change_all = 1<CR><Plug>c/
+nmap c/ <Plug>c/
+nmap c? <Plug>c?
 nmap ca* <Cmd>let g:change_all = 1<CR><Plug>c*
 nmap ca& <Cmd>let g:change_all = 1<CR><Plug>c&
 nmap ca# <Cmd>let g:change_all = 1<CR><Plug>c#
 nmap ca@ <Cmd>let g:change_all = 1<CR><Plug>c@
-nnoremap <expr> <Plug>c/ tags#change_next('c/')
+nmap ca/ <Cmd>let g:change_all = 1<CR><Plug>c/
+nmap ca? <Cmd>let g:change_all = 1<CR><Plug>c?
 nnoremap <expr> <Plug>c* tags#change_next('c*')
 nnoremap <expr> <Plug>c& tags#change_next('c&')
 nnoremap <expr> <Plug>c# tags#change_next('c#')
 nnoremap <expr> <Plug>c@ tags#change_next('c@')
+nnoremap <expr> <Plug>c/ tags#change_next('c/')
+nnoremap <expr> <Plug>c? tags#change_next('c?')
 nnoremap <Plug>change_again <Cmd>call tags#change_again()<CR>
 
 " Normal mode mappings that replicate :d/regex/ behavior and can be repeated
 " with '.'. The cursuro automatically jumps to the next match. The 'a' mappings
 " delete all matches.
-nmap d/ <Plug>d/
 nmap d* <Plug>d*
 nmap d& <Plug>d&
 nmap d# <Plug>d#
 nmap d@ <Plug>d@
-nmap da/ <Cmd>call tags#delete_all('d/')<CR>
+nmap d/ <Plug>d/
+nmap d? <Plug>d?
 nmap da* <Cmd>call tags#delete_all('d*')<CR>
 nmap da& <Cmd>call tags#delete_all('d&')<CR>
 nmap da# <Cmd>call tags#delete_all('d#')<CR>
 nmap da@ <Cmd>call tags#delete_all('d@')<CR>
-nnoremap <expr> <Plug>d/ tags#delete_next('d/')
+nmap da/ <Cmd>call tags#delete_all('d/')<CR>
+nmap da? <Cmd>call tags#delete_all('d?')<CR>
 nnoremap <expr> <Plug>d* tags#delete_next('d*')
 nnoremap <expr> <Plug>d& tags#delete_next('d&')
 nnoremap <expr> <Plug>d# tags#delete_next('d#')
 nnoremap <expr> <Plug>d@ tags#delete_next('d@')
+nnoremap <expr> <Plug>d/ tags#delete_next('d/')
+nnoremap <expr> <Plug>d? tags#delete_next('d?')
