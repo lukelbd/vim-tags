@@ -193,7 +193,7 @@ function! tags#check_scope(...) abort
     let info2 = line2 . ' (' . text2[:maxlen] . ')'
     echom 'Selected line ' . info1 . ' to line ' . info2 . '.'
   endif
-  exe exists(':ShowSearchIndex') ? 'sleep 800m' : ''
+  exe exists(':ShowSearchIndex') ? 'sleep 1000m' : ''
 endfunction
 
 " Search within top level tags belonging to 'scope' kinds
@@ -206,20 +206,30 @@ function! tags#set_scope(...) abort
   if !exists('b:tags_scope_by_line') || len(b:tags_scope_by_line) == 0
     return ['', 0]
   endif
-  let taglines = add(map(deepcopy(b:tags_scope_by_line), 'v:val[1]'), line('$'))
-  for i in range(0, len(taglines) - 2)
-    if taglines[i] > lnum || taglines[i + 1] <= lnum  " must be line above start of next function
-      continue
-    endif
-    return [
-      \ printf('\%%>%dl\%%<%dl', taglines[i] - 1, taglines[i + 1]),
-      \ taglines[i],
-      \ b:tags_scope_by_line[i][0],
-      \ taglines[i + 1] - 1,
-      \ b:tags_scope_by_line[i + 1][0],
-      \ ]
-  endfor
-  return ['', 1]
+  let taglines = map(deepcopy(b:tags_scope_by_line), 'v:val[1]')
+  if lnum < taglines[0]
+    let line1 = 1
+    let line2 = taglines[0]
+    let scope1 = 'START'
+    let scope2 = b:tags_scope_by_line[0][0]
+  elseif lnum >= taglines[len(taglines) - 1]
+    let line1 = taglines[len(taglines) - 1]
+    let line2 = line('$') + 1  " match below this
+    let scope1 = b:tags_scope_by_line[len(taglines) - 1][0]
+    let scope2 = 'END'
+  else
+    for idx in range(0, len(taglines) - 2)
+      if lnum >= taglines[idx] && lnum < taglines[idx + 1]
+        let line1 = taglines[idx]
+        let line2 = taglines[idx + 1]
+        let scope1 = b:tags_scope_by_line[idx][0]
+        let scope2 = b:tags_scope_by_line[idx + 1][0]
+        break
+      endif
+    endfor
+  endif
+  let regex = printf('\%%>%dl\%%<%dl', line1 - 1, line2)
+  return [regex, line1, scope1, line2, scope2]
 endfunction
 
 " Set the last search register to some 'current pattern' under cursor, and
