@@ -262,8 +262,8 @@ function! tags#set_match(key, ...) abort
   let cmds .= "\<Cmd>setlocal hlsearch\<CR>"
   let cmds .= a:key =~# '[#@]' ? "\<Cmd>call call('tags#check_scope', " . string(args) . ")\<CR>" : ''
   let cmds .= exists(':ShowSearchIndex') ? "\<Cmd>ShowSearchIndex\<CR>" : ''
-  let cmds .= !empty(maparg('<Plug>(indexed-search-after)')) ? "\<Plug>(indexed-search-after)" : ''
-  return cmds
+  return cmds  " adding plug mapping causes issues
+  " let cmds .= !empty(maparg('<Plug>(indexed-search-after)')) ? "\<Plug>(indexed-search-after)" : ''
 endfunction
 
 " Finish change after InsertLeave and automatically jump to next occurence.
