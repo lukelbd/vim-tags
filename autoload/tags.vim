@@ -177,34 +177,18 @@ function! tags#count_matches(key) abort
   return cmd . "\<Cmd>%s@" . @/ . "@@ne | call winrestview(b:winview)\<CR>"
 endfunction
 
-" Emit warning or success message message
-" Note: Try to do this before indexed-search is shown. Original idea was to
-" trigger hlsearch before the delay but seems this does not work.
-function! tags#check_scope(...) abort
-  if empty(a:1)
-    let info = a:2 == 0 ? 'tags unavailable' : 'outside of scope delimiters'
-    echohl WarningMsg
-    echom 'Warning: Failed to restrict the search scope (' . info . ').'
-    echohl None
-  else
-    let maxlen = 20
-    let [line1, text1, line2, text2] = a:000[1:]
-    let info1 = line1 . ' (' . text1[:maxlen] . ')'
-    let info2 = line2 . ' (' . text2[:maxlen] . ')'
-    echom 'Selected line ' . info1 . ' to line ' . info2 . '.'
-  endif
-  exe exists(':ShowSearchIndex') ? 'sleep 1000m' : ''
-endfunction
-
 " Search within top level tags belonging to 'scope' kinds
-" * Search func idea came from: http://vim.wikia.com/wiki/Search_in_current_function
-" * Below is copied from: https://stackoverflow.com/a/597932/4970632
-" * Note jedi-vim 'variable rename' is sketchy and fails; should do my own
-"   renaming, and do it by confirming every single instance
+" Search func idea came from: http://vim.wikia.com/wiki/Search_in_current_function
+" The Below is copied from: https://stackoverflow.com/a/597932/4970632
+" Note jedi-vim 'variable rename' utility is sketchy and fails; gives us
+" motivation for custom renaming, and should confirm every single instance.
 function! tags#set_scope(...) abort
   let lnum = a:0 ? a:1 : line('.')
   if !exists('b:tags_scope_by_line') || len(b:tags_scope_by_line) == 0
-    return ['', 0]
+    echohl WarningMsg
+    echom 'Warning: Failed to restrict the search scope (tags unavailable).'
+    echohl None
+    return ''
   endif
   let taglines = map(deepcopy(b:tags_scope_by_line), 'v:val[1]')
   if lnum < taglines[0]
@@ -228,8 +212,13 @@ function! tags#set_scope(...) abort
       endif
     endfor
   endif
+  let maxlen = 20
   let regex = printf('\%%>%dl\%%<%dl', line1 - 1, line2)
-  return [regex, line1, scope1, line2, scope2]
+  let info1 = line1 . ' (' . scope1[:maxlen] . ')'
+  let info2 = line2 . ' (' . scope2[:maxlen] . ')'
+  echom 'Selected line ' . info1 . ' to line ' . info2 . '.'
+  exe exists(':ShowSearchIndex') ? 'sleep 1000m' : ''
+  return regex
 endfunction
 
 " Set the last search register to some 'current pattern' under cursor, and
@@ -248,22 +237,21 @@ function! tags#set_match(key, ...) abort
     let @/ = '\_s\@<=' . escape(expand('<cWORD>'), mag) . '\ze\_s\C'
   elseif a:key =~# '#'
     let motion = 'lb'
-    let args = tags#set_scope()
-    let @/ = args[0] . '\<' . escape(expand('<cword>'), mag) . '\>\C'
+    let regex = tags#set_scope()
+    let @/ = regex . '\<' . escape(expand('<cword>'), mag) . '\>\C'
   elseif a:key =~# '@'
     let motion = 'lB'
-    let args = tags#set_scope()
-    let @/ = '\_s\@<=' . args[0] . escape(expand('<cWORD>'), mag) . '\ze\_s\C'
+    let regex = tags#set_scope()
+    let @/ = '\_s\@<=' . regex . escape(expand('<cWORD>'), mag) . '\ze\_s\C'
   elseif a:key =~# '!'
     let text = getline('.')
     let @/ = empty(text) ? "\n" : escape(matchstr(text, '.', byteidx(text, col('.') - 1)), mag)
   endif  " otherwise keep current selection
   let cmds = inplace ? motion : ''
   let cmds .= "\<Cmd>setlocal hlsearch\<CR>"
-  let cmds .= a:key =~# '[#@]' ? "\<Cmd>call call('tags#check_scope', " . string(args) . ")\<CR>" : ''
   let cmds .= exists(':ShowSearchIndex') ? "\<Cmd>ShowSearchIndex\<CR>" : ''
+  let cmds .= !empty(maparg('<Plug>(indexed-search-after)')) ? "\<Plug>(indexed-search-after)" : ''
   return cmds  " adding plug mapping causes issues
-  " let cmds .= !empty(maparg('<Plug>(indexed-search-after)')) ? "\<Plug>(indexed-search-after)" : ''
 endfunction
 
 " Finish change after InsertLeave and automatically jump to next occurence.
