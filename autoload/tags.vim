@@ -224,7 +224,10 @@ endfunction
 " Set the last search register to some 'current pattern' under cursor, and
 " return normal mode commands for highlighting that match (must return the
 " command because for some reason set hlsearch does not work inside function).
-" Note: Here '!' handles multi-byte characters using example in :help byteidx
+" Note: Here '!' handles multi-byte characters using example in :help byteidx. Also
+" the native vim-indexed-search maps invoke <Plug>(indexed-search-after), which just
+" calls <Plug>(indexed-search-index) --> :ShowSearchIndex... but causes change
+" mappings to silently abort for some weird reason... so instead call this manually.
 function! tags#set_match(key, ...) abort
   let mag = '[]\/.*$~'
   let motion = ''
@@ -250,8 +253,7 @@ function! tags#set_match(key, ...) abort
   let cmds = inplace ? motion : ''
   let cmds .= "\<Cmd>setlocal hlsearch\<CR>"
   let cmds .= exists(':ShowSearchIndex') ? "\<Cmd>ShowSearchIndex\<CR>" : ''
-  let cmds .= !empty(maparg('<Plug>(indexed-search-after)')) ? "\<Plug>(indexed-search-after)" : ''
-  return cmds  " adding plug mapping causes issues
+  return cmds  " see top for notes about <Plug>(indexed-search-after)
 endfunction
 
 " Finish change after InsertLeave and automatically jump to next occurence.
