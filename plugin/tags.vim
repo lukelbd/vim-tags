@@ -1,8 +1,8 @@
-"------------------------------------------------------------------------------"
+"------------------------------------------------------------------------------
 " Author: Luke Davis (lukelbd@gmail.com)
 " Date:   2018-09-09
 " A collection of IDE-like tools for vim. See README.md for details.
-"------------------------------------------------------------------------------"
+"------------------------------------------------------------------------------
 " * Each element of the b:tags_by_line list (and similar lists) is as follows:
 "     Index 0: Tag name.
 "     Index 1: Tag line number.
@@ -78,9 +78,9 @@ if !exists('g:tags_forward_top_map')
   let g:tags_forward_top_map = ']T'
 endif
 
-"-----------------------------------------------------------------------------"
+"-----------------------------------------------------------------------------
 " Tag commands and maps
-"-----------------------------------------------------------------------------"
+"-----------------------------------------------------------------------------
 " Public commands
 command! ShowTag echom 'Current tag: ' . tags#current_tag()
 command! ShowTags call tags#print_tags()
@@ -99,9 +99,9 @@ noremap <expr> <silent> <Plug>TagsBackwardAll tags#jump_tag(v:count, 0, 0)
 noremap <expr> <silent> <Plug>TagsForwardTop tags#jump_tag(v:count, 1, 1)
 noremap <expr> <silent> <Plug>TagsBackwardTop tags#jump_tag(v:count, 1, 0)
 
-"------------------------------------------------------------------------------"
+"------------------------------------------------------------------------------
 " Refactoring commands and maps
-"------------------------------------------------------------------------------"
+"------------------------------------------------------------------------------
 " Public commands
 command! -nargs=1 -range Count
   \ let @/ = <line1> == <line2> ? <q-args> :

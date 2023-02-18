@@ -1,6 +1,6 @@
-"------------------------------------------------------------------------------"
+"------------------------------------------------------------------------------
 " General tag processing utiltiies
-"------------------------------------------------------------------------------"
+"------------------------------------------------------------------------------
 " Strip leading and trailing whitespace
 function! s:strip_whitespace(text) abort
   return substitute(a:text, '^\_s*\(.\{-}\)\_s*$', '\1', '')
@@ -66,9 +66,9 @@ function! tags#update_tags() abort
   return 1
 endfunction
 
-"-----------------------------------------------------------------------------"
+"-----------------------------------------------------------------------------
 " Tag navigation utiltiies
-"-----------------------------------------------------------------------------"
+"-----------------------------------------------------------------------------
 " Get the current tag from a list of tags
 " Note: This function searches exclusively (i.e. does not match the current line).
 " So only start at current line when jumping, otherwise start one line down.
@@ -166,9 +166,9 @@ function! s:tag_source() abort
   return map(tags, "printf('%4d', v:val[1]) . ': ' . v:val[0] . ' (' . join(v:val[2:], ', ') . ')'")
 endfunction
 
-"-----------------------------------------------------------------------------"
+"-----------------------------------------------------------------------------
 " Refactoring-related utilities
-"-----------------------------------------------------------------------------"
+"-----------------------------------------------------------------------------
 " Count occurrences inside file
 " See: https://vi.stackexchange.com/a/20661/8084
 function! tags#count_matches(key) abort
