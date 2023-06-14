@@ -41,7 +41,7 @@ Mappings
 | `[t`, `]t` | Jump to subsequent and preceding tags. The maps can be changed with `g:tags_backward_map` and `g:tags_forward_map`. |
 | `[T`, `]T` | Jump to subsequent and preceding top-level "significant" tags -- that is, omitting variable definitions, import statements, etc. Generally these are just function and class definitions. The maps can be changed with `g:tags_backward_top_map` and `g:tags_forward_top_map`. |
 | `!`, `*`, `&` | Select the character, word or WORD under the cursor. Unlike the vim `*` map, these do not move the cursor. |
-| `#`, `@` | As for `*` and `&`, but select only the approximate local scope instead of the entire file, using "significant ctag locations" as approximate scope boundaries.
+| `#`, `@` | As for `*` and `&`, but select only the approximate local scope instead of the entire file, using "significant ctag locations" as scope boundaries (typically functions).
 | `g/`, `g?` | As for `/` and `?`, but again select only the approximate local scope instead of the entire file.
 | `d/`, `d*`, `d&`, `d#`, `d@` | Delete the corresponding selection under the cursor and move to the next occurrence.  Hitting `.` deletes this occurrence and jumps to the next one. `d/` uses the last search pattern.
 | `c/`, `c*`, `c&`, `c#`, `c@` | Replace the corresponding selection under the cursor with user input text by (1) deleting the selection and (2) entering insert mode and allowing the user to type something. `c/` uses the last search pattern. When you exit insert mode we jump to the next occurrence. Hitting `.` replaces this with the text you previously typed. This is like `:s/pattern/replacement/g` but cleaner.
@@ -53,9 +53,10 @@ Options
 
 | Option | Description |
 | ---- | ---- |
-| `g:tags_skip_filetypes` | List of filetypes for which we do not want to try to generate tags. Fill this to prevent annoying error messages. |
-| `g:tags_scope_filetypes` | Dictionary whose keys are filetypes and whose values are lists of characters, corresponding to the tags categories used to approximate the local variable scope. If the current filetype is not in the dictionary, the `'default'` entry is used. By default, this is `'f'`, indicating function definitions. To generate a list of all possible tag types for a given language, call e.g. `ctags --list-kinds=python` on the command line. |
-| `g:tags_nofilter_filetypes` | List of filetypes for which we do *not* want to use only the "top level" tags as scope delimiters, but also "child" tags -- for example, functions declared inside of other functions. By default, this list is equal to just `['fortran']`, since all Fortran subroutines and functions must be declared inside of a "`program`" or "`module`", which have their own tags. |
+| `g:tags_skip_filetypes` | List of filetypes for which we do not want to try to generate tags. Fill this to prevent annoying error messages. Default is `['diff', 'help', 'man', 'qf']`. |
+| `g:tags_subtop_filetypes` | List of filetypes for which we do not want to use only the "top level" tags as scope boundaries. For example, methods inside of classes or subroutines inside of modules. |
+| `g:tags_skip_kinds` | Dictionary whose keys are filetypes and whose values are strings indicating the tag kinds to ignore throughout all `vim-tags` utilities. Default is to include all tags. To generate a list of all possible tag types for a given language, call e.g. `ctags --list-kinds=python` on the command line. |
+| `g:tags_scope_kinds` | Dictionary whose keys are filetypes and whose values are strings indicating the tag kinds used to define search scope boundaries. Default is `'f'` i.e. function definition tags. To generate a list of all possible tag types for a given language, call e.g. `ctags --list-kinds=python` on the command line. |
 
 Installation
 ============

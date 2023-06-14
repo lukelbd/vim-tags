@@ -4,9 +4,9 @@
 " A collection of IDE-like tools for vim. See README.md for details.
 "------------------------------------------------------------------------------
 " * Each element of the b:tags_by_line list (and similar lists) is as follows:
-"     Index 0: Tag name.
-"     Index 1: Tag line number.
-"     Index 2: Tag type.
+"   Index 0: Tag name.
+"   Index 1: Tag line number.
+"   Index 2: Tag type.
 " * Made my own implementation instead of using easytags or gutentags, because
 "   (1) find that :tag and :pop are not that useful outside of help menus --
 "   generally only want to edit one file at a time, and the <C-]> is about as
@@ -18,13 +18,12 @@
 "   could expand functionality by adding s*, s# maps to go along with c*, c# maps,
 "   which replace every choice without user confirmation. Or C*, C# would work.
 " * Re-define a few of the shift-number row keys to make them a bit more useful:
-"     '*' is the current word, global
-"     '&' is the current WORD, global
-"     '#' is the current word, local
-"     '@' is the current WORD, local
-"   This made sense for my workflow because I never really want the backward
-"   search from '#', access my macros with the comma key instead of @, and the
-"   & key goes pretty much untouched.
+"   '*' is the current word, global
+"   '&' is the current WORD, global
+"   '#' is the current word, local
+"   '@' is the current WORD, local
+"   This made sense because never really want the backward search from '#', access my
+"   macros with the comma key instead of @, and the & key goes pretty much untouched.
 " * For c* and c# map origin, see:
 "   https://www.reddit.com/r/vim/comments/8k4p6v/what_are_your_best_mappings/
 "   https://www.reddit.com/r/vim/comments/2p6jqr/quick_replace_useful_refactoring_and_editing_tool/
@@ -37,6 +36,8 @@ if v:shell_error " exit code
   echohl None
   finish
 endif
+
+" Initial stuff
 set cpoptions+=d
 augroup tags
   au!
@@ -49,16 +50,22 @@ if !exists('g:tags_skip_filetypes')
   let g:tags_skip_filetypes = ['diff', 'help', 'man', 'qf']
 endif
 
-" List of per-file/per-filetype tag categories that we define as 'scope-delimiters',
-" i.e. tags approximately denoting boundaries for variable scope of code block underneath cursor
-if !exists('g:tags_scope_filetypes')
-  let g:tags_scope_filetypes = {}
-endif
-
 " List of files for which we only want not just the 'top level' tags (i.e. tags
 " that do not belong to another block, e.g. a program or subroutine)
-if !exists('g:tags_nofilter_filetypes')
-  let g:tags_nofilter_filetypes = []
+if !exists('g:tags_subtop_filetypes')
+  let g:tags_subtop_filetypes = []
+endif
+
+" List of per-file/per-filetype tag categories that we define as 'scope-delimiters',
+" i.e. tags approximately denoting variable scope for code block underneath cursor
+if !exists('g:tags_scope_kinds')
+  let g:tags_scope_kinds = {}
+endif
+
+" List of per-file/per-filetype kind categories to skip. Useful to trim options (e.g.
+" vim remappings) or to skip secondary or verbose options (e.g. tex frame subtitles).
+if !exists('g:tags_skip_kinds')
+  let g:tags_skip_kinds = {}
 endif
 
 " Default mapping settings

@@ -52,17 +52,19 @@ function! tags#update_tags() abort
   let flags = getline(1) =~# '#!.*python[23]' ? '--language-force=python' : ''
   let tags = system(s:tag_command(flags) . " | sed 's/;\"\t/\t/g'")
   let tags = map(split(tags, '\n'), "split(v:val, '\t')")
+  let filt = "v:val[2] !~# '[" . get(g:tags_skip_kinds, &filetype, '@') . "]'"
+  let tags = filter(tags, filt)
   if len(tags) == 0 || len(tags[0]) == 0
     return 0  " no warning message outside of UpdateTags manual invocation
   endif
   let b:tags_by_name = sort(deepcopy(tags), 's:sort_by_name')  " sort alphabetically by name
   let b:tags_by_line = sort(deepcopy(tags), 's:sort_by_line')  " sort numerically by line
-  let cmd1 = index(g:tags_nofilter_filetypes, &filetype) . ' != -1'
-  let cmd2 = "v:val[2] =~# '[" . get(g:tags_scope_filetypes, &filetype, 'f') . "]'"
-  let b:tags_scope_by_line = filter(deepcopy(b:tags_by_line), cmd1 . ' || ' . cmd2)
-  let cmd1 = '(' . cmd1 . ' || ' . cmd2 . ')'  " enforce a scope delimiter
-  let cmd2 = 'len(v:val) == 3'  " enforce a top-level tag
-  let b:tags_top_by_line = filter(deepcopy(b:tags_by_line), cmd1 . ' && ' . cmd2)
+  let filt1 = index(g:tags_subtop_filetypes, &filetype) . ' != -1'
+  let filt2 = "v:val[2] =~# '[" . get(g:tags_scope_kinds, &filetype, 'f') . "]'"
+  let b:tags_scope_by_line = filter(deepcopy(b:tags_by_line), filt1 . ' || ' . filt2)
+  let filt1 = '(' . filt1 . ' || ' . filt2 . ')'  " enforce a scope delimiter
+  let filt2 = 'len(v:val) == 3'  " enforce a top-level tag
+  let b:tags_top_by_line = filter(deepcopy(b:tags_by_line), filt1 . ' && ' . filt2)
   return 1
 endfunction
 
@@ -133,7 +135,7 @@ function! tags#jump_tag(repeat, ...) abort
     let args[0] = str2nr(tag[1])  " adjust line number
   endfor
   echom 'Tag: ' . tag[0]
-  return "\<Esc>" . tag[1] . 'G'  " return cmd since cannot move cursor inside autoload function
+  return tag[1] . 'G'  " return cmd since cannot move cursor inside autoload function
 endfunction
 
 " Select a specific tag using fzf
