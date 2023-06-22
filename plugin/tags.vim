@@ -113,7 +113,7 @@ noremap <expr> <silent> <Plug>TagsBackwardTop tags#jump_tag(v:count, 1, 0)
 command! -nargs=1 -range Match
   \ let @/ = <line1> == <line2> ? <q-args> :
   \ printf('\%%>%dl\%%<%dl', <line1> - 1, <line2> + 1) . <q-args>
-  \ | call feedkeys(tags#count_matches('/'))
+  \ | call feedkeys(tags#count_match('/'))
 
 " Global and local <cword>, global and local <cWORD>, local forward and backward,
 " and current character searches. Also include match counts.

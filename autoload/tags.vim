@@ -176,7 +176,7 @@ endfunction
 "-----------------------------------------------------------------------------
 " Count occurrences inside file
 " See: https://vi.stackexchange.com/a/20661/8084
-function! tags#count_matches(key) abort
+function! tags#count_match(key) abort
   let cmd = tags#set_match(a:key)
   let b:winview = winsaveview()  " store window as buffer variable
   return cmd . "\<Cmd>%s@" . @/ . "@@gne | call winrestview(b:winview)\<CR>"
