@@ -28,8 +28,8 @@ Commands
 | Command | Description |
 | ---- | ---- |
 | `:Count` | Count the number of occurences of a search expression. |
-| `:ShowTag` | Show the "current" tag under or preceding the cursor. |
-| `:ShowTags` | Show a summary table of tags in the current file. |
+| `:ShowTags` | Print a summary table of tags in the current file. |
+| `:CurrentTag` | Print the "current" tag under or preceding the cursor. |
 | `:UpdateTags` | Manually refresh the `b:tags_by_name`, `b:tags_by_line`, and `b:tags_for_scope`  variables used by this plugin. This is called automatically whenever a file is read or written to disk. |
 
 Mappings

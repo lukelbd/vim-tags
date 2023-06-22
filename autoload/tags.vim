@@ -1,41 +1,43 @@
 "------------------------------------------------------------------------------
 " General tag processing utiltiies
+" Warning: Encountered strange error where naming .vim/autoload file same as
+" vim-tags/autoload file or naming the latter to tags.vim at all caused an autocmd
+" BufRead error on startup. Was impossible to diagnose so just use alternate names.
 "------------------------------------------------------------------------------
-" Strip leading and trailing whitespace
-function! s:strip_whitespace(text) abort
-  return substitute(a:text, '^\_s*\(.\{-}\)\_s*$', '\1', '')
-endfunction
+" Tags command
+" Note: Keep in sync with g:fzf_tags_command
+let s:tags_command = 'ctags -f - --excmd=number '
 
 " Numerical sorting of tag lines
 function! s:sort_by_line(tag1, tag2) abort
   let num1 = a:tag1[1]
   let num2 = a:tag2[1]
-  return num1 - num2  " fits requirements
+  return num1 - num2  " >0 if greater, 0 if equal, <0 if lesser
 endfunc
 
-" Alphabetical sorting of tag names
-" From this page: https://vi.stackexchange.com/a/11237/8084
+" Alphabetical sorting of tag names (see: https://vi.stackexchange.com/a/11237/8084)
 function! s:sort_by_name(tag1, tag2) abort
   let str1 = a:tag1[0]
   let str2 = a:tag2[0]
-  return (str1 < str2 ? -1 : str1 == str2 ? 0 : 1)  " equality, lesser, and greater
+  return str1 <# str2 ? -1 : str1 ==# str2 ? 0 : 1  " equality, lesser, and greater
 endfunction
 
 " Generate command-line exe that prints taglist to stdout
-" We use ctags in number mode (i.e. return line number)
-function! s:tag_command(...) abort
+" Use ctags in number mode (i.e. return line number)
+function! s:tags_command(...) abort
   let path = shellescape(expand('%:p'))
   let flags = a:0 ? a:1 : ''  " extra flags
-  return
-    \ 'ctags -f - --excmd=number ' . flags . ' ' . path
-    \ . " 2>/dev/null | cut -d'\t' -f1,3-5 "
+  return s:tags_command . flags . ' ' . path . " 2>/dev/null | cut -d'\t' -f1,3-5 "
 endfunction
 
-" Function that simply prints the result of the tag command
-" Note: Just prints the output of the command
-function! tags#print_tags() abort
-  let cmd = s:tag_command() . " | tr -s '\t' | column -t -s '\t'"
-  let tags = s:strip_whitespace(system(cmd))
+" Show the current file tags
+" Note: This also calls UpdateTags so that the display matches
+" the buffer. Otherwise possibly confusing for users.
+function! tags#show_tags() abort
+  silent! call tags#update_tags()
+  let cmd = s:tags_command() . " | tr -s '\t' | column -t -s '\t'"
+  let tags = system(cmd)  " call ctags command
+  let tags = substitute(tags, '^\_s*\(.\{-}\)\_s*$', '\1', '')  " strip whitespace
   if empty(tags)
     echohl WarningMsg | echom 'Warning: Tags not found or not available.' | echohl None | return ''
   endif
@@ -45,12 +47,13 @@ endfunction
 " Generate tags and parse them into list of lists
 " Note: Multiple tags on same line is *very* common, try the below in a model
 " src folder: for f in <pattern>; do echo $f:; ctags -f - -n $f | cut -d $'\t' -f3 | cut -d\; -f1 | sort -n | uniq -c | cut -d' ' -f4 | uniq; done
-function! tags#update_tags() abort
-  if index(g:tags_skip_filetypes, &filetype) != -1
+function! tags#update_tags(...) abort
+  let force = a:0 ? a:1 : 0
+  if !force || index(g:tags_skip_filetypes, &filetype) != -1
     return 0  " silently skip file type
   endif
   let flags = getline(1) =~# '#!.*python[23]' ? '--language-force=python' : ''
-  let tags = system(s:tag_command(flags) . " | sed 's/;\"\t/\t/g'")
+  let tags = system(s:tags_command(flags) . " | sed 's/;\"\t/\t/g'")
   let tags = map(split(tags, '\n'), "split(v:val, '\t')")
   let filt = "v:val[2] !~# '[" . get(g:tags_skip_kinds, &filetype, '@') . "]'"
   let tags = filter(tags, filt)
@@ -179,6 +182,65 @@ function! tags#count_matches(key) abort
   return cmd . "\<Cmd>%s@" . @/ . "@@ne | call winrestview(b:winview)\<CR>"
 endfunction
 
+" Finish change after InsertLeave and automatically jump to next occurence.
+" Warning: The @. register may contain keystrokes like <80>kb (i.e. backspace) so
+" must feed keys as if typed rather than as if from mapping.
+function! tags#change_finish() abort
+  if exists('g:change_all') && g:change_all
+    silent undo  " undo first change so subsequent undo reverts all changes
+    let b:winview = winsaveview()  " store window view as buffer variable
+    call feedkeys(':keepjumps %s@' . @/ . '@' . @. . "@ge | call winrestview(b:winview)\<CR>", 'nt')
+  elseif exists('g:change_next') && g:change_next
+    call feedkeys('n', 'nt')
+    if exists('*repeat#set')
+      call repeat#set("\<Plug>change_again")
+    endif
+  endif
+  let g:change_all = 0
+  let g:change_next = 0
+endfunction
+
+" Function that sets things up for maps that change text
+" Note: Unlike tags#delete_next we wait until
+function! tags#change_next(key) abort
+  let cmd = tags#set_match(a:key)
+  let g:change_next = 1
+  if exists('*repeat#set')
+    call repeat#set("\<Plug>change_again")
+  endif
+  return cmd . 'cgn'
+endfunction
+
+" Repeat previous change
+" Warning: The 'cgn' command silently fails to trigger insert mode if no matches found
+" so we check for that. Putting <Esc> in feedkeys() cancels operation so must come
+" afterward (may be no-op) and the 'i' is necessary to insert <C-a> before <Esc>.
+function! tags#change_again() abort
+  let cmd = "\<Cmd>call feedkeys(mode() =~# 'i' ? '\<C-a>' : '', 'ni')\<CR>"
+  call feedkeys('cgn' . cmd . "\<Esc>n")  " add previously inserted if cgn succeeds
+  if exists('*repeat#set')
+    call repeat#set("\<Plug>change_again")  " re-apply this function for next repeat
+  endif
+endfunction
+
+" Delete next match
+" Warning: hlsearch inside function fails: https://stackoverflow.com/q/1803539/4970632
+function! tags#delete_next(key) abort
+  let cmd = tags#set_match(a:key)
+  if exists('*repeat#set')
+    call repeat#set("\<Plug>" . a:key, v:count)
+  endif
+  return cmd . 'dgnn'
+endfunction
+
+" Delete all of next matches
+function! tags#delete_all(key) abort
+  call tags#set_match(a:key)
+  let winview = winsaveview()
+  exe 'keepjumps %s@' . @/ . '@@ge'
+  call winrestview(winview)
+endfunction
+
 " Search within top level tags belonging to 'scope' kinds
 " Search func idea came from: http://vim.wikia.com/wiki/Search_in_current_function
 " The Below is copied from: https://stackoverflow.com/a/597932/4970632
@@ -256,63 +318,4 @@ function! tags#set_match(key, ...) abort
   let cmds .= "\<Cmd>setlocal hlsearch\<CR>"
   let cmds .= exists(':ShowSearchIndex') ? "\<Cmd>ShowSearchIndex\<CR>" : ''
   return cmds  " see top for notes about <Plug>(indexed-search-after)
-endfunction
-
-" Finish change after InsertLeave and automatically jump to next occurence.
-" Warning: The @. register may contain keystrokes like <80>kb (i.e. backspace) so
-" must feed keys as if typed rather than as if from mapping.
-function! tags#change_finish() abort
-  if exists('g:change_all') && g:change_all
-    silent undo  " undo first change so subsequent undo reverts all changes
-    let b:winview = winsaveview()  " store window view as buffer variable
-    call feedkeys(':keepjumps %s@' . @/ . '@' . @. . "@ge | call winrestview(b:winview)\<CR>", 'nt')
-  elseif exists('g:change_next') && g:change_next
-    call feedkeys('n', 'nt')
-    if exists('*repeat#set')
-      call repeat#set("\<Plug>change_again")
-    endif
-  endif
-  let g:change_all = 0
-  let g:change_next = 0
-endfunction
-
-" Function that sets things up for maps that change text
-" Note: Unlike tags#delete_next we wait until
-function! tags#change_next(key) abort
-  let cmd = tags#set_match(a:key)
-  let g:change_next = 1
-  if exists('*repeat#set')
-    call repeat#set("\<Plug>change_again")
-  endif
-  return cmd . 'cgn'
-endfunction
-
-" Repeat previous change
-" Warning: The 'cgn' command silently fails to trigger insert mode if no matches found
-" so we check for that. Putting <Esc> in feedkeys() cancels operation so must come
-" afterward (may be no-op) and the 'i' is necessary to insert <C-a> before <Esc>.
-function! tags#change_again() abort
-  let cmd = "\<Cmd>call feedkeys(mode() =~# 'i' ? '\<C-a>' : '', 'ni')\<CR>"
-  call feedkeys('cgn' . cmd . "\<Esc>n")  " add previously inserted if cgn succeeds
-  if exists('*repeat#set')
-    call repeat#set("\<Plug>change_again")  " re-apply this function for next repeat
-  endif
-endfunction
-
-" Delete next match
-" Warning: hlsearch inside function fails: https://stackoverflow.com/q/1803539/4970632
-function! tags#delete_next(key) abort
-  let cmd = tags#set_match(a:key)
-  if exists('*repeat#set')
-    call repeat#set("\<Plug>" . a:key, v:count)
-  endif
-  return cmd . 'dgnn'
-endfunction
-
-" Delete all of next matches
-function! tags#delete_all(key) abort
-  call tags#set_match(a:key)
-  let winview = winsaveview()
-  exe 'keepjumps %s@' . @/ . '@@ge'
-  call winrestview(winview)
 endfunction

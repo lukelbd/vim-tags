@@ -26,7 +26,6 @@
 "   macros with the comma key instead of @, and the & key goes pretty much untouched.
 " * For c* and c# map origin, see:
 "   https://www.reddit.com/r/vim/comments/8k4p6v/what_are_your_best_mappings/
-"   https://www.reddit.com/r/vim/comments/2p6jqr/quick_replace_useful_refactoring_and_editing_tool/
 " * For repeat.vim usage see:
 "   http://vimcasts.org/episodes/creating-repeatable-mappings-with-repeat-vim/
 call system('type ctags &>/dev/null')
@@ -89,9 +88,10 @@ endif
 " Tag commands and maps
 "-----------------------------------------------------------------------------
 " Public commands
-command! ShowTag echom 'Current tag: ' . tags#current_tag()
-command! ShowTags call tags#print_tags()
+" Note: The tags#current_tag() is also used in vim-statusline plugin.
+command! ShowTags call tags#show_tags()
 command! UpdateTags echom tags#update_tags() ? 'Updated tags.' : 'Failed to update tags.'
+command! CurrentTag echom 'Current tag: ' . tags#current_tag()
 
 " Tag select maps
 " Note: Must use :n instead of <expr> ngg so we can use <C-u> to discard count!
