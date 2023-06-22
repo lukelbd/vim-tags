@@ -1,33 +1,23 @@
 "------------------------------------------------------------------------------
+" Name: tags.vim
 " Author: Luke Davis (lukelbd@gmail.com)
 " Date:   2018-09-09
-" A collection of IDE-like tools for vim. See README.md for details.
-"------------------------------------------------------------------------------
-" * Each element of the b:tags_by_line list (and similar lists) is as follows:
+" Tag and searching integration tools for vim.
+" * For c* and c# map origin, see:
+"   https://www.reddit.com/r/vim/comments/8k4p6v/what_are_your_best_mappings/
+" * For repeat.vim usage see:
+"   http://vimcasts.org/episodes/creating-repeatable-mappings-with-repeat-vim/
+" * Each element of the b:tags_* variables is as follows:
 "   Index 0: Tag name.
 "   Index 1: Tag line number.
 "   Index 2: Tag type.
-" * Made my own implementation instead of using easytags or gutentags, because
-"   (1) find that :tag and :pop are not that useful outside of help menus --
-"   generally only want to edit one file at a time, and the <C-]> is about as
-"   reliable as gd or gD, and (2) now I can filter the most important tags
-"   and make them searchable, without losing the completion popup you'd get
-"   from :tagjump /<Tab>.
-" * General searching/replacing utilities, useful for refactoring. A convervative
-"   approach is taken for the most part -- global searches are not automatic. But
-"   could expand functionality by adding s*, s# maps to go along with c*, c# maps,
-"   which replace every choice without user confirmation. Or C*, C# would work.
+"   Index 3: Tag parent (optional).
 " * Re-define a few of the shift-number row keys to make them a bit more useful:
 "   '*' is the current word, global
 "   '&' is the current WORD, global
 "   '#' is the current word, local
 "   '@' is the current WORD, local
-"   This made sense because never really want the backward search from '#', access my
-"   macros with the comma key instead of @, and the & key goes pretty much untouched.
-" * For c* and c# map origin, see:
-"   https://www.reddit.com/r/vim/comments/8k4p6v/what_are_your_best_mappings/
-" * For repeat.vim usage see:
-"   http://vimcasts.org/episodes/creating-repeatable-mappings-with-repeat-vim/
+"------------------------------------------------------------------------------
 call system('type ctags &>/dev/null')
 if v:shell_error " exit code
   echohl WarningMsg
@@ -44,19 +34,6 @@ augroup tags
   au BufReadPost,BufWritePost * silent call tags#update_tags(expand('<afile>'))
 augroup END
 
-" Files that we wish to ignore
-if !exists('g:tags_skip_filetypes')
-  let g:tags_skip_filetypes = ['diff', 'help', 'man', 'qf']
-endif
-
-" List of per-file/per-filetype tag categories that should have
-" (e.g. classes, subroutines)
-" for which scope delimiters should include non-'top level' tags (i.e.
-" tags that belong to another block, e.g. classes, programs, or subroutine)
-if !exists('g:tags_subtop_filetypes')
-  let g:tags_subtop_filetypes = []
-endif
-
 " List of per-file/per-filetype tag categories that we define as 'scope-delimiters',
 " i.e. tags approximately denoting variable scope for code blocks. Default is 'f'
 if !exists('g:tags_scope_kinds')
@@ -67,6 +44,11 @@ endif
 " vim remappings) or to skip secondary or verbose options (e.g. tex frame subtitles).
 if !exists('g:tags_skip_kinds')
   let g:tags_skip_kinds = {}
+endif
+
+" Files that we wish to ignore
+if !exists('g:tags_skip_filetypes')
+  let g:tags_skip_filetypes = ['diff', 'help', 'man', 'qf']
 endif
 
 " Default mapping settings

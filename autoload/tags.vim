@@ -74,7 +74,7 @@ endfunction
 " Show the current file tags
 " Note: This also calls UpdateTags so that printed tags match buffer variables.
 function! tags#show_tags(...) abort
-  call tags#update_tags(global)
+  call call('tags#update_tags', a:000)
   let global = a:0 ? a:1 : 0
   let paths = global ? s:get_paths() : [expand('%:p')]
   let table = []
@@ -109,26 +109,24 @@ function! tags#update_tags(...) abort
   for path in paths
     " Possibly skip
     let bnr = bufnr(path)  " buffer unique to path
-    let filetype = getbufvar(bnr, '&filetype')
-    let updatetime = getbufvar(bnr, 'tags_update_time', 0)
-    if getftime(path) < updatetime | continue | endif
-    if index(g:tags_skip_filetypes, filetype) != -1 | continue | endif
+    let type = getbufvar(bnr, '&filetype')
+    let time = getbufvar(bnr, 'tags_update_time', 0)
+    if getftime(path) < time | continue | endif
+    if index(g:tags_skip_filetypes, type) != -1 | continue | endif
     " Retrieve tags
     let flags = getline(1) =~# '#!.*python[23]' ? '--language-force=python' : ''
     let tags = system(s:get_tags(path, flags) . " | sed 's/;\"\t/\t/g'")
     let tags = map(split(tags, '\n'), "split(v:val, '\t')")
-    let filt = "v:val[2] !~# '[" . get(g:tags_skip_kinds, filetype, '@') . "]'"
+    let filt = "v:val[2] !~# '[" . get(g:tags_skip_kinds, type, '@') . "]'"
     let tags = filter(tags, filt)
+    " Get helper variables
     let by_name = sort(deepcopy(tags), 's:sort_by_name')  " sort alphabetically by name
     let by_line = sort(deepcopy(tags), 's:sort_by_line')  " sort numerically by line
-    " Add special filters
-    let filt1 = index(g:tags_subtop_filetypes, filetype) . ' != -1'
-    let filt2 = "v:val[2] =~# '[" . get(g:tags_scope_kinds, filetype, 'f') . "]'"
-    let scope_by_line = filter(deepcopy(by_line), filt1 . ' || ' . filt2)
-    let filt1 = '(' . filt1 . ' || ' . filt2 . ')'  " enforce a scope delimiter
-    let filt2 = 'len(v:val) == 3'  " enforce a top-level tag
-    let top_by_line = filter(deepcopy(by_line), filt1 . ' && ' . filt2)
-    " Set buffer variables
+    let scope_filt = "v:val[2] =~# '[" . get(g:tags_scope_kinds, type, 'f') . "]'"
+    let top_filt = 'len(v:val) == 3'  " does not belong to larger tag
+    let scope_by_line = filter(deepcopy(by_line), scope_filt)
+    let top_by_line = filter(deepcopy(by_line), top_filt . ' && ' . scope_filt)
+    " Set helper variables
     call setbufvar(bnr, 'tags_by_name', by_name)
     call setbufvar(bnr, 'tags_by_line', by_line)
     call setbufvar(bnr, 'tags_scope_by_line', scope_by_line)

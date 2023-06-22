@@ -54,10 +54,9 @@ Options
 
 | Option | Description |
 | ---- | ---- |
-| `g:tags_skip_filetypes` | List of filetypes for which we do not want to try to generate tags. Fill this to prevent annoying error messages. Default is `['diff', 'help', 'man', 'qf']`. |
-| `g:tags_subtop_filetypes` | List of filetypes for which we do not want to use only the "top level" tags as scope boundaries. For example, methods inside of classes or subroutines inside of modules. |
-| `g:tags_skip_kinds` | Dictionary whose keys are filetypes and whose values are strings indicating the tag kinds to ignore throughout all `vim-tags` utilities. Default is to include all tags. To generate a list of all possible tag types for a given language, call e.g. `ctags --list-kinds=python` on the command line. |
-| `g:tags_scope_kinds` | Dictionary whose keys are filetypes and whose values are strings indicating the tag kinds used to define search scope boundaries. Default is `'f'` i.e. function definition tags. To generate a list of all possible tag types for a given language, call e.g. `ctags --list-kinds=python` on the command line. |
+| `g:tags_skip_filetypes` | List of filetypes for which we do not want to try to generate tags. Setting this variable could speed things up a bit. Default is `['diff', 'help', 'man', 'qf']`. |
+| `g:tags_skip_kinds` | Dictionary whose keys are filetypes and whose values are strings indicating the tag kinds to ignore. Default behavior is to include all tags. |
+| `g:tags_scope_kinds` | Dictionary whose keys are filetypes and whose values are strings indicating the tag kinds used to define search scope boundaries. Default is `'f'` i.e. function definition tags. |
 
 Installation
 ============
