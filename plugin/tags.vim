@@ -2,11 +2,11 @@
 " Name: tags.vim
 " Author: Luke Davis (lukelbd@gmail.com)
 " Date:   2018-09-09
-" Tag and searching integration tools for vim.
-" * For c* and c# map origin, see:
-"   https://www.reddit.com/r/vim/comments/8k4p6v/what_are_your_best_mappings/
-" * For repeat.vim usage see:
-"   http://vimcasts.org/episodes/creating-repeatable-mappings-with-repeat-vim/
+" Tools for working with ctags in vim.
+" For c* and c# map origin, see:
+" https://www.reddit.com/r/vim/comments/8k4p6v/what_are_your_best_mappings/
+" For repeat.vim usage see:
+" http://vimcasts.org/episodes/creating-repeatable-mappings-with-repeat-vim/
 " * Each element of the b:tags_* variables is as follows:
 "   Index 0: Tag name.
 "   Index 1: Tag line number.
