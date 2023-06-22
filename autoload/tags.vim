@@ -353,7 +353,6 @@ function! tags#set_scope(...) abort
   let info1 = line1 . ' (' . scope1[:maxlen] . ')'
   let info2 = line2 . ' (' . scope2[:maxlen] . ')'
   echom 'Selected line ' . info1 . ' to line ' . info2 . '.'
-  exe exists(':ShowSearchIndex') ? 'sleep 1000m' : ''
   return regex
 endfunction
 
@@ -365,6 +364,7 @@ endfunction
 " calls <Plug>(indexed-search-index) --> :ShowSearchIndex... but causes change
 " mappings to silently abort for some weird reason... so instead call this manually.
 function! tags#set_match(key, ...) abort
+  let scope = ''
   let motion = ''
   let inplace = a:0 && a:1 ? 1 : 0
   if a:key =~# '\*'
@@ -375,18 +375,18 @@ function! tags#set_match(key, ...) abort
     let @/ = '\_s\@<=' . escape(expand('<cWORD>'), s:regex_magic) . '\ze\_s\C'
   elseif a:key =~# '#'
     let motion = 'lb'
-    let regex = tags#set_scope()
-    let @/ = regex . '\<' . escape(expand('<cword>'), s:regex_magic) . '\>\C'
+    let scope = tags#set_scope()
+    let @/ = scope . '\<' . escape(expand('<cword>'), s:regex_magic) . '\>\C'
   elseif a:key =~# '@'
     let motion = 'lB'
-    let regex = tags#set_scope()
-    let @/ = '\_s\@<=' . regex . escape(expand('<cWORD>'), s:regex_magic) . '\ze\_s\C'
+    let scope = tags#set_scope()
+    let @/ = '\_s\@<=' . scope . escape(expand('<cWORD>'), s:regex_magic) . '\ze\_s\C'
   elseif a:key =~# '!'
     let text = getline('.')
     let @/ = empty(text) ? "\n" : escape(matchstr(text, '.', byteidx(text, col('.') - 1)), s:regex_magic)
   endif  " otherwise keep current selection
   let cmds = inplace ? motion : ''
   let cmds .= "\<Cmd>setlocal hlsearch\<CR>"
-  let cmds .= exists(':ShowSearchIndex') ? "\<Cmd>ShowSearchIndex\<CR>" : ''
+  let cmds .= empty(scope) && exists(':ShowSearchIndex') ? "\<Cmd>ShowSearchIndex\<CR>" : ''
   return cmds  " see top for notes about <Plug>(indexed-search-after)
 endfunction
