@@ -179,7 +179,7 @@ endfunction
 function! tags#count_matches(key) abort
   let cmd = tags#set_match(a:key)
   let b:winview = winsaveview()  " store window as buffer variable
-  return cmd . "\<Cmd>%s@" . @/ . "@@ne | call winrestview(b:winview)\<CR>"
+  return cmd . "\<Cmd>%s@" . @/ . "@@gne | call winrestview(b:winview)\<CR>"
 endfunction
 
 " Finish change after InsertLeave and automatically jump to next occurence.

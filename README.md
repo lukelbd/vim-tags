@@ -27,8 +27,8 @@ Commands
 
 | Command | Description |
 | ---- | ---- |
-| `:Count` | Count the number of occurences of a search expression. |
-| `:ShowTags` | Print a summary table of tags in the current file. |
+| `:Match` | Set the current search pattern to the input regex and print a count. |
+| `:ShowTags` | Print a table of the tags in the current file. |
 | `:CurrentTag` | Print the "current" tag under or preceding the cursor. |
 | `:UpdateTags` | Manually refresh the `b:tags_by_name`, `b:tags_by_line`, and `b:tags_for_scope`  variables used by this plugin. This is called automatically whenever a file is read or written to disk. |
 
