@@ -41,7 +41,7 @@ set cpoptions+=d
 augroup tags
   au!
   au InsertLeave * silent call tags#change_finish()  " finish change operation and set repeat
-  au BufReadPost,BufWritePost * silent call tags#update_tags()
+  au BufReadPost,BufWritePost * silent call tags#update_tags(expand('<afile>'))
 augroup END
 
 " Files that we wish to ignore
@@ -49,14 +49,16 @@ if !exists('g:tags_skip_filetypes')
   let g:tags_skip_filetypes = ['diff', 'help', 'man', 'qf']
 endif
 
-" List of files for which we only want not just the 'top level' tags (i.e. tags
-" that do not belong to another block, e.g. a program or subroutine)
+" List of per-file/per-filetype tag categories that should have
+" (e.g. classes, subroutines)
+" for which scope delimiters should include non-'top level' tags (i.e.
+" tags that belong to another block, e.g. classes, programs, or subroutine)
 if !exists('g:tags_subtop_filetypes')
   let g:tags_subtop_filetypes = []
 endif
 
 " List of per-file/per-filetype tag categories that we define as 'scope-delimiters',
-" i.e. tags approximately denoting variable scope for code block underneath cursor
+" i.e. tags approximately denoting variable scope for code blocks. Default is 'f'
 if !exists('g:tags_scope_kinds')
   let g:tags_scope_kinds = {}
 endif
@@ -89,8 +91,9 @@ endif
 "-----------------------------------------------------------------------------
 " Public commands
 " Note: The tags#current_tag() is also used in vim-statusline plugin.
-command! ShowTags call tags#show_tags()
-command! UpdateTags echom tags#update_tags() ? 'Updated tags.' : 'Failed to update tags.'
+command! -bang -nargs=* ShowTags call tags#show_tags(<bang>0)
+command! -bang -nargs=* ShowKinds call tags#show_kinds(<bang>0)
+command! -bang -nargs=* UpdateTags call tags#update_tags(<bang>0)
 command! CurrentTag echom 'Current tag: ' . tags#current_tag()
 
 " Tag select maps

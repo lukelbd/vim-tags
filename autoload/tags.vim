@@ -6,7 +6,8 @@
 "------------------------------------------------------------------------------
 " Tags command
 " Note: Keep in sync with g:fzf_tags_command
-let s:tags_command = 'ctags -f - --excmd=number '
+let s:tags_command = 'ctags -f - --excmd=number'
+let s:regex_magic = '[]\/.*$~'
 
 " Numerical sorting of tag lines
 function! s:sort_by_line(tag1, tag2) abort
@@ -15,60 +16,125 @@ function! s:sort_by_line(tag1, tag2) abort
   return num1 - num2  " >0 if greater, 0 if equal, <0 if lesser
 endfunc
 
-" Alphabetical sorting of tag names (see: https://vi.stackexchange.com/a/11237/8084)
+" Alphabetical sorting of tag names
 function! s:sort_by_name(tag1, tag2) abort
   let str1 = a:tag1[0]
   let str2 = a:tag2[0]
   return str1 <# str2 ? -1 : str1 ==# str2 ? 0 : 1  " equality, lesser, and greater
 endfunction
 
-" Generate command-line exe that prints taglist to stdout
-" Use ctags in number mode (i.e. return line number)
-function! s:tags_command(...) abort
-  let path = shellescape(expand('%:p'))
-  let flags = a:0 ? a:1 : ''  " extra flags
-  return s:tags_command . flags . ' ' . path . " 2>/dev/null | cut -d'\t' -f1,3-5 "
+" Return command-line executable that prints tags to stdout
+" Results should be in number mode (i.e. shows line number instead of line)
+function! s:get_tags(path, ...) abort
+  let flags = join(a:000, ' ')
+  let path = shellescape(expand(fnamemodify(a:path, ':p')))
+  return s:tags_command . ' ' . flags . ' ' . path . " 2>/dev/null | cut -d'\t' -f1,3-5"
+endfunction
+
+" List open window paths
+" Todo: Also use this to jump to tags in arbitrary files? Similar to :Tags but no file.
+function! s:get_paths() abort
+  let paths = []
+  for tnr in range(tabpagenr('$'))  " iterate through each tab
+    let tabnr = tnr + 1 " the tab number
+    let tbufs = tabpagebuflist(tabnr)
+    for bnr in tbufs
+      let path = expand('#' . bnr . ':p')
+      let type = getbufvar(bnr, '&filetype')
+      if !filereadable(path) || index(g:tags_skip_filetypes, type) != -1
+        continue
+      endif
+      call add(paths, path)
+    endfor
+  endfor
+  return paths
+endfunction
+
+" Show the current file kinds
+" Note: See https://stackoverflow.com/a/71334/4970632 for difference between \r and \n
+function! tags#show_kinds(...) abort
+  let global = a:0 ? a:1 : 0
+  let kind = global ? 'all' : &filetype
+  let cmd = s:get_tags('', '--list-kinds=' . string(kind))
+  let cmd = substitute(cmd, '|.*$', '', 'g')
+  let table = system(cmd)
+  if global
+    let l:subs = []
+    let types = uniq(map(s:get_paths(), "getbufvar(v:val, '&filetype')"))
+    let regex = '\c\(\%(\n\|^\)\@<=\%(' . join(types, '\|') . '\)\n'
+    let regex = regex . '\%(\s\+[^\n]*\%(\n\|$\)\)*\)\S\@!'
+    let repl = '\=add(l:subs, submatch(0))'  " see: https://vi.stackexchange.com/a/16491/8084
+    call substitute(table, regex, repl, 'gn')
+    let table = join(l:subs, '')
+  endif
+  let head = global ? 'Tag kinds for open filetypes' : "Tag kinds for filetype '" . &filetype . "'"
+  echo head . ":\n" . table
 endfunction
 
 " Show the current file tags
-" Note: This also calls UpdateTags so that the display matches
-" the buffer. Otherwise possibly confusing for users.
-function! tags#show_tags() abort
-  silent! call tags#update_tags()
-  let cmd = s:tags_command() . " | tr -s '\t' | column -t -s '\t'"
-  let tags = system(cmd)  " call ctags command
-  let tags = substitute(tags, '^\_s*\(.\{-}\)\_s*$', '\1', '')  " strip whitespace
-  if empty(tags)
-    echohl WarningMsg | echom 'Warning: Tags not found or not available.' | echohl None | return ''
+" Note: This also calls UpdateTags so that printed tags match buffer variables.
+function! tags#show_tags(...) abort
+  call tags#update_tags(global)
+  let global = a:0 ? a:1 : 0
+  let paths = global ? s:get_paths() : [expand('%:p')]
+  let table = []
+  for path in paths  " always absolutes
+    let cmd = s:get_tags(path) . " | tr -s '\t' | column -t -s '\t'"
+    let tags = system(cmd)  " call ctags command
+    let tags = substitute(tags, '^\_s*\(.\{-}\)\_s*$', '\1', '')  " strip whitespace
+    if !empty(tags)
+      let tags = substitute(tags, escape(path, s:regex_magic), '', 'g')
+      if len(paths) > 1
+        let tags = substitute(tags, '\(^\|\n\)', '\1    ', 'g')
+        let tags = fnamemodify(path, ':~:.') . "\n" . tags
+      endif
+      call add(table, tags)
+    endif
+  endfor
+  if empty(table)
+    echohl WarningMsg
+    echom 'Warning: Tags not found or not available.'
+    echohl None
+    return
   endif
-  echo "Tags for file '" . expand('%:p') . "':\n" . tags
+  let head = global ? 'Tags for open files' : "Tags for file '" . expand('%:~:.') . "'"
+  echo head . ":\n" . join(table, "\n")
 endfunction
 
 " Generate tags and parse them into list of lists
-" Note: Multiple tags on same line is *very* common, try the below in a model
-" src folder: for f in <pattern>; do echo $f:; ctags -f - -n $f | cut -d $'\t' -f3 | cut -d\; -f1 | sort -n | uniq -c | cut -d' ' -f4 | uniq; done
+" Note: Files open in multiple windows use the same buffer number and same variables.
 function! tags#update_tags(...) abort
-  let force = a:0 ? a:1 : 0
-  if !force || index(g:tags_skip_filetypes, &filetype) != -1
-    return 0  " silently skip file type
-  endif
-  let flags = getline(1) =~# '#!.*python[23]' ? '--language-force=python' : ''
-  let tags = system(s:tags_command(flags) . " | sed 's/;\"\t/\t/g'")
-  let tags = map(split(tags, '\n'), "split(v:val, '\t')")
-  let filt = "v:val[2] !~# '[" . get(g:tags_skip_kinds, &filetype, '@') . "]'"
-  let tags = filter(tags, filt)
-  if len(tags) == 0 || len(tags[0]) == 0
-    return 0  " no warning message outside of UpdateTags manual invocation
-  endif
-  let b:tags_by_name = sort(deepcopy(tags), 's:sort_by_name')  " sort alphabetically by name
-  let b:tags_by_line = sort(deepcopy(tags), 's:sort_by_line')  " sort numerically by line
-  let filt1 = index(g:tags_subtop_filetypes, &filetype) . ' != -1'
-  let filt2 = "v:val[2] =~# '[" . get(g:tags_scope_kinds, &filetype, 'f') . "]'"
-  let b:tags_scope_by_line = filter(deepcopy(b:tags_by_line), filt1 . ' || ' . filt2)
-  let filt1 = '(' . filt1 . ' || ' . filt2 . ')'  " enforce a scope delimiter
-  let filt2 = 'len(v:val) == 3'  " enforce a top-level tag
-  let b:tags_top_by_line = filter(deepcopy(b:tags_by_line), filt1 . ' && ' . filt2)
-  return 1
+  let global = a:0 ? a:1 : 0
+  let paths = global ? s:get_paths() : [expand('%:p')]
+  for path in paths
+    " Possibly skip
+    let bnr = bufnr(path)  " buffer unique to path
+    let filetype = getbufvar(bnr, '&filetype')
+    let updatetime = getbufvar(bnr, 'tags_update_time', 0)
+    if getftime(path) < updatetime | continue | endif
+    if index(g:tags_skip_filetypes, filetype) != -1 | continue | endif
+    " Retrieve tags
+    let flags = getline(1) =~# '#!.*python[23]' ? '--language-force=python' : ''
+    let tags = system(s:get_tags(path, flags) . " | sed 's/;\"\t/\t/g'")
+    let tags = map(split(tags, '\n'), "split(v:val, '\t')")
+    let filt = "v:val[2] !~# '[" . get(g:tags_skip_kinds, filetype, '@') . "]'"
+    let tags = filter(tags, filt)
+    let by_name = sort(deepcopy(tags), 's:sort_by_name')  " sort alphabetically by name
+    let by_line = sort(deepcopy(tags), 's:sort_by_line')  " sort numerically by line
+    " Add special filters
+    let filt1 = index(g:tags_subtop_filetypes, filetype) . ' != -1'
+    let filt2 = "v:val[2] =~# '[" . get(g:tags_scope_kinds, filetype, 'f') . "]'"
+    let scope_by_line = filter(deepcopy(by_line), filt1 . ' || ' . filt2)
+    let filt1 = '(' . filt1 . ' || ' . filt2 . ')'  " enforce a scope delimiter
+    let filt2 = 'len(v:val) == 3'  " enforce a top-level tag
+    let top_by_line = filter(deepcopy(by_line), filt1 . ' && ' . filt2)
+    " Set buffer variables
+    call setbufvar(bnr, 'tags_by_name', by_name)
+    call setbufvar(bnr, 'tags_by_line', by_line)
+    call setbufvar(bnr, 'tags_scope_by_line', scope_by_line)
+    call setbufvar(bnr, 'tags_top_by_line', top_by_line)
+    call setbufvar(bnr, 'tags_update_time', localtime())
+  endfor
 endfunction
 
 "-----------------------------------------------------------------------------
@@ -146,10 +212,16 @@ endfunction
 function! tags#select_tag() abort
   let tags = s:tag_source()
   if empty(tags)
-    echohl WarningMsg | echom 'Warning: Tags not found or not available.' | echohl None | return
+    echohl WarningMsg
+    echom 'Warning: Tags not found or not available.'
+    echohl None
+    return
   endif
   if !exists('*fzf#run')
-    echohl WarningMsg | echom 'Warning: FZF plugin not found.' | echohl None | return
+    echohl WarningMsg
+    echom 'Warning: FZF plugin not found.'
+    echohl None
+    return
   endif
   call fzf#run(fzf#wrap({
     \ 'source': tags,
@@ -293,26 +365,25 @@ endfunction
 " calls <Plug>(indexed-search-index) --> :ShowSearchIndex... but causes change
 " mappings to silently abort for some weird reason... so instead call this manually.
 function! tags#set_match(key, ...) abort
-  let mag = '[]\/.*$~'
   let motion = ''
   let inplace = a:0 && a:1 ? 1 : 0
   if a:key =~# '\*'
     let motion = 'lb'
-    let @/ = '\<' . escape(expand('<cword>'), mag) . '\>\C'
+    let @/ = '\<' . escape(expand('<cword>'), s:regex_magic) . '\>\C'
   elseif a:key =~# '&'
     let motion = 'lB'
-    let @/ = '\_s\@<=' . escape(expand('<cWORD>'), mag) . '\ze\_s\C'
+    let @/ = '\_s\@<=' . escape(expand('<cWORD>'), s:regex_magic) . '\ze\_s\C'
   elseif a:key =~# '#'
     let motion = 'lb'
     let regex = tags#set_scope()
-    let @/ = regex . '\<' . escape(expand('<cword>'), mag) . '\>\C'
+    let @/ = regex . '\<' . escape(expand('<cword>'), s:regex_magic) . '\>\C'
   elseif a:key =~# '@'
     let motion = 'lB'
     let regex = tags#set_scope()
-    let @/ = '\_s\@<=' . regex . escape(expand('<cWORD>'), mag) . '\ze\_s\C'
+    let @/ = '\_s\@<=' . regex . escape(expand('<cWORD>'), s:regex_magic) . '\ze\_s\C'
   elseif a:key =~# '!'
     let text = getline('.')
-    let @/ = empty(text) ? "\n" : escape(matchstr(text, '.', byteidx(text, col('.') - 1)), mag)
+    let @/ = empty(text) ? "\n" : escape(matchstr(text, '.', byteidx(text, col('.') - 1)), s:regex_magic)
   endif  " otherwise keep current selection
   let cmds = inplace ? motion : ''
   let cmds .= "\<Cmd>setlocal hlsearch\<CR>"
