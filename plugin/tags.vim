@@ -73,8 +73,8 @@ endif
 "-----------------------------------------------------------------------------
 " Public commands
 " Note: The tags#current_tag() is also used in vim-statusline plugin.
-command! -bang -nargs=* ShowTags call tags#show_tags(<bang>0)
-command! -bang -nargs=* ShowKinds call tags#show_kinds(<bang>0)
+command! -bang -nargs=* ShowTags echo tags#table_tags(<bang>0)
+command! -bang -nargs=* ShowKinds echo tags#table_kinds(<bang>0)
 command! -bang -nargs=* UpdateTags call tags#update_tags(<bang>0)
 command! CurrentTag echom 'Current tag: ' . tags#current_tag()
 

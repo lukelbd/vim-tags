@@ -50,16 +50,9 @@ function! s:get_paths() abort
   return paths
 endfunction
 
-" Helper tag utility
-" Used to put both results in same message
-function! tags#show_both(...) abort
-  call call('tags#show_kinds', a:000)
-  call call('tags#show_tags', a:000)
-endfunction
-
 " Show the current file kinds
 " Note: See https://stackoverflow.com/a/71334/4970632 for difference between \r and \n
-function! tags#show_kinds(...) abort
+function! tags#table_kinds(...) abort
   let global = a:0 ? a:1 : 0
   let kind = global ? 'all' : &filetype
   let cmd = s:get_tags('', '--list-kinds=' . string(kind))
@@ -75,12 +68,12 @@ function! tags#show_kinds(...) abort
     let table = join(l:subs, '')
   endif
   let head = global ? 'Tag kinds for open filetypes' : "Tag kinds for filetype '" . &filetype . "'"
-  echo head . ":\n" . table
+  return head . ":\n" . table
 endfunction
 
 " Show the current file tags
 " Note: This also calls UpdateTags so that printed tags match buffer variables.
-function! tags#show_tags(...) abort
+function! tags#table_tags(...) abort
   call call('tags#update_tags', a:000)
   let global = a:0 ? a:1 : 0
   let paths = global ? s:get_paths() : [expand('%:p')]
@@ -105,7 +98,7 @@ function! tags#show_tags(...) abort
     return
   endif
   let head = global ? 'Tags for open files' : "Tags for file '" . expand('%:~:.') . "'"
-  echo head . ":\n" . join(table, "\n")
+  return head . ":\n" . join(table, "\n")
 endfunction
 
 " Generate tags and parse them into list of lists
