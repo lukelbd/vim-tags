@@ -50,6 +50,13 @@ function! s:get_paths() abort
   return paths
 endfunction
 
+" Helper tag utility
+" Used to put both results in same message
+function! tags#show_both(...) abort
+  call call('tags#show_kinds', a:000)
+  call call('tags#show_tags', a:000)
+endfunction
+
 " Show the current file kinds
 " Note: See https://stackoverflow.com/a/71334/4970632 for difference between \r and \n
 function! tags#show_kinds(...) abort
