@@ -55,6 +55,9 @@ endif
 if !exists('g:tags_jump_map')
   let g:tags_jump_map = '<Leader><Leader>'
 endif
+if !exists('g:tags_drop_map')
+  let g:tags_drop_map = '<Leader><Tab>'
+endif
 if !exists('g:tags_backward_map')
   let g:tags_backward_map = '[t'
 endif
@@ -81,11 +84,13 @@ command! CurrentTag echom 'Current tag: ' . tags#current_tag()
 " Tag select maps
 " Note: Must use :n instead of <expr> ngg so we can use <C-u> to discard count!
 exe 'map ' . g:tags_jump_map . ' <Plug>TagsJump'
+exe 'map ' . g:tags_drop_map . ' <Plug>TagsDrop'
 exe 'map <silent> ' . g:tags_forward_map . ' <Plug>TagsForwardAll'
 exe 'map <silent> ' . g:tags_backward_map . ' <Plug>TagsBackwardAll'
 exe 'map <silent> ' . g:tags_forward_top_map . ' <Plug>TagsForwardTop'
 exe 'map <silent> ' . g:tags_backward_top_map . ' <Plug>TagsBackwardTop'
-noremap <Plug>TagsJump <Cmd>call tags#select_tag()<CR>
+noremap <Plug>TagsJump <Cmd>call tags#select_tag(0)<CR>
+noremap <Plug>TagsDrop <Cmd>call tags#select_tag(1)<CR>
 noremap <expr> <silent> <Plug>TagsForwardAll tags#jump_tag(v:count, 0, 1)
 noremap <expr> <silent> <Plug>TagsBackwardAll tags#jump_tag(v:count, 0, 0)
 noremap <expr> <silent> <Plug>TagsForwardTop tags#jump_tag(v:count, 1, 1)

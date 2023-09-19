@@ -39,6 +39,7 @@ Mappings
 | Mapping | Description |
 | ---- | ---- |
 | `<Leader><Leader>` | Show a fuzzy-completion menu of the tags and jump to the selected location. This is only defined if the [fzf](https://github.com/junegunn/fzf) plugin is installed. The map can be changed with `g:tags_jump_map`. |
+| `<Leader><Tab>` | Show a fuzzy-completion menu of the tags across all open tab page buffers and jump to the location with `:tab drop <file> | exe <line>`. The map can be changed with `g:tags_drop_map`. |
 | `[t`, `]t` | Jump to subsequent and preceding tags. The maps can be changed with `g:tags_backward_map` and `g:tags_forward_map`. |
 | `[T`, `]T` | Jump to subsequent and preceding top-level "significant" tags -- that is, omitting variable definitions, import statements, etc. Generally these are just function and class definitions. The maps can be changed with `g:tags_backward_top_map` and `g:tags_forward_top_map`. |
 | `!`, `*`, `&` | Select the character, word or WORD under the cursor. Unlike the vim `*` map, these do not move the cursor. |

@@ -207,8 +207,8 @@ endfunction
 
 " Select a specific tag using fzf
 " Note: This matches construction of fzf mappings in vim-succinct.
-function! tags#select_tag() abort
-  let tags = s:tag_source()
+function! tags#select_tag(...) abort
+  let tags = call('s:tag_source', a:000)
   if empty(tags)
     echohl WarningMsg
     echom 'Warning: Tags not found or not available.'
@@ -228,17 +228,44 @@ function! tags#select_tag() abort
     \ }))
 endfunction
 
-" Return a list of strings for the an menu in the format: '<line number>: name (type)'
-" or the format '<line number>: name (type, scope)' if scope information is present.
-" Then the sink function simply gets the line number before the colon.
+" Return strings in the format: '[<file name>: ]<line number>: name (type, [scope])'
+" for selection by fzf. File name included only if 'global' was passed.
+" Note: Tried gutentags, but too complicated, would need access to script variables
+" See: https://github.com/ludovicchabant/vim-gutentags/issues/349
 " See: https://github.com/junegunn/fzf/wiki/Examples-(vim)
 function! s:tag_sink(tag) abort
-  exe split(a:tag, ':')[0]
+  let parts = split(a:tag, ':')
+  if parts[0] =~# '^\s*\d\+'
+    exe parts[0]
+  elseif exists('*file#open_drop')
+    call file#open_drop(parts[0])
+    exe parts[1]
+  else
+    exe 'tab drop ' . parts[0]
+    exe parts[1]
+  endif
 endfunction
-function! s:tag_source() abort
-  let tags = get(b:, 'tags_by_name', [])
-  let tags = deepcopy(tags)
-  return map(tags, "printf('%4d', v:val[1]) . ': ' . v:val[0] . ' (' . join(v:val[2:], ', ') . ')'")
+function! s:tag_source(...) abort
+  let global = a:0 ? a:1 : 0
+  let paths = global ? s:get_paths() : [expand('%:p')]
+  let source = []
+  for path in paths
+    let bnr = bufnr(path)  " buffer unique to path
+    let tags = deepcopy(getbufvar(bnr, 'tags_by_name', []))
+    let head = "printf('%4d', v:val[1]) . ': '"
+    let tail = "v:val[0] . ' (' . join(v:val[2:], ', ') . ')'"
+    if global
+      if exists('*RelativePath')
+        let path = RelativePath(path)  " vim-statusline function
+      else
+        let path = fnamemodify(path, ':~:.')
+      endif
+      let head = string(path) . " . ': ' . " . head
+    endif
+    let tags = map(tags, head . ' . ' . tail)
+    call extend(source, tags)
+  endfor
+  return source
 endfunction
 
 "-----------------------------------------------------------------------------
