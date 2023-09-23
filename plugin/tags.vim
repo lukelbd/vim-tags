@@ -1,5 +1,4 @@
 "------------------------------------------------------------------------------
-" Name: tags.vim
 " Author: Luke Davis (lukelbd@gmail.com)
 " Date:   2018-09-09
 " Tools for working with ctags in vim.
@@ -40,8 +39,8 @@ if !exists('g:tags_scope_kinds')
   let g:tags_scope_kinds = {}
 endif
 
-" List of per-file/per-filetype kind categories to skip. Useful to trim options (e.g.
-" vim remappings) or to skip secondary or verbose options (e.g. tex frame subtitles).
+" List of per-file/per-filetype kind categories to skip. Useful to skip frequent or
+" verbose tags. Can also define in .ctags config.
 if !exists('g:tags_skip_kinds')
   let g:tags_skip_kinds = {}
 endif

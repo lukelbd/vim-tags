@@ -33,12 +33,12 @@ endfunction
 
 " List open window paths
 " Todo: Also use this to jump to tags in arbitrary files? Similar to :Tags but no file.
-function! s:get_paths() abort
+function! tags#buffer_paths() abort
   let paths = []
   for tnr in range(tabpagenr('$'))  " iterate through each tab
     let tabnr = tnr + 1 " the tab number
-    let tbufs = tabpagebuflist(tabnr)
-    for bnr in tbufs
+    let bnrs = tabpagebuflist(tabnr)
+    for bnr in bnrs
       let path = expand('#' . bnr . ':p')
       let type = getbufvar(bnr, '&filetype')
       if !filereadable(path) || index(g:tags_skip_filetypes, type) != -1
@@ -60,7 +60,7 @@ function! tags#table_kinds(...) abort
   let table = system(cmd)
   if global
     let l:subs = []
-    let types = uniq(map(s:get_paths(), "getbufvar(v:val, '&filetype')"))
+    let types = uniq(map(tags#buffer_paths(), "getbufvar(v:val, '&filetype')"))
     let regex = '\c\(\%(\n\|^\)\@<=\%(' . join(types, '\|') . '\)\n'
     let regex = regex . '\%(\s\+[^\n]*\%(\n\|$\)\)*\)\S\@!'
     let repl = '\=add(l:subs, submatch(0))'  " see: https://vi.stackexchange.com/a/16491/8084
@@ -76,7 +76,7 @@ endfunction
 function! tags#table_tags(...) abort
   call call('tags#update_tags', a:000)
   let global = a:0 ? a:1 : 0
-  let paths = global ? s:get_paths() : [expand('%:p')]
+  let paths = global ? tags#buffer_paths() : [expand('%:p')]
   let table = []
   for path in paths  " always absolutes
     let cmd = s:get_tags(path) . " | tr -s '\t' | column -t -s '\t'"
@@ -105,7 +105,7 @@ endfunction
 " Note: Files open in multiple windows use the same buffer number and same variables.
 function! tags#update_tags(...) abort
   let global = a:0 ? a:1 : 0
-  let paths = global ? s:get_paths() : [expand('%:p')]
+  let paths = global ? tags#buffer_paths() : [expand('%:p')]
   for path in paths
     " Possibly skip
     let bnr = bufnr(path)  " buffer unique to path
@@ -247,7 +247,7 @@ function! s:tag_sink(tag) abort
 endfunction
 function! s:tag_source(...) abort
   let global = a:0 ? a:1 : 0
-  let paths = global ? s:get_paths() : [expand('%:p')]
+  let paths = global ? tags#buffer_paths() : [expand('%:p')]
   let source = []
   for path in paths
     let bnr = bufnr(path)  " buffer unique to path
