@@ -1,17 +1,16 @@
 "------------------------------------------------------------------------------
 " Author: Luke Davis (lukelbd@gmail.com)
 " Date:   2018-09-09
-" Tools for working with ctags in vim.
-" For c* and c# map origin, see:
-" https://www.reddit.com/r/vim/comments/8k4p6v/what_are_your_best_mappings/
-" For repeat.vim usage see:
-" http://vimcasts.org/episodes/creating-repeatable-mappings-with-repeat-vim/
-" * Each element of the b:tags_* variables is as follows:
+" Tools for working with tags in vim. This plugin works as a lightweight companion to
+" more comprehensive utilities like gutentags, offering tag jumping across open
+" buffers and tag navigation and search-replace utilities within buffers.
+"------------------------------------------------------------------------------
+" Each element of the b:tags_* variables is as follows:
 "   Index 0: Tag name.
 "   Index 1: Tag line number.
 "   Index 2: Tag type.
 "   Index 3: Tag parent (optional).
-" * Re-define a few of the shift-number row keys to make them a bit more useful:
+" Re-define a few of the shift-number row keys to make them a bit more useful:
 "   '*' is the current word, global
 "   '&' is the current WORD, global
 "   '#' is the current word, local
