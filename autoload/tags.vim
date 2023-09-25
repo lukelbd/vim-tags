@@ -244,6 +244,7 @@ function! s:tag_sink(tag) abort
     exe 'tab drop ' . parts[0]
     exe parts[1]
   endif
+  normal! zv
 endfunction
 function! s:tag_source(...) abort
   let global = a:0 ? a:1 : 0
