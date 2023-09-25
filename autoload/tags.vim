@@ -58,7 +58,7 @@ function! tags#table_kinds(...) abort
   let cmd = s:get_tags('', '--list-kinds=' . string(kind))
   let cmd = substitute(cmd, '|.*$', '', 'g')
   let table = system(cmd)
-  if global
+  if global  " filter particular filetypes
     let l:subs = []
     let types = uniq(map(tags#buffer_paths(), "getbufvar(v:val, '&filetype')"))
     let regex = '\c\(\%(\n\|^\)\@<=\%(' . join(types, '\|') . '\)\n'
@@ -72,33 +72,36 @@ function! tags#table_kinds(...) abort
 endfunction
 
 " Show the current file tags
-" Note: This also calls UpdateTags so that printed tags match buffer variables.
+" Note: Previously this called UpdateTags on each file and also called the ctags
+" executable. Now to help support giant sessions simply print buffer variables.
+" let cmd = system(s:get_tags(path) . " | tr -s '\t' | column -t -s '\t'")
+" let tags = substitute(tags, '^\_s*\(.\{-}\)\_s*$', '\1', '')  " strip whitespace
+" let tags = substitute(tags, escape(path, s:regex_magic), '', 'g')
 function! tags#table_tags(...) abort
-  call call('tags#update_tags', a:000)
   let global = a:0 ? a:1 : 0
   let paths = global ? tags#buffer_paths() : [expand('%:p')]
-  let table = []
+  let tables = []
   for path in paths  " always absolutes
-    let cmd = s:get_tags(path) . " | tr -s '\t' | column -t -s '\t'"
-    let tags = system(cmd)  " call ctags command
-    let tags = substitute(tags, '^\_s*\(.\{-}\)\_s*$', '\1', '')  " strip whitespace
-    if !empty(tags)
-      let tags = substitute(tags, escape(path, s:regex_magic), '', 'g')
-      if len(paths) > 1
-        let tags = substitute(tags, '\(^\|\n\)', '\1    ', 'g')
-        let tags = fnamemodify(path, ':~:.') . "\n" . tags
-      endif
-      call add(table, tags)
-    endif
+    let table = ''
+    let bnr = bufnr(path)  " buffer unique to path
+    let items = getbufvar(bnr, 'tags_by_name', {})
+    if empty(items) | continue | endif
+    if len(paths) > 1 | let table .= fnamemodify(path, ':~:.') . "\n" | endif
+    for [name, line, kind; rest] in items
+      if global | let kind = '    ' . kind | endif
+      if !empty(rest) | let name .= ' (' . join(rest, ' ') . ')' | endif
+      let table .= kind . ' ' . repeat(' ', 4 - len(line)) . line . ': ' . name . "\n"
+    endfor
+    call add(tables, table[:-2])
   endfor
-  if empty(table)
+  if empty(tables)
     echohl WarningMsg
     echom 'Warning: Tags not found or not available.'
     echohl None
     return
   endif
   let head = global ? 'Tags for open files' : "Tags for file '" . expand('%:~:.') . "'"
-  return head . ":\n" . join(table, "\n")
+  return head . ":\n" . join(tables, "\n")
 endfunction
 
 " Generate tags and parse them into list of lists
