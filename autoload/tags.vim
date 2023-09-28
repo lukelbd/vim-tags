@@ -211,6 +211,8 @@ endfunction
 " Select a specific tag using fzf
 " Note: This matches construction of fzf mappings in vim-succinct.
 function! tags#select_tag(...) abort
+  let global = a:0 ? a:1 : 0
+  let prompt = global ? 'Tag> ' : 'BTag> '
   let tags = call('s:tag_source', a:000)
   if empty(tags)
     echohl WarningMsg
@@ -227,7 +229,7 @@ function! tags#select_tag(...) abort
   call fzf#run(fzf#wrap({
     \ 'source': tags,
     \ 'sink': function('s:tag_sink'),
-    \ 'options': "--no-sort --prompt='Tag> '",
+    \ 'options': '--no-sort --prompt=' . string(prompt),
     \ }))
 endfunction
 
