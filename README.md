@@ -27,11 +27,11 @@ Commands
 
 | Command | Description |
 | ---- | ---- |
-| `:Match` | Set the current search pattern to the input and print a count. Accepts an optional line range. |
-| `:ShowTags` | Update the current file tags and print them in a table. This ignores `g:tags_skip_kinds`. |
-| `:ShowKinds` | Print the current file tag kinds in a table. This ignores `g:tags_skip_kinds`. Use `:ShowTags!` an optional bang parameter to show  optional `<bang>` i.e. |
-| `:CurrentTag` | Print the tag under or preceding the cursor. The associated autoload function `tags#current_tag()` can be used to print the tag in the status line by updating `&statusline`. |
-| `:UpdateTags` | Manually refresh the `b:tags_by_name`, `b:tags_by_line`, and `b:tags_for_scope`  variables used by this plugin. This is called automatically whenever a file is read or written to disk. |
+| `:Search` | Set the current search pattern to the input and print a count. Accepts an optional manually-passed or visually-selected line range. |
+| `:ShowTags` | Update the current file tags and print them in a table. This ignores `g:tags_skip_kinds`. Use `:ShowTags!` to display tags for all open buffers. |
+| `:ShowKinds` | Print the current file tag kinds in a table. This ignores `g:tags_skip_kinds`. Use `:ShowKinds!` to display kinds for all open buffers. |
+| `:CurrentTag` | Print the tag under or preceding the cursor. Use the associated function `tags#current_tag()` to print the tag in the status line by updating `&statusline`. |
+| `:UpdateTags` | Manually refresh the buffer-scope variables used by this plugin. This is called whenever a file is read or written. Use `:UpdateTags!` to update tags for all open buffers. |
 
 Mappings
 --------

@@ -98,7 +98,7 @@ noremap <expr> <silent> <Plug>TagsBackwardTop tags#jump_tag(v:count, 1, 0)
 " Refactoring commands and maps
 "------------------------------------------------------------------------------
 " Public commands
-command! -nargs=1 -range Match
+command! -nargs=1 -range Search
   \ let @/ = <line1> == <line2> ? <q-args> :
   \ printf('\%%>%dl\%%<%dl', <line1> - 1, <line2> + 1) . <q-args>
   \ | call feedkeys(tags#count_match('/'))
