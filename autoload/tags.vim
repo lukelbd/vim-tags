@@ -25,7 +25,7 @@ endfunction
 
 " Return command-line executable that prints tags to stdout
 " Results should be in number mode (i.e. shows line number instead of line)
-function! s:get_tags(path, ...) abort
+function! s:tags_command(path, ...) abort
   let flags = join(a:000, ' ')
   let path = shellescape(expand(fnamemodify(a:path, ':p')))
   return s:tags_command . ' ' . flags . ' ' . path . " 2>/dev/null | cut -d'\t' -f1,3-5"
@@ -55,7 +55,7 @@ endfunction
 function! tags#table_kinds(...) abort
   let global = a:0 ? a:1 : 0
   let kind = global ? 'all' : &filetype
-  let cmd = s:get_tags('', '--list-kinds=' . string(kind))
+  let cmd = s:tags_command('', '--list-kinds=' . string(kind))
   let cmd = substitute(cmd, '|.*$', '', 'g')
   let table = system(cmd)
   if global  " filter particular filetypes
@@ -74,7 +74,7 @@ endfunction
 " Show the current file tags
 " Note: Previously this called UpdateTags on each file and also called the ctags
 " executable. Now to help support giant sessions simply print buffer variables.
-" let cmd = system(s:get_tags(path) . " | tr -s '\t' | column -t -s '\t'")
+" let cmd = system(s:tags_command(path) . " | tr -s '\t' | column -t -s '\t'")
 " let tags = substitute(tags, '^\_s*\(.\{-}\)\_s*$', '\1', '')  " strip whitespace
 " let tags = substitute(tags, escape(path, s:regex_magic), '', 'g')
 function! tags#table_tags(...) abort
@@ -112,28 +112,21 @@ function! tags#update_tags(...) abort
   for path in paths
     " Possibly skip
     let bnr = bufnr(path)  " buffer unique to path
-    let type = getbufvar(bnr, '&filetype')
     let time = getbufvar(bnr, 'tags_update_time', 0)
+    let ftype = getbufvar(bnr, '&filetype')
     if getftime(path) < time | continue | endif
-    if index(g:tags_skip_filetypes, type) != -1 | continue | endif
+    if index(g:tags_skip_filetypes, ftype) != -1 | continue | endif
     " Retrieve tags
     let flags = getline(1) =~# '#!.*python[23]' ? '--language-force=python' : ''
-    let tags = system(s:get_tags(path, flags) . " | sed 's/;\"\t/\t/g'")
-    let tags = map(split(tags, '\n'), "split(v:val, '\t')")
-    let filt = "v:val[2] !~# '[" . get(g:tags_skip_kinds, type, '@') . "]'"
-    let tags = filter(tags, filt)
-    " Get helper variables
-    let by_name = sort(deepcopy(tags), 's:sort_by_name')  " sort alphabetically by name
-    let by_line = sort(deepcopy(tags), 's:sort_by_line')  " sort numerically by line
-    let scope_filt = "v:val[2] =~# '[" . get(g:tags_scope_kinds, type, 'f') . "]'"
-    let top_filt = 'len(v:val) == 3'  " does not belong to larger tag
-    let scope_by_line = filter(deepcopy(by_line), scope_filt)
-    let top_by_line = filter(deepcopy(by_line), top_filt . ' && ' . scope_filt)
-    " Set helper variables
-    call setbufvar(bnr, 'tags_by_name', by_name)
-    call setbufvar(bnr, 'tags_by_line', by_line)
-    call setbufvar(bnr, 'tags_scope_by_line', scope_by_line)
-    call setbufvar(bnr, 'tags_top_by_line', top_by_line)
+    let filt = "v:val[2] !~# '[" . get(g:tags_skip_kinds, ftype, '@') . "]'"
+    let opts = system(s:tags_command(path, flags) . " | sed 's/;\"\t/\t/g'")
+    let opts = map(split(opts, '\n'), "split(v:val, '\t')")
+    let opts = filter(opts, filt)
+    " Update buffer variables
+    let tags_by_name = sort(deepcopy(opts), 's:sort_by_name')
+    let tags_by_line = sort(deepcopy(opts), 's:sort_by_line')
+    call setbufvar(bnr, 'tags_by_name', tags_by_name)
+    call setbufvar(bnr, 'tags_by_line', tags_by_line)
     call setbufvar(bnr, 'tags_update_time', localtime())
   endfor
 endfunction
@@ -144,25 +137,34 @@ endfunction
 " Get the current tag from a list of tags
 " Note: This function searches exclusively (i.e. does not match the current line).
 " So only start at current line when jumping, otherwise start one line down.
-function! tags#close_tag(line, toplevel, forward, circular) abort
-  let bufvar = a:toplevel ? 'b:tags_top_by_line' : 'b:tags_by_line'
-  if !exists(bufvar) || len(eval(bufvar)) == 0
+function! tags#close_tag(line, major, forward, circular) abort
+  if a:major
+    let kinds = get(g:tags_major_kinds, &filetype, 'f')
+    let filt = "len(v:val) == 3 && v:val[2] =~# '[" . kinds . "]'"
+  else
+    let kinds = get(g:tags_minor_kinds, &filetype, 'v')
+    let filt = "v:val[2] !~# '[" . kinds . "]'"
+  endif
+  silent! unlet! b:tags_scope_by_line  " outdated
+  silent! unlet! b:tags_top_by_line  " outdated
+  let tags = get(b:, 'tags_by_line', [])
+  let tags = filter(copy(tags), filt)
+  if empty(tags)
     return []  " silent failure
   endif
   let lnum = a:line
-  let tags = eval(bufvar)
   if a:circular && a:forward && lnum >= tags[-1][1]
     let idx = 0
   elseif a:circular && !a:forward && lnum <= tags[0][1]
     let idx = -1
   else
-    for i in range(1, len(tags) - 1)  " in-between tags (endpoint inclusive)
-      if a:forward && lnum >= tags[-i - 1][1]
-        let idx = -i
+    for jdx in range(1, len(tags) - 1)  " in-between tags (endpoint inclusive)
+      if a:forward && lnum >= tags[-jdx - 1][1]
+        let idx = -jdx
         break
       endif
-      if !a:forward && lnum <= tags[i][1]
-        let idx = i - 1
+      if !a:forward && lnum <= tags[jdx][1]
+        let idx = jdx - 1
         break
       endif
     endfor
@@ -176,15 +178,19 @@ endfunction
 " Get the 'current' tag defined as the tag under the cursor or preceding
 " Note: This is used with statusline
 function! tags#current_tag(...) abort
-  let tag = tags#close_tag(line('.') + 1, 0, 0, 0)
+  let lnum = line('.') + 1
+  let info = tags#close_tag(lnum, 0, 0, 0)
   let full = a:0 ? a:1 : 1  " print full tag
-  if empty(tag)
-    return ''
-  elseif full && len(tag) == 4  " indicates extra information
-    return tag[2] . ':' . substitute(tag[3], '^.*:', '', '') . ':' . tag[0]
-  else
-    return tag[2] . ':' . tag[0]
+  if empty(info)
+    let parts = []
+  elseif !full || len(info) == 3
+    let parts = [info[2], info[0]]
+  els  " include extra information
+    let extra = substitute(info[3], '^.*:', '', '')
+    let parts = [info[2], extra, info[0]]
   endif
+  let string = join(parts, ':')
+  return string
 endfunction
 
 " Get the line of the next or previous tag excluding under the cursor
@@ -194,7 +200,7 @@ function! tags#jump_tag(repeat, ...) abort
   let args = copy(a:000)
   call add(args, 1)  " enable circular searching
   call insert(args, line('.'))  " start on current line
-  for j in range(repeat)  " loop through repitition count
+  for idx in range(repeat)  " loop through repitition count
     let tag = call('tags#close_tag', args)
     if empty(tag)
       echohl WarningMsg
@@ -213,8 +219,8 @@ endfunction
 function! tags#select_tag(...) abort
   let global = a:0 ? a:1 : 0
   let prompt = global ? 'Tag> ' : 'BTag> '
-  let tags = call('s:tag_source', a:000)
-  if empty(tags)
+  let source = call('s:tag_source', a:000)
+  if empty(source)
     echohl WarningMsg
     echom 'Warning: Tags not found or not available.'
     echohl None
@@ -227,7 +233,7 @@ function! tags#select_tag(...) abort
     return
   endif
   call fzf#run(fzf#wrap({
-    \ 'source': tags,
+    \ 'source': source,
     \ 'sink': function('s:tag_sink'),
     \ 'options': '--no-sort --prompt=' . string(prompt),
     \ }))
@@ -257,7 +263,7 @@ function! s:tag_source(...) abort
   let source = []
   for path in paths
     let bnr = bufnr(path)  " buffer unique to path
-    let tags = deepcopy(getbufvar(bnr, 'tags_by_name', []))
+    let src = deepcopy(getbufvar(bnr, 'tags_by_name', []))
     let head = "printf('%4d', v:val[1]) . ': '"
     let tail = "v:val[0] . ' (' . join(v:val[2:], ', ') . ')'"
     if global
@@ -268,8 +274,8 @@ function! s:tag_source(...) abort
       endif
       let head = string(path) . " . ': ' . " . head
     endif
-    let tags = map(tags, head . ' . ' . tail)
-    call extend(source, tags)
+    let src = map(src, head . ' . ' . tail)
+    call extend(source, src)
   endfor
   return source
 endfunction
@@ -285,9 +291,31 @@ function! tags#count_match(key) abort
   return cmd . "\<Cmd>%s@" . @/ . "@@gne | call winrestview(b:winview)\<CR>"
 endfunction
 
-" Finish change after InsertLeave and automatically jump to next occurence.
-" Warning: The @. register may contain keystrokes like <80>kb (i.e. backspace) so
-" must feed keys as if typed rather than as if from mapping.
+" Repeat previous change
+" Note: The 'cgn' command silently fails to trigger insert mode if no matches found
+" so we check for that. Putting <Esc> in feedkeys() cancels operation so must come
+" afterward (may be no-op) and the 'i' is necessary to insert <C-a> before <Esc>.
+function! tags#change_again() abort
+  let cmd = "\<Cmd>call feedkeys(mode() =~# 'i' ? '\<C-a>' : '', 'ni')\<CR>"
+  call feedkeys('cgn' . cmd . "\<Esc>n")  " add previously inserted if cgn succeeds
+  if exists('*repeat#set')
+    call repeat#set("\<Plug>change_again")  " re-apply this function for next repeat
+  endif
+endfunction
+
+" Function that sets things up for maps that change text
+" Note: Unlike tags#delete_next we wait until
+function! tags#change_next(key) abort
+  let cmd = tags#set_match(a:key)
+  let g:change_next = 1
+  if exists('*repeat#set')
+    call repeat#set("\<Plug>change_again")
+  endif
+  return cmd . 'cgn'
+endfunction
+
+" Finish change after InsertLeave and automatically jump to next occurence
+" Note: Register may have keystrokes e.g. <80>kb (backspace) so must feed as 'typed'
 function! tags#change_finish() abort
   if exists('g:change_all') && g:change_all
     silent undo  " undo first change so subsequent undo reverts all changes
@@ -303,31 +331,8 @@ function! tags#change_finish() abort
   let g:change_next = 0
 endfunction
 
-" Function that sets things up for maps that change text
-" Note: Unlike tags#delete_next we wait until
-function! tags#change_next(key) abort
-  let cmd = tags#set_match(a:key)
-  let g:change_next = 1
-  if exists('*repeat#set')
-    call repeat#set("\<Plug>change_again")
-  endif
-  return cmd . 'cgn'
-endfunction
-
-" Repeat previous change
-" Warning: The 'cgn' command silently fails to trigger insert mode if no matches found
-" so we check for that. Putting <Esc> in feedkeys() cancels operation so must come
-" afterward (may be no-op) and the 'i' is necessary to insert <C-a> before <Esc>.
-function! tags#change_again() abort
-  let cmd = "\<Cmd>call feedkeys(mode() =~# 'i' ? '\<C-a>' : '', 'ni')\<CR>"
-  call feedkeys('cgn' . cmd . "\<Esc>n")  " add previously inserted if cgn succeeds
-  if exists('*repeat#set')
-    call repeat#set("\<Plug>change_again")  " re-apply this function for next repeat
-  endif
-endfunction
-
 " Delete next match
-" Warning: hlsearch inside function fails: https://stackoverflow.com/q/1803539/4970632
+" Note: hlsearch inside function fails: https://stackoverflow.com/q/1803539/4970632
 function! tags#delete_next(key) abort
   let cmd = tags#set_match(a:key)
   if exists('*repeat#set')
@@ -337,6 +342,7 @@ function! tags#delete_next(key) abort
 endfunction
 
 " Delete all of next matches
+" Note: Here simply run substitute
 function! tags#delete_all(key) abort
   call tags#set_match(a:key)
   let winview = winsaveview()
@@ -344,45 +350,49 @@ function! tags#delete_all(key) abort
   call winrestview(winview)
 endfunction
 
-" Search within top level tags belonging to 'scope' kinds
+" Search within top level tags belonging to 'major' kinds
 " Search func idea came from: http://vim.wikia.com/wiki/Search_in_current_function
-" The Below is copied from: https://stackoverflow.com/a/597932/4970632
-" Note jedi-vim 'variable rename' utility is sketchy and fails; gives us
+" The below is copied from: https://stackoverflow.com/a/597932/4970632
+" Note: jedi-vim 'variable rename' utility is sketchy and fails; gives us
 " motivation for custom renaming, and should confirm every single instance.
-function! tags#set_scope(...) abort
+function! tags#get_scope(...) abort
+  let kinds = get(g:tags_major_kinds, &filetype, 'f')
+  let filt = "v:val[2] =~# '[" . kinds . "]'"
   let lnum = a:0 ? a:1 : line('.')
-  if !exists('b:tags_scope_by_line') || len(b:tags_scope_by_line) == 0
+  let opts = get(b:, 'tags_by_line', [])
+  let opts = filter(copy(opts), filt)
+  if empty(opts)
     echohl WarningMsg
     echom 'Warning: Failed to restrict the search scope (tags unavailable).'
     echohl None
     return ''
   endif
-  let taglines = map(deepcopy(b:tags_scope_by_line), 'v:val[1]')
-  if lnum < taglines[0]
+  let lines = map(deepcopy(opts), 'v:val[1]')
+  if lnum < lines[0]
     let line1 = 1
-    let line2 = taglines[0]
-    let scope1 = 'START'
-    let scope2 = b:tags_scope_by_line[0][0]
-  elseif lnum >= taglines[len(taglines) - 1]
-    let line1 = taglines[len(taglines) - 1]
+    let line2 = lines[0]
+    let tag1 = 'START'
+    let tag2 = opts[0][0]
+  elseif lnum >= lines[len(lines) - 1]
+    let line1 = lines[len(lines) - 1]
     let line2 = line('$') + 1  " match below this
-    let scope1 = b:tags_scope_by_line[len(taglines) - 1][0]
-    let scope2 = 'END'
+    let tag1 = opts[len(lines) - 1][0]
+    let tag2 = 'END'
   else
-    for idx in range(0, len(taglines) - 2)
-      if lnum >= taglines[idx] && lnum < taglines[idx + 1]
-        let line1 = taglines[idx]
-        let line2 = taglines[idx + 1]
-        let scope1 = b:tags_scope_by_line[idx][0]
-        let scope2 = b:tags_scope_by_line[idx + 1][0]
+    for idx in range(0, len(lines) - 2)
+      if lnum >= lines[idx] && lnum < lines[idx + 1]
+        let line1 = lines[idx]
+        let line2 = lines[idx + 1]
+        let tag1 = opts[idx][0]
+        let tag2 = opts[idx + 1][0]
         break
       endif
     endfor
   endif
   let maxlen = 20
   let regex = printf('\%%>%dl\%%<%dl', line1 - 1, line2)
-  let info1 = line1 . ' (' . scope1[:maxlen] . ')'
-  let info2 = line2 . ' (' . scope2[:maxlen] . ')'
+  let info1 = line1 . ' (' . tag1[:maxlen] . ')'
+  let info2 = line2 . ' (' . tag2[:maxlen] . ')'
   echom 'Selected line ' . info1 . ' to line ' . info2 . '.'
   return regex
 endfunction
@@ -406,11 +416,11 @@ function! tags#set_match(key, ...) abort
     let @/ = '\_s\@<=' . escape(expand('<cWORD>'), s:regex_magic) . '\ze\_s\C'
   elseif a:key =~# '#'
     let motion = 'lb'
-    let scope = tags#set_scope()
+    let scope = tags#get_scope()
     let @/ = scope . '\<' . escape(expand('<cword>'), s:regex_magic) . '\>\C'
   elseif a:key =~# '@'
     let motion = 'lB'
-    let scope = tags#set_scope()
+    let scope = tags#get_scope()
     let @/ = '\_s\@<=' . scope . escape(expand('<cWORD>'), s:regex_magic) . '\ze\_s\C'
   elseif a:key =~# '!'
     let text = getline('.')

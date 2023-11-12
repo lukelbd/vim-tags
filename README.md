@@ -57,7 +57,8 @@ Options
 | ---- | ---- |
 | `g:tags_skip_filetypes` | List of filetypes for which we do not want to try to generate tags. Setting this variable could speed things up a bit. Default is `['diff', 'help', 'man', 'qf']`. |
 | `g:tags_skip_kinds` | Dictionary whose keys are filetypes and whose values are strings indicating the tag kinds to ignore. Default behavior is to include all tags. |
-| `g:tags_scope_kinds` | Dictionary whose keys are filetypes and whose values are strings indicating the tag kinds used to define search scope boundaries. Default is `'f'` i.e. function definition tags. |
+| `g:tags_major_kinds` | Dictionary whose keys are filetypes and whose values are strings indicating the tag kinds defining search scope boundaries. Default is `'f'` i.e. function definition tags. |
+| `g:tags_minor_kinds` | Dictionary whose keys are filetypes and whose values are strings indicating the tag kinds to ignore during bracket navigation. Default is `'v'` i.e. variable definition tags. |
 
 Installation
 ============

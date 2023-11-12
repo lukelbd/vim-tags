@@ -32,21 +32,24 @@ augroup tags
   au BufReadPost,BufWritePost * silent call tags#update_tags(expand('<afile>'))
 augroup END
 
-" List of per-file/per-filetype tag categories that we define as 'scope-delimiters',
-" i.e. tags approximately denoting variable scope for code blocks. Default is 'f'
-if !exists('g:tags_scope_kinds')
-  let g:tags_scope_kinds = {}
+" Files that we wish to ignore
+if !exists('g:tags_skip_filetypes')
+  let g:tags_skip_filetypes = ['diff', 'help', 'man', 'qf']
 endif
 
-" List of per-file/per-filetype kind categories to skip. Useful to skip frequent or
-" verbose tags. Can also define in .ctags config.
+" List of per-file/per-filetype tag kinds to skip. Can also use .ctags config
 if !exists('g:tags_skip_kinds')
   let g:tags_skip_kinds = {}
 endif
 
-" Files that we wish to ignore
-if !exists('g:tags_skip_filetypes')
-  let g:tags_skip_filetypes = ['diff', 'help', 'man', 'qf']
+" List of per-file/per-filetype tag kinds used as to for search scope and [T navigation
+if !exists('g:tags_major_kinds')
+  let g:tags_major_kinds = {}
+endif
+
+" List of per-file/per-filetype tag kinds skipped during [t navigation
+if !exists('g:tags_minor_kinds')
+  let g:tags_minor_kinds = {}
 endif
 
 " Default mapping settings
@@ -113,8 +116,8 @@ noremap <expr> & tags#set_match('&', 1)
 noremap <expr> # tags#set_match('#', 1)
 noremap <expr> @ tags#set_match('@', 1)
 noremap <expr> ! tags#set_match('!', 1)
-noremap <expr> g/ '/' . tags#set_scope()
-noremap <expr> g? '?' . tags#set_scope()
+noremap <expr> g/ '/' . tags#get_scope()
+noremap <expr> g? '?' . tags#get_scope()
 
 " Normal mode mappings that replicate :s/regex/sub/ behavior and can be repeated
 " with '.'. The substitution is determined from the text inserted by the user and
