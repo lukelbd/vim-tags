@@ -77,10 +77,13 @@ endif
 "-----------------------------------------------------------------------------
 " Public commands
 " Note: The tags#current_tag() is also used in vim-statusline plugin.
-command! -bang -nargs=* ShowTags echo tags#table_tags(<bang>0)
-command! -bang -nargs=* ShowKinds echo tags#table_kinds(<bang>0)
-command! -bang -nargs=* UpdateTags call tags#update_tags(<bang>0)
 command! CurrentTag echom 'Current tag: ' . tags#current_tag()
+command! -bang -nargs=* -complete=filetype ShowKinds
+  \ echo call('tags#table_kinds', <bang>0 ? ['all'] : [<f-args>])
+command! -bang -nargs=* -complete=file ShowTags
+  \ echo call('tags#table_tags', <bang>0 ? ['all'] : [<f-args>])
+command! -bang -nargs=* -complete=file UpdateTags
+  \ call call('tags#update_tags', <bang>0 ? ['all'] : [<f-args>])
 
 " Tag select maps
 " Note: Must use :n instead of <expr> ngg so we can use <C-u> to discard count!

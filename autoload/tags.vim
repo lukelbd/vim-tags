@@ -4,7 +4,7 @@
 " vim-tags/autoload file or naming the latter to tags.vim at all caused an autocmd
 " BufRead error on startup. Was impossible to diagnose so just use alternate names.
 "------------------------------------------------------------------------------
-" Tags command
+" Global tags command
 " Note: Keep in sync with g:fzf_tags_command
 let s:tags_command = 'ctags -f - --excmd=number'
 let s:regex_magic = '[]\/.*$~'
@@ -24,11 +24,26 @@ function! s:sort_by_name(tag1, tag2) abort
 endfunction
 
 " Return command-line executable that prints tags to stdout
-" Results should be in number mode (i.e. shows line number instead of line)
+" Note: Output should be in number mode (i.e. shows line number instead of full line)
 function! s:tags_command(path, ...) abort
   let flags = join(a:000, ' ')
   let path = shellescape(expand(fnamemodify(a:path, ':p')))
-  return s:tags_command . ' ' . flags . ' ' . path . " 2>/dev/null | cut -d'\t' -f1,3-5"
+  let cmd = s:tags_command . ' ' . flags . ' ' . path . ' 2>/dev/null'
+  return cmd . " | cut -d'\t' -f1,3-5"
+endfunction
+
+" Return tags parsed and sorted by name and line
+" Note: This is used for buffer variables and unopened :ShowTags path(s)
+function! s:tags_parsed(path) abort
+  let type = getbufvar(bufnr(a:path), '&filetype')  " possibly empty string
+  let skip = get(g:tags_skip_kinds, type, '@')  " default dummy character
+  if index(g:tags_skip_filetypes, type) >= 0 | return [[], []] | endif
+  let flags = getline(1) =~# '#!.*python[23]' ? '--language-force=python' : ''
+  let items = system(s:tags_command(a:path, flags) . " | sed 's/;\"\t/\t/g'")
+  let items = map(split(items, '\n'), "split(v:val, '\t')")
+  let items = filter(items, "v:val[2] !~# '[" . skip . "]'")
+  let items = [sort(items, 's:sort_by_line'), sort(deepcopy(items), 's:sort_by_name')]
+  return items
 endfunction
 
 " List open window paths
@@ -50,85 +65,101 @@ function! tags#buffer_paths() abort
   return paths
 endfunction
 
-" Show the current file kinds
-" Note: See https://stackoverflow.com/a/71334/4970632 for difference between \r and \n
-function! tags#table_kinds(...) abort
-  let global = a:0 ? a:1 : 0
-  let kind = global ? 'all' : &filetype
-  let cmd = s:tags_command('', '--list-kinds=' . string(kind))
-  let cmd = substitute(cmd, '|.*$', '', 'g')
-  let table = system(cmd)
-  if global  " filter particular filetypes
-    let l:subs = []
-    let types = uniq(map(tags#buffer_paths(), "getbufvar(v:val, '&filetype')"))
-    let regex = '\c\(\%(\n\|^\)\@<=\%(' . join(types, '\|') . '\)\n'
-    let regex = regex . '\%(\s\+[^\n]*\%(\n\|$\)\)*\)\S\@!'
-    let repl = '\=add(l:subs, submatch(0))'  " see: https://vi.stackexchange.com/a/16491/8084
-    call substitute(table, regex, repl, 'gn')
-    let table = join(l:subs, '')
-  endif
-  let head = global ? 'Tag kinds for open filetypes' : "Tag kinds for filetype '" . &filetype . "'"
-  return head . ":\n" . table
-endfunction
-
-" Show the current file tags
-" Note: Previously this called UpdateTags on each file and also called the ctags
-" executable. Now to help support giant sessions simply print buffer variables.
-" let cmd = system(s:tags_command(path) . " | tr -s '\t' | column -t -s '\t'")
-" let tags = substitute(tags, '^\_s*\(.\{-}\)\_s*$', '\1', '')  " strip whitespace
-" let tags = substitute(tags, escape(path, s:regex_magic), '', 'g')
-function! tags#table_tags(...) abort
-  let global = a:0 ? a:1 : 0
-  let paths = global ? tags#buffer_paths() : [expand('%:p')]
-  let tables = []
-  for path in paths  " always absolutes
-    let table = ''
-    let bnr = bufnr(path)  " buffer unique to path
-    let items = getbufvar(bnr, 'tags_by_name', {})
-    if empty(items) | continue | endif
-    if len(paths) > 1 | let table .= fnamemodify(path, ':~:.') . "\n" | endif
-    for [name, line, kind; rest] in items
-      if global | let kind = '    ' . kind | endif
-      if !empty(rest) | let name .= ' (' . join(rest, ' ') . ')' | endif
-      let table .= kind . ' ' . repeat(' ', 4 - len(line)) . line . ': ' . name . "\n"
-    endfor
-    call add(tables, table[:-2])
-  endfor
-  if empty(tables)
-    echohl WarningMsg
-    echom 'Warning: Tags not found or not available.'
-    echohl None
-    return
-  endif
-  let head = global ? 'Tags for open files' : "Tags for file '" . expand('%:~:.') . "'"
-  return head . ":\n" . join(tables, "\n")
-endfunction
-
 " Generate tags and parse them into list of lists
 " Note: Files open in multiple windows use the same buffer number and same variables.
 function! tags#update_tags(...) abort
   let global = a:0 ? a:1 : 0
   let paths = global ? tags#buffer_paths() : [expand('%:p')]
   for path in paths
-    " Possibly skip
     let bnr = bufnr(path)  " buffer unique to path
     let time = getbufvar(bnr, 'tags_update_time', 0)
     let ftype = getbufvar(bnr, '&filetype')
     if getftime(path) < time | continue | endif
-    if index(g:tags_skip_filetypes, ftype) != -1 | continue | endif
-    " Retrieve tags
-    let flags = getline(1) =~# '#!.*python[23]' ? '--language-force=python' : ''
-    let filt = "v:val[2] !~# '[" . get(g:tags_skip_kinds, ftype, '@') . "]'"
-    let opts = system(s:tags_command(path, flags) . " | sed 's/;\"\t/\t/g'")
-    let opts = map(split(opts, '\n'), "split(v:val, '\t')")
-    let opts = filter(opts, filt)
-    " Update buffer variables
-    let tags_by_name = sort(deepcopy(opts), 's:sort_by_name')
-    let tags_by_line = sort(deepcopy(opts), 's:sort_by_line')
-    call setbufvar(bnr, 'tags_by_name', tags_by_name)
-    call setbufvar(bnr, 'tags_by_line', tags_by_line)
+    let items = s:tags_parsed(path)  " items by line and name
+    call setbufvar(bnr, 'tags_by_line', items[0])
+    call setbufvar(bnr, 'tags_by_name', items[1])
     call setbufvar(bnr, 'tags_update_time', localtime())
   endfor
+endfunction
+
+"-----------------------------------------------------------------------------
+" Tag display utiltiies
+"-----------------------------------------------------------------------------
+" Show the current file kinds
+" Note: Ctags cannot show specific filetype kinds so instead filter '--list-kinds=all'
+" Note: See https://stackoverflow.com/a/71334/4970632 for difference between \r and \n
+function! tags#table_kinds(...) abort
+  if index(a:000, 'all') >= 0  " all open filetypes
+    let flag = 'all'
+    let types = uniq(map(tags#buffer_paths(), "getbufvar(v:val, '&filetype')"))
+    let label = 'all buffer filetypes'
+  elseif a:0  " input filetype(s)
+    let flag = a:0 == 1 ? a:1 : 'all'
+    let types = copy(a:000)
+    let label = 'input filetype(s) ' . join(map(copy(types), 'string(v:val)'), ', ')
+  else  " current filetype
+    let flag = &filetype
+    let types = [&filetype]
+    let label = 'current filetype ' . string(&filetype)
+  endif
+  let cmd = s:tags_command('', '--list-kinds=' . string(flag))
+  let cmd = substitute(cmd, '|.*$', '', 'g')
+  let table = system(cmd)
+  if flag ==# 'all'  " filter particular filetypes
+    let l:subs = []
+    let regex = '\c\(\%(\n\|^\)\@<=\%(' . join(types, '\|') . '\)\n'
+    let regex = regex . '\%(\s\+[^\n]*\%(\n\|$\)\)*\)\S\@!'
+    let append = '\=add(l:subs, submatch(0))'  " see: https://vi.stackexchange.com/a/16491/8084
+    call substitute(table, regex, append, 'gn')
+    let table = join(l:subs, '')
+  endif
+  return 'Tag kinds for ' . label . ":\n" . trim(table)
+endfunction
+
+" Show the current file tags
+" Note: This tries to read existing buffer variable to increase speed in huge sessions
+" let table = system(s:tags_command(path) . ' | tr -s $''\t'' | column -t -s $''\t''')
+" let table = substitute(table, escape(path, s:regex_magic), '', 'g')
+function! tags#table_tags(...) abort
+  if index(a:000, 'all') >= 0  " all open paths
+    let paths = tags#buffer_paths()
+    let label = 'all open paths'
+  elseif a:0  " input path(s)
+    let paths = copy(a:000)
+    let label = 'input path(s) ' . join(map(copy(paths), 'string(v:val)'), ', ')
+  else  " current path
+    let paths = [exists('*RelativePath') ? RelativePath(@%) : expand('%:~:.')]
+    let label = 'current path ' . string(paths[0])
+  endif
+  let tables = []
+  for path in paths  " relative paths
+    if !filereadable(path)
+      let types = getcompletion(path, 'filetype')  " https://vi.stackexchange.com/a/14990/8084
+      if index(types, path) < 0
+        echohl WarningMsg
+        echom 'Warning: Path ' . string(path) . ' not open or not readable.'
+        echohl None
+      endif
+      continue
+    endif
+    let path = exists('*RelativePath') ? RelativePath(path) : fnamemodify(path, ':~:.')
+    let items = getbufvar(bufnr(path), 'tags_by_name', [])  " use buffer by default
+    let items = empty(items) ? s:tags_parsed(path)[1] : items  " try to generate
+    let table = empty(items) || len(paths) == 1 ? '' : path . "\n"
+    for [name, line, kind; context] in empty(items) ? [] : items
+      let kind = len(paths) == 1 ? kind : '    ' . kind
+      let name = empty(context) ? name : name . ' (' . join(context, ' ') . ')'
+      let table .= kind . ' ' . repeat(' ', 4 - len(line)) . line . ': ' . name . "\n"
+    endfor
+    if !empty(trim(table)) | call add(tables, trim(table)) | endif
+  endfor
+  if empty(tables)
+    echohl WarningMsg
+    echom 'Warning: Tags not found or not available.'
+    echohl None
+    return ''
+  endif
+  return 'Tags for ' . label . ":\n" . join(tables, "\n")
 endfunction
 
 "-----------------------------------------------------------------------------
@@ -342,7 +373,7 @@ function! tags#delete_next(key) abort
 endfunction
 
 " Delete all of next matches
-" Note: Here simply run substitute
+" Note: Unlike 'change all' this can simply call :substitute
 function! tags#delete_all(key) abort
   call tags#set_match(a:key)
   let winview = winsaveview()
@@ -359,32 +390,32 @@ function! tags#get_scope(...) abort
   let kinds = get(g:tags_major_kinds, &filetype, 'f')
   let filt = "v:val[2] =~# '[" . kinds . "]'"
   let lnum = a:0 ? a:1 : line('.')
-  let opts = get(b:, 'tags_by_line', [])
-  let opts = filter(copy(opts), filt)
-  if empty(opts)
+  let items = get(b:, 'tags_by_line', [])
+  let items = filter(copy(items), filt)
+  if empty(items)
     echohl WarningMsg
     echom 'Warning: Failed to restrict the search scope (tags unavailable).'
     echohl None
     return ''
   endif
-  let lines = map(deepcopy(opts), 'v:val[1]')
+  let lines = map(deepcopy(items), 'v:val[1]')
   if lnum < lines[0]
     let line1 = 1
     let line2 = lines[0]
     let tag1 = 'START'
-    let tag2 = opts[0][0]
+    let tag2 = items[0][0]
   elseif lnum >= lines[len(lines) - 1]
     let line1 = lines[len(lines) - 1]
     let line2 = line('$') + 1  " match below this
-    let tag1 = opts[len(lines) - 1][0]
+    let tag1 = items[len(lines) - 1][0]
     let tag2 = 'END'
   else
     for idx in range(0, len(lines) - 2)
       if lnum >= lines[idx] && lnum < lines[idx + 1]
         let line1 = lines[idx]
         let line2 = lines[idx + 1]
-        let tag1 = opts[idx][0]
-        let tag2 = opts[idx + 1][0]
+        let tag1 = items[idx][0]
+        let tag2 = items[idx + 1][0]
         break
       endif
     endfor

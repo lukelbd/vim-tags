@@ -28,9 +28,9 @@ Commands
 | Command | Description |
 | ---- | ---- |
 | `:Search` | Set the current search pattern to the input and print a count. Accepts an optional manually-passed or visually-selected line range. |
-| `:ShowTags` | Update the current file tags and print them in a table. This ignores `g:tags_skip_kinds`. Use `:ShowTags!` to display tags for all open buffers. |
-| `:ShowKinds` | Print the current file tag kinds in a table. This ignores `g:tags_skip_kinds`. Use `:ShowKinds!` to display kinds for all open buffers. |
-| `:CurrentTag` | Print the tag under or preceding the cursor. Use the associated function `tags#current_tag()` to print the tag in the status line by updating `&statusline`. |
+| `:ShowTags` | Update file tags and print them in a table. This ignores `g:tags_skip_kinds`. Use `:ShowTags!` to display tags for all open buffers or `:ShowTags path1 [path2...]` for specific files. |
+| `:ShowKinds` | Print file tag kinds in a table. This ignores `g:tags_skip_kinds`. Use `:ShowKinds!` to display kinds for all open buffers or `:ShowKinds path1 [path2...]` for specific files. |
+| `:CurrentTag` | Print the non-minor tag under or preceding the cursor. This can be shown in the status line by adding the associated function `tags#current_tag()` to `&statusline`. |
 | `:UpdateTags` | Manually refresh the buffer-scope variables used by this plugin. This is called whenever a file is read or written. Use `:UpdateTags!` to update tags for all open buffers. |
 
 Mappings
