@@ -114,13 +114,13 @@ command! -nargs=1 -range Search
 " character search, and forward and backward local scope search.
 " Note: current character copied from https://stackoverflow.com/a/23323958/4970632
 " Todo: Add scope-local matches? No because use those for other mappings.
-noremap <expr> * tags#set_match('*', 1)
-noremap <expr> & tags#set_match('&', 1)
-noremap <expr> # tags#set_match('#', 1)
-noremap <expr> @ tags#set_match('@', 1)
-noremap <expr> ! tags#set_match('!', 1)
-noremap <expr> g/ '/' . tags#get_scope()
-noremap <expr> g? '?' . tags#get_scope()
+noremap * <Cmd>call tags#set_match('*', 1)<CR><Cmd>setlocal hlsearch<CR>
+noremap & <Cmd>call tags#set_match('&', 1)<CR><Cmd>setlocal hlsearch<CR>
+noremap # <Cmd>call tags#set_match('#', 1)<CR><Cmd>setlocal hlsearch<CR>
+noremap @ <Cmd>call tags#set_match('@', 1)<CR><Cmd>setlocal hlsearch<CR>
+noremap ! <Cmd>call tags#set_match('!', 1)<CR><Cmd>setlocal hlsearch<CR>
+noremap g/ /<C-r>=tags#get_scope()<CR>
+noremap g? ?<C-r>=tags#get_scope()<CR>
 
 " Normal mode mappings that replicate :s/regex/sub/ behavior and can be repeated
 " with '.'. The substitution is determined from the text inserted by the user and

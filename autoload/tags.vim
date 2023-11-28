@@ -382,11 +382,12 @@ function! tags#delete_all(key) abort
 endfunction
 
 " Search within top level tags belonging to 'major' kinds
-" Search func idea came from: http://vim.wikia.com/wiki/Search_in_current_function
-" The below is copied from: https://stackoverflow.com/a/597932/4970632
-" Note: jedi-vim 'variable rename' utility is sketchy and fails; gives us
-" motivation for custom renaming, and should confirm every single instance.
+" See: http://vim.wikia.com/wiki/Search_in_current_function
+" See: https://stackoverflow.com/a/597932/4970632
+" Note: The jedi-vim 'variable rename' utility is sketchy and fails. Gives us
+" motivation for custom renaming where we can see and confirm each change.
 function! tags#get_scope(...) abort
+  " Initial stuff
   let kinds = get(g:tags_major_kinds, &filetype, 'f')
   let filt = "v:val[2] =~# '[" . kinds . "]'"
   let lnum = a:0 ? a:1 : line('.')
@@ -399,38 +400,50 @@ function! tags#get_scope(...) abort
     return ''
   endif
   let lines = map(deepcopy(items), 'v:val[1]')
+  " Find delimiter tags
   if lnum < lines[0]
     let line1 = 1
     let line2 = lines[0]
-    let tag1 = 'START'
-    let tag2 = items[0][0]
+    let label = ''
   elseif lnum >= lines[len(lines) - 1]
     let line1 = lines[len(lines) - 1]
     let line2 = line('$') + 1  " match below this
-    let tag1 = items[len(lines) - 1][0]
-    let tag2 = 'END'
+    let label = items[len(lines) - 1][0]
   else
     for idx in range(0, len(lines) - 2)
       if lnum >= lines[idx] && lnum < lines[idx + 1]
         let line1 = lines[idx]
         let line2 = lines[idx + 1]
-        let tag1 = items[idx][0]
-        let tag2 = items[idx + 1][0]
+        let label = items[idx][0]
         break
       endif
     endfor
   endif
+  " Find closing line and tag
+  keepjumps normal! zv
+  let winview = winsaveview()
+  exe lnum == line1 ? line1 + 1 : ''
+  keepjumps normal! [z
+  let iline = line('.')
+  keepjumps normal! ]z
+  let jline = line('.')
+  call winrestview(winview)
+  if iline == line1 && jline > iline && foldlevel(iline) == foldlevel(jline)
+    let line2 = jline
+    let [label1, label2] = [label, trim(getline(jline))]
+  else
+    let [line1, line2] = [1, line('$')]
+    let [label1, label2] = ['START', 'END']
+  endif
   let maxlen = 20
-  let regex = printf('\%%>%dl\%%<%dl', line1 - 1, line2)
-  let info1 = line1 . ' (' . tag1[:maxlen] . ')'
-  let info2 = line2 . ' (' . tag2[:maxlen] . ')'
+  let regex = printf('\%%>%dl\%%<%dl', line1 - 1, line2 + 1)
+  let info1 = line1 . ' (' . label1[:maxlen] . ')'
+  let info2 = line2 . ' (' . label2[:maxlen] . ')'
   echom 'Selected line ' . info1 . ' to line ' . info2 . '.'
   return regex
 endfunction
 
-" Set the last search register to some 'current pattern' under cursor, and
-" return normal mode commands for highlighting that match (must return the
-" command because for some reason set hlsearch does not work inside function).
+" Set the last search register to some 'current pattern' under cursor
 " Note: Here '!' handles multi-byte characters using example in :help byteidx. Also
 " the native vim-indexed-search maps invoke <Plug>(indexed-search-after), which just
 " calls <Plug>(indexed-search-index) --> :ShowSearchIndex... but causes change
@@ -457,8 +470,10 @@ function! tags#set_match(key, ...) abort
     let text = getline('.')
     let @/ = empty(text) ? "\n" : escape(matchstr(text, '.', byteidx(text, col('.') - 1)), s:regex_magic)
   endif  " otherwise keep current selection
-  let cmds = inplace ? motion : ''
-  let cmds .= "\<Cmd>setlocal hlsearch\<CR>"
-  let cmds .= empty(scope) && exists(':ShowSearchIndex') ? "\<Cmd>ShowSearchIndex\<CR>" : ''
-  return cmds  " see top for notes about <Plug>(indexed-search-after)
+  if a:0 && a:1
+    exe 'normal! ' . motion
+  endif
+  if empty(scope) && exists(':ShowSearchIndex')
+    ShowSearchIndex
+  endif  " see top for notes about <Plug>(indexed-search-after)
 endfunction
