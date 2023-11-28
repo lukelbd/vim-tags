@@ -137,17 +137,16 @@ nmap ca# <Cmd>let g:change_all = 1<CR><Plug>c#
 nmap ca@ <Cmd>let g:change_all = 1<CR><Plug>c@
 nmap ca/ <Cmd>let g:change_all = 1<CR><Plug>c/
 nmap ca? <Cmd>let g:change_all = 1<CR><Plug>c?
-nnoremap <expr> <Plug>c* tags#change_next('c*')
-nnoremap <expr> <Plug>c& tags#change_next('c&')
-nnoremap <expr> <Plug>c# tags#change_next('c#')
-nnoremap <expr> <Plug>c@ tags#change_next('c@')
-nnoremap <expr> <Plug>c/ tags#change_next('c/')
-nnoremap <expr> <Plug>c? tags#change_next('c?')
+nnoremap <Plug>c* <Cmd>call tags#change_next('c*')<CR>
+nnoremap <Plug>c& <Cmd>call tags#change_next('c&')<CR>
+nnoremap <Plug>c# <Cmd>call tags#change_next('c#')<CR>
+nnoremap <Plug>c@ <Cmd>call tags#change_next('c@')<CR>
+nnoremap <Plug>c/ <Cmd>call tags#change_next('c/')<CR>
+nnoremap <Plug>c? <Cmd>call tags#change_next('c?')<CR>
 nnoremap <Plug>change_again <Cmd>call tags#change_again()<CR>
 
-" Normal mode mappings that replicate :d/regex/ behavior and can be repeated
-" with '.'. The cursuro automatically jumps to the next match. The 'a' mappings
-" delete all matches.
+" Normal mode mappings that replicate :d/regex/ behavior and can be repeated with '.'.
+" Cursor automatically jumps to the next match. The 'a' mappings delete all matches.
 nmap d* <Plug>d*
 nmap d& <Plug>d&
 nmap d# <Plug>d#
@@ -160,9 +159,9 @@ nmap da# <Cmd>call tags#delete_all('d#')<CR>
 nmap da@ <Cmd>call tags#delete_all('d@')<CR>
 nmap da/ <Cmd>call tags#delete_all('d/')<CR>
 nmap da? <Cmd>call tags#delete_all('d?')<CR>
-nnoremap <expr> <Plug>d* tags#delete_next('d*')
-nnoremap <expr> <Plug>d& tags#delete_next('d&')
-nnoremap <expr> <Plug>d# tags#delete_next('d#')
-nnoremap <expr> <Plug>d@ tags#delete_next('d@')
-nnoremap <expr> <Plug>d/ tags#delete_next('d/')
-nnoremap <expr> <Plug>d? tags#delete_next('d?')
+nnoremap <Plug>d* <Cmd>call tags#delete_next('d*')<CR>
+nnoremap <Plug>d& <Cmd>call tags#delete_next('d&')<CR>
+nnoremap <Plug>d# <Cmd>call tags#delete_next('d#')<CR>
+nnoremap <Plug>d@ <Cmd>call tags#delete_next('d@')<CR>
+nnoremap <Plug>d/ <Cmd>call tags#delete_next('d/')<CR>
+nnoremap <Plug>d? <Cmd>call tags#delete_next('d?')<CR>

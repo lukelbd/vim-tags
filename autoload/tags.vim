@@ -317,9 +317,10 @@ endfunction
 " Count occurrences inside file
 " See: https://vi.stackexchange.com/a/20661/8084
 function! tags#count_match(key) abort
-  let cmd = tags#set_match(a:key)
-  let b:winview = winsaveview()  " store window as buffer variable
-  return cmd . "\<Cmd>%s@" . @/ . "@@gne | call winrestview(b:winview)\<CR>"
+  call tags#set_match(a:key)
+  let winview = winsaveview()  " store window as buffer variable
+  exe '%s@' . @/ . '@@gne'
+  call winrestview(b:winview)
 endfunction
 
 " Repeat previous change
@@ -327,8 +328,9 @@ endfunction
 " so we check for that. Putting <Esc> in feedkeys() cancels operation so must come
 " afterward (may be no-op) and the 'i' is necessary to insert <C-a> before <Esc>.
 function! tags#change_again() abort
-  let cmd = "\<Cmd>call feedkeys(mode() =~# 'i' ? '\<C-a>' : '', 'ni')\<CR>"
-  call feedkeys('cgn' . cmd . "\<Esc>n")  " add previously inserted if cgn succeeds
+  let cmd = "feedkeys(mode() =~# 'i' ? '\<C-a>' : '', 'ni')"
+  let cmd = "cgn\<Cmd>call " . cmd . "\<CR>\<Esc>n"
+  call feedkeys(cmd, 'n')  " add previous insert if cgn succeeds
   if exists('*repeat#set')
     call repeat#set("\<Plug>change_again")  " re-apply this function for next repeat
   endif
@@ -337,12 +339,12 @@ endfunction
 " Function that sets things up for maps that change text
 " Note: Unlike tags#delete_next we wait until
 function! tags#change_next(key) abort
-  let cmd = tags#set_match(a:key)
+  call tags#set_match(a:key)
+  call feedkeys('cgn')
   let g:change_next = 1
   if exists('*repeat#set')
     call repeat#set("\<Plug>change_again")
   endif
-  return cmd . 'cgn'
 endfunction
 
 " Finish change after InsertLeave and automatically jump to next occurence
@@ -365,11 +367,11 @@ endfunction
 " Delete next match
 " Note: hlsearch inside function fails: https://stackoverflow.com/q/1803539/4970632
 function! tags#delete_next(key) abort
-  let cmd = tags#set_match(a:key)
+  call tags#set_match(a:key)
+  call feedkeys('dgnn')
   if exists('*repeat#set')
     call repeat#set("\<Plug>" . a:key, v:count)
   endif
-  return cmd . 'dgnn'
 endfunction
 
 " Delete all of next matches
