@@ -328,7 +328,8 @@ endfunction
 " so we check for that. Putting <Esc> in feedkeys() cancels operation so must come
 " afterward (may be no-op) and the 'i' is necessary to insert <C-a> before <Esc>.
 function! tags#change_again() abort
-  let cmd = "feedkeys(mode() =~# 'i' ? '\<C-a>' : '', 'ni')"
+  let cmd = "mode() =~# 'i' ? '\<C-a>' : ''"
+  let cmd = 'feedkeys(' . cmd . ', "ni")'
   let cmd = "cgn\<Cmd>call " . cmd . "\<CR>\<Esc>n"
   call feedkeys(cmd, 'n')  " add previous insert if cgn succeeds
   if exists('*repeat#set')
