@@ -319,7 +319,8 @@ endfunction
 function! tags#count_match(key) abort
   call tags#set_match(a:key)
   let winview = winsaveview()  " store window as buffer variable
-  exe '%s@' . @/ . '@@gne'
+  let search = @/
+  exe '%s@' . search . '@@gne'
   call winrestview(b:winview)
 endfunction
 
@@ -396,53 +397,40 @@ function! tags#get_scope(...) abort
   let lnum = a:0 ? a:1 : line('.')
   let items = get(b:, 'tags_by_line', [])
   let items = filter(copy(items), filt)
+  let lines = map(deepcopy(items), 'v:val[1]')
   if empty(items)
     echohl WarningMsg
     echom 'Warning: Failed to restrict the search scope (tags unavailable).'
     echohl None
     return ''
   endif
-  let lines = map(deepcopy(items), 'v:val[1]')
-  " Find delimiter tags
-  if lnum < lines[0]
-    let line1 = 1
-    let line2 = lines[0]
-    let label = ''
-  elseif lnum >= lines[len(lines) - 1]
-    let line1 = lines[len(lines) - 1]
-    let line2 = line('$') + 1  " match below this
-    let label = items[len(lines) - 1][0]
-  else
-    for idx in range(0, len(lines) - 2)
-      if lnum >= lines[idx] && lnum < lines[idx + 1]
-        let line1 = lines[idx]
-        let line2 = lines[idx + 1]
-        let label = items[idx][0]
-        break
-      endif
-    endfor
-  endif
   " Find closing line and tag
   keepjumps normal! zv
   let winview = winsaveview()
-  exe lnum == line1 ? line1 + 1 : ''
-  keepjumps normal! [z
-  let iline = line('.')
+  exe index(lines, lnum) >= 0 ? lnum + 1 : ''
+  let [kline, klevel] = [-1, -1]
+  while kline != line('.') && foldlevel('.') > klevel
+    let [kline, klevel] = [line('.'), foldlevel('.')]
+    keepjumps normal! [z
+  endwhile
+  let [iline, ilevel] = [line('.'), foldlevel('.')]
   keepjumps normal! ]z
-  let jline = line('.')
+  let [jline, jlevel] = [line('.'), foldlevel('.')]
   call winrestview(winview)
-  if iline == line1 && jline > iline && foldlevel(iline) == foldlevel(jline)
-    let line2 = jline
-    let [label1, label2] = [label, trim(getline(jline))]
-  else
+  " Return scope if within fold
+  let idx = index(lines, string(iline))  " type matters for index()
+  if idx >= 0 && lnum >= iline && lnum <= jline && iline != jline && ilevel == jlevel
+    let [line1, line2] = [iline, jline]
+    let [label1, label2] = [items[idx][0], trim(getline(jline))]
+  else  " fallback to global search
     let [line1, line2] = [1, line('$')]
     let [label1, label2] = ['START', 'END']
   endif
   let maxlen = 20
+  let label1 = len(label1) <= maxlen ? label1 : label1[:maxlen - 3] . '···'
+  let label2 = len(label2) <= maxlen ? label2 : label2[:maxlen - 3] . '···'
   let regex = printf('\%%>%dl\%%<%dl', line1 - 1, line2 + 1)
-  let info1 = line1 . ' (' . label1[:maxlen] . ')'
-  let info2 = line2 . ' (' . label2[:maxlen] . ')'
-  echom 'Selected line ' . info1 . ' to line ' . info2 . '.'
+  echom 'Selected lines ' . line1 . ' (' . label1 . ') to ' . line2 . ' (' . label2 . ').'
   return regex
 endfunction
 
