@@ -418,6 +418,7 @@ function! tags#get_scope(...) abort
   let [jline, jlevel] = [line('.'), foldlevel('.')]
   call winrestview(winview)
   " Return scope if within fold
+  let maxlen = 20  " truncate long labels
   let idx = index(lines, string(iline))  " type matters for index()
   if idx >= 0 && lnum >= iline && lnum <= jline && iline != jline && ilevel == jlevel
     let [line1, line2] = [iline, jline]
@@ -426,7 +427,6 @@ function! tags#get_scope(...) abort
     let [line1, line2] = [1, line('$')]
     let [label1, label2] = ['START', 'END']
   endif
-  let maxlen = 20
   let label1 = len(label1) <= maxlen ? label1 : label1[:maxlen - 3] . '···'
   let label2 = len(label2) <= maxlen ? label2 : label2[:maxlen - 3] . '···'
   let regex = printf('\%%>%dl\%%<%dl', line1 - 1, line2 + 1)
