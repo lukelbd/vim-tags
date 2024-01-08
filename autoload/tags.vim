@@ -6,6 +6,7 @@
 "------------------------------------------------------------------------------
 " Global tags command
 " Note: Keep in sync with g:fzf_tags_command
+scriptencoding utf-8
 let s:tags_command = 'ctags -f - --excmd=number'
 let s:regex_magic = '[]\/.*$~'
 
@@ -448,7 +449,7 @@ function! tags#set_match(key, ...) abort
     let @/ = '\<' . escape(expand('<cword>'), s:regex_magic) . '\>\C'
   elseif a:key =~# '&'
     let motion = 'lB'
-    let @/ = '\_s\@<=' . escape(expand('<cWORD>'), s:regex_magic) . '\ze\_s\C'
+    let @/ = '\(^\|\s\)\zs' . escape(expand('<cWORD>'), s:regex_magic) . '\ze\($\|\s\)\C'
   elseif a:key =~# '#'
     let motion = 'lb'
     let scope = tags#get_scope()
@@ -456,12 +457,12 @@ function! tags#set_match(key, ...) abort
   elseif a:key =~# '@'
     let motion = 'lB'
     let scope = tags#get_scope()
-    let @/ = '\_s\@<=' . scope . escape(expand('<cWORD>'), s:regex_magic) . '\ze\_s\C'
+    let @/ = '\(^\|\s\)\zs' . scope . escape(expand('<cWORD>'), s:regex_magic) . '\ze\($\|\s\)\C'
   elseif a:key =~# '!'
     let text = getline('.')
     let @/ = empty(text) ? "\n" : escape(matchstr(text, '.', byteidx(text, col('.') - 1)), s:regex_magic)
   endif  " otherwise keep current selection
-  if a:0 && a:1
+  if a:0 && a:1 && !empty(motion)
     exe 'normal! ' . motion
   endif
   if empty(scope) && exists(':ShowSearchIndex')
