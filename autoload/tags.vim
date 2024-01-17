@@ -462,7 +462,7 @@ function! tags#set_match(key, ...) abort
     let text = getline('.')
     let @/ = empty(text) ? "\n" : escape(matchstr(text, '.', byteidx(text, col('.') - 1)), s:regex_magic)
   endif  " otherwise keep current selection
-  if a:0 && a:1 && !empty(motion)
+  if a:0 && a:1 && !empty(motion) && foldclosed('.') == -1
     exe 'normal! ' . motion
   endif
   if empty(scope) && exists(':ShowSearchIndex')
