@@ -52,8 +52,7 @@ endfunction
 function! tags#buffer_paths() abort
   let paths = []
   for tnr in range(tabpagenr('$'))  " iterate through each tab
-    let tabnr = tnr + 1 " the tab number
-    let bnrs = tabpagebuflist(tabnr)
+    let bnrs = tabpagebuflist(tnr + 1)
     for bnr in bnrs
       let path = expand('#' . bnr . ':p')
       let type = getbufvar(bnr, '&filetype')
@@ -386,11 +385,9 @@ function! tags#delete_all(key) abort
   call winrestview(winview)
 endfunction
 
-" Search within top level tags belonging to 'major' kinds
-" See: http://vim.wikia.com/wiki/Search_in_current_function
+" Return major tag folding scope
 " See: https://stackoverflow.com/a/597932/4970632
-" Note: The jedi-vim 'variable rename' utility is sketchy and fails. Gives us
-" motivation for custom renaming where we can see and confirm each change.
+" See: http://vim.wikia.com/wiki/Search_in_current_function
 function! tags#get_scope(...) abort
   " Initial stuff
   let kinds = get(g:tags_major_kinds, &filetype, 'f')
