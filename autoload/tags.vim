@@ -27,10 +27,9 @@ endfunction
 " Return command-line executable that prints tags to stdout
 " Note: Output should be in number mode (i.e. shows line number instead of full line)
 function! s:tags_command(path, ...) abort
-  let flags = join(a:000, ' ')
   let path = shellescape(expand(fnamemodify(a:path, ':p')))
-  let cmd = s:tags_command . ' ' . flags . ' ' . path . ' 2>/dev/null'
-  return cmd . " | cut -d'\t' -f1,3-5"
+  let cmd = join(a:000, ' ') . ' ' . path
+  return s:tags_command . ' ' . cmd . ' 2>/dev/null' . " | cut -d'\t' -f1,3-5"
 endfunction
 
 " Return tags parsed and sorted by name and line
@@ -47,29 +46,90 @@ function! s:tags_parsed(path) abort
   return items
 endfunction
 
-" List open window paths
-" Todo: Also use this to jump to tags in arbitrary files? Similar to :Tags but no file.
+" Return buffers by most recent
+" Note: Here try to detect tabs that were either accessed within session or were only
+" loaded on startup by finding the minimum access time that differs from neighbors.
+function! tags#buffers_recent(...) abort
+  let bufs = map(getbufinfo(), {idx, val -> [val['bufnr'], val['lastused']]})
+  let mintime = a:0 ? a:1 : 0
+  if a:0 == 0  " auto-detect threshold for sorting
+    for btime in sort(map(copy(bufs), 'v:val[1]'))  " approximate loading time
+      if mintime && btime - mintime > 10 | break | endif | let mintime = btime
+    endfor
+  endif
+  let recent = []  " buffers used after mintime
+  for [bnr, btime] in bufs
+    if btime > mintime
+      call add(recent, [bnr, btime])
+    endif
+  endfor
+  let recent = sort(recent, {val1, val2 -> val2[1] - val1[1]})
+  let recent = map(recent, 'v:val[0]')
+  return recent
+endfunction
+
+" Return [tab, buffer] number pairs in helpful order
+" Note: This is used to sort tag files by recent use or else tab adjacency
+" when displaying tags in window or running multi-file fzf selection.
 function! tags#buffer_paths() abort
-  let paths = []
-  for tnr in range(tabpagenr('$'))  " iterate through each tab
-    let bnrs = tabpagebuflist(tnr + 1)
-    for bnr in bnrs
+  let tnr = tabpagenr()  " active tab
+  let tleft = tnr
+  let tright = tnr - 1  " initial value
+  let pairs = []  " [tnr, bnr] pairs
+  while 1
+    if tnr == tleft
+      let tright += 1 | let tnr = tright
+    else
+      let tleft -= 1 | let tnr = tleft
+    endif
+    if tleft < 1 && tright > tabpagenr('$')
+      break
+    elseif tnr == tright && tright > tabpagenr('$')
+      continue  " possibly more tabs to the left
+    elseif tnr == tleft && tleft < 1
+      continue  " possibly more tabs to the right
+    endif
+    for bnr in tabpagebuflist(tnr)
       let path = expand('#' . bnr . ':p')
       let type = getbufvar(bnr, '&filetype')
-      if !filereadable(path) || index(g:tags_skip_filetypes, type) != -1
-        continue
+      if filereadable(path) && index(g:tags_skip_filetypes, type) == -1
+        call add(pairs, [tnr, bnr]) | break  " one entry per tab
       endif
-      call add(paths, path)
+    endfor
+  endwhile
+  let idxs = []
+  let temporal = []  " sorted by access time
+  let physical = []  " ordered by adjacency
+  for bnr in tags#buffers_recent()
+    for idx in range(len(pairs))
+      let [tnr, inr] = pairs[idx]
+      if inr == bnr
+        let path = expand('#' . bnr . ':p')
+        call add(idxs, idx)
+        call add(temporal, [tnr, path])
+      endif
     endfor
   endfor
-  return paths
+  for idx in range(len(pairs))
+    if index(idxs, idx) == -1
+      let [tnr, bnr] = pairs[idx]
+      let path = expand('#' . bnr . ':p')
+      call add(physical, [tnr, path])
+    endif
+  endfor
+  let pairs = temporal + physical
+  return pairs  " prefer most recently visited then closest
 endfunction
 
 " Generate tags and parse them into list of lists
 " Note: Files open in multiple windows use the same buffer number and same variables.
 function! tags#update_tags(...) abort
   let global = a:0 ? a:1 : 0
-  let paths = global ? tags#buffer_paths() : [expand('%:p')]
+  if global  " global paths
+    let paths = map(tags#buffer_paths(), 'v:val[1]')
+  else  " local path
+    let paths = [expand('%:p')]
+  endif
   for path in paths
     let bnr = bufnr(path)  " buffer unique to path
     let time = getbufvar(bnr, 'tags_update_time', 0)
@@ -91,7 +151,7 @@ endfunction
 function! tags#table_kinds(...) abort
   if index(a:000, 'all') >= 0  " all open filetypes
     let flag = 'all'
-    let types = uniq(map(tags#buffer_paths(), "getbufvar(v:val, '&filetype')"))
+    let types = uniq(map(tags#buffer_paths(), "getbufvar(v:val[1], '&filetype')"))
     let label = 'all buffer filetypes'
   elseif a:0  " input filetype(s)
     let flag = a:0 == 1 ? a:1 : 'all'
@@ -122,7 +182,7 @@ endfunction
 " let table = substitute(table, escape(path, s:regex_magic), '', 'g')
 function! tags#table_tags(...) abort
   if index(a:000, 'all') >= 0  " all open paths
-    let paths = tags#buffer_paths()
+    let paths = map(tags#buffer_paths(), 'v:val[1]')
     let label = 'all open paths'
   elseif a:0  " input path(s)
     let paths = copy(a:000)
@@ -290,8 +350,12 @@ function! s:tag_sink(tag) abort
 endfunction
 function! s:tag_source(...) abort
   let global = a:0 ? a:1 : 0
-  let paths = global ? tags#buffer_paths() : [expand('%:p')]
   let source = []
+  if global  " global paths
+    let paths = map(tags#buffer_paths(), 'v:val[1]')
+  else  " local path
+    let paths = [expand('%:p')]
+  endif
   for path in paths
     let bnr = bufnr(path)  " buffer unique to path
     let src = deepcopy(getbufvar(bnr, 'tags_by_name', []))
