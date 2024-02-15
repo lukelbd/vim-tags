@@ -77,7 +77,8 @@ endif
 "-----------------------------------------------------------------------------
 " Public commands
 " Note: The tags#current_tag() is also used in vim-statusline plugin.
-command! CurrentTag echom 'Current tag: ' . tags#current_tag()
+command! -nargs=0 CurrentTag echom 'Current tag: ' . tags#current_tag()
+command! -bang -nargs=0 SelectTag call tags#select_tag(<bang>0)
 command! -bang -nargs=* -complete=filetype ShowKinds
   \ echo call('tags#table_kinds', <bang>0 ? ['all'] : [<f-args>])
 command! -bang -nargs=* -complete=file ShowTags
