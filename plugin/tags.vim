@@ -125,25 +125,31 @@ noremap g? ?<C-r>=tags#get_scope()<CR>
 
 " Normal mode mappings that replicate :s/regex/sub/ behavior and can be repeated
 " with '.'. The substitution is determined from the text inserted by the user and
-" the cursor automatically jumps to the next match. The 'a' mappings change all matches.
+" the cursor automatically jumps to the next match. The 'a' mappings change matches
 nmap c* <Plug>c*
 nmap c& <Plug>c&
 nmap c# <Plug>c#
 nmap c@ <Plug>c@
 nmap c/ <Plug>c/
 nmap c? <Plug>c?
-nmap ca* <Cmd>let g:change_all = 1<CR><Plug>c*
-nmap ca& <Cmd>let g:change_all = 1<CR><Plug>c&
-nmap ca# <Cmd>let g:change_all = 1<CR><Plug>c#
-nmap ca@ <Cmd>let g:change_all = 1<CR><Plug>c@
-nmap ca/ <Cmd>let g:change_all = 1<CR><Plug>c/
-nmap ca? <Cmd>let g:change_all = 1<CR><Plug>c?
+nmap ca* <Plug>ca*
+nmap ca& <Plug>ca&
+nmap ca# <Plug>ca#
+nmap ca@ <Plug>ca@
+nmap ca/ <Plug>ca/
+nmap ca? <Plug>ca?
 nnoremap <Plug>c* <Cmd>call tags#change_next('c*')<CR>
 nnoremap <Plug>c& <Cmd>call tags#change_next('c&')<CR>
 nnoremap <Plug>c# <Cmd>call tags#change_next('c#')<CR>
 nnoremap <Plug>c@ <Cmd>call tags#change_next('c@')<CR>
 nnoremap <Plug>c/ <Cmd>call tags#change_next('c/')<CR>
 nnoremap <Plug>c? <Cmd>call tags#change_next('c?')<CR>
+nnoremap <Plug>ca* <Cmd>call tags#change_next('c*', 1)<CR>
+nnoremap <Plug>ca& <Cmd>call tags#change_next('c&', 1)<CR>
+nnoremap <Plug>ca# <Cmd>call tags#change_next('c#', 1)<CR>
+nnoremap <Plug>ca@ <Cmd>call tags#change_next('c@', 1)<CR>
+nnoremap <Plug>ca/ <Cmd>call tags#change_next('c/', 1)<CR>
+nnoremap <Plug>ca? <Cmd>call tags#change_next('c?', 1)<CR>
 nnoremap <Plug>change_again <Cmd>call tags#change_again()<CR>
 
 " Normal mode mappings that replicate :d/regex/ behavior and can be repeated with '.'.
@@ -154,15 +160,21 @@ nmap d# <Plug>d#
 nmap d@ <Plug>d@
 nmap d/ <Plug>d/
 nmap d? <Plug>d?
-nmap da* <Cmd>call tags#delete_all('d*')<CR>
-nmap da& <Cmd>call tags#delete_all('d&')<CR>
-nmap da# <Cmd>call tags#delete_all('d#')<CR>
-nmap da@ <Cmd>call tags#delete_all('d@')<CR>
-nmap da/ <Cmd>call tags#delete_all('d/')<CR>
-nmap da? <Cmd>call tags#delete_all('d?')<CR>
+nmap da* <Plug>da*
+nmap da& <Plug>da&
+nmap da# <Plug>da#
+nmap da@ <Plug>da@
+nmap da/ <Plug>da/
+nmap da? <Plug>da?
 nnoremap <Plug>d* <Cmd>call tags#delete_next('d*')<CR>
 nnoremap <Plug>d& <Cmd>call tags#delete_next('d&')<CR>
 nnoremap <Plug>d# <Cmd>call tags#delete_next('d#')<CR>
 nnoremap <Plug>d@ <Cmd>call tags#delete_next('d@')<CR>
 nnoremap <Plug>d/ <Cmd>call tags#delete_next('d/')<CR>
 nnoremap <Plug>d? <Cmd>call tags#delete_next('d?')<CR>
+nnoremap <Plug>da* <Cmd>call tags#delete_next('d*', 1)<CR>
+nnoremap <Plug>da& <Cmd>call tags#delete_next('d&', 1)<CR>
+nnoremap <Plug>da# <Cmd>call tags#delete_next('d#', 1)<CR>
+nnoremap <Plug>da@ <Cmd>call tags#delete_next('d@', 1)<CR>
+nnoremap <Plug>da/ <Cmd>call tags#delete_next('d/', 1)<CR>
+nnoremap <Plug>da? <Cmd>call tags#delete_next('d?', 1)<CR>

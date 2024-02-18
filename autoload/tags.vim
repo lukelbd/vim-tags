@@ -380,12 +380,28 @@ endfunction
 "-----------------------------------------------------------------------------
 " Count occurrences inside file
 " See: https://vi.stackexchange.com/a/20661/8084
+function! s:feed_repeat(plug)
+  if exists('*repeat#set')
+    let cmd = 'call repeat#set("\<Plug>' . a:plug . '")'
+    call feedkeys("\<Cmd>" . cmd . "\<CR>", 'n')
+  endif
+endfunction
 function! tags#count_match(key) abort
   call tags#set_match(a:key)
   let winview = winsaveview()  " store window as buffer variable
   let search = @/
   exe '%s@' . search . '@@gne'
   call winrestview(b:winview)
+endfunction
+
+" Function that sets things up for maps that change text
+" Note: Unlike tags#delete_next we wait until
+function! tags#change_next(key, ...) abort
+  let s:change_key = a:0 && a:1 ? a:key : ''
+  call tags#set_match(a:key)
+  call feedkeys('cgn', 'n')
+  let s:change_next = 1
+  call s:feed_repeat('change_again')
 endfunction
 
 " Repeat previous change
@@ -397,56 +413,38 @@ function! tags#change_again() abort
   let cmd = 'feedkeys(' . cmd . ', "ni")'
   let cmd = "cgn\<Cmd>call " . cmd . "\<CR>\<Esc>n"
   call feedkeys(cmd, 'n')  " add previous insert if cgn succeeds
-  if exists('*repeat#set')
-    call repeat#set("\<Plug>change_again")  " re-apply this function for next repeat
-  endif
-endfunction
-
-" Function that sets things up for maps that change text
-" Note: Unlike tags#delete_next we wait until
-function! tags#change_next(key) abort
-  call tags#set_match(a:key)
-  call feedkeys('cgn')
-  let g:change_next = 1
-  if exists('*repeat#set')
-    call repeat#set("\<Plug>change_again")
-  endif
+  call s:feed_repeat('change_again')
 endfunction
 
 " Finish change after InsertLeave and automatically jump to next occurence
-" Note: Register may have keystrokes e.g. <80>kb (backspace) so must feed as 'typed'
+" Note: Undo first change so subsequent undo reverts all changes. Also note
+" register may have keystrokes e.g. <80>kb (backspace) so must feed as 'typed'
 function! tags#change_finish() abort
-  if exists('g:change_all') && g:change_all
-    silent undo  " undo first change so subsequent undo reverts all changes
-    let b:winview = winsaveview()  " store window view as buffer variable
-    call feedkeys(':keepjumps %s@' . @/ . '@' . @. . "@ge | call winrestview(b:winview)\<CR>", 'nt')
-  elseif exists('g:change_next') && g:change_next
+  let cmd = ''
+  let b:winview = winsaveview()
+  if !empty(get(s:, 'change_key', ''))
+    let cmd = 'u:keepjumps %s@' . @/ . '@' . @. . "@ge | call winrestview(b:winview)\<CR>"
+    call feedkeys(cmd, 'nt') | call s:feed_repeat(s:change_key)
+  elseif get(s:, 'change_next', 0)
     call feedkeys('n', 'nt')
-    if exists('*repeat#set')
-      call repeat#set("\<Plug>change_again")
-    endif
+    call s:feed_repeat('change_again')
   endif
-  let g:change_all = 0
-  let g:change_next = 0
+  let [s:change_key, s:change_next] = ['', 0]
 endfunction
 
 " Delete next match
-" Note: hlsearch inside function fails: https://stackoverflow.com/q/1803539/4970632
-function! tags#delete_next(key) abort
+" Note: Unlike 'change all' this can simply call :substitute. Also note that
+" hlsearch inside function fails: https://stackoverflow.com/q/1803539/4970632
+function! tags#delete_next(key, ...) abort
+  let all = a:0 ? a:1 : 0
   call tags#set_match(a:key)
-  call feedkeys('dgnn')
-  if exists('*repeat#set')
-    call repeat#set("\<Plug>" . a:key, v:count)
+  if all
+    let winview = winsaveview() | exe 'keepjumps %s@' . @/ . '@@ge'
+    call winrestview(winview)
+  else
+    call feedkeys('dgnn', 'n')
+    if exists('*repeat#set') | call repeat#set("\<Plug>" . a:key, v:count) | endif
   endif
-endfunction
-
-" Delete all of next matches
-" Note: Unlike 'change all' this can simply call :substitute
-function! tags#delete_all(key) abort
-  call tags#set_match(a:key)
-  let winview = winsaveview()
-  exe 'keepjumps %s@' . @/ . '@@ge'
-  call winrestview(winview)
 endfunction
 
 " Return major tag folding scope
@@ -516,22 +514,25 @@ function! s:get_item(key, ...) abort
   return item
 endfunction
 function! tags#set_match(key, ...) abort
-  let item = s:get_item(a:key, 0)
-  if a:0 && a:1 && empty(item) && foldclosed('.') == -1
-    exe getline('.') =~# '^\s*$' ? '' : 'normal! B'
+  let scope = ''
+  if a:key !~# '[/?]'
+    let item = s:get_item(a:key, 0)
+    if a:0 && a:1 && empty(item) && foldclosed('.') == -1
+      exe getline('.') =~# '^\s*$' ? '' : 'normal! B'
+    endif
+    let item = s:get_item(a:key, 1)
+    let char = strcharpart(strpart(getline('.'), col('.') - 1), 0, 1)
+    let flags = char =~# '\s' || a:key =~# '[*#]' && char !~# '\k' ? 'cW' : 'cbW'
+    if a:0 && a:1 && strwidth(item) > 1
+      call search(item, flags, line('.'))
+    endif
+    let scope = a:key =~# '[#@]' ? tags#get_scope() : ''
+    let @/ = scope . item
   endif
-  let item = s:get_item(a:key, 1)
-  if !strwidth(item)
-    return
+  if a:0 && a:1 && foldclosed('.') != -1
+    foldopen
   endif
-  let char = strcharpart(strpart(getline('.'), col('.') - 1), 0, 1)
-  let flags = char =~# '\s' || a:key =~# '[*#]' && char !~# '\k' ? 'cW' : 'cbW'
-  if a:0 && a:1 && strwidth(item) > 1
-    call search(item, flags, line('.'))
-  endif
-  let scope = a:key =~# '[#@]' ? tags#get_scope() : ''
-  let @/ = scope . item
   if empty(scope) && exists(':ShowSearchIndex')
-    ShowSearchIndex
+    call feedkeys("\<Cmd>ShowSearchIndex\<CR>", 'n')
   endif
 endfunction
