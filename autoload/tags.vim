@@ -499,34 +499,39 @@ endfunction
 " Set the last search register to some 'current pattern' under cursor
 " Note: Here '!' handles multi-byte characters using example in :help byteidx. Also
 " the native vim-indexed-search maps invoke <Plug>(indexed-search-after), which just
-" calls <Plug>(indexed-search-index) --> :ShowSearchIndex... but causes change
-" mappings to silently abort for some weird reason... so instead call this manually.
-function! tags#set_match(key, ...) abort
-  let scope = ''
-  let motion = ''
-  let inplace = a:0 && a:1 ? 1 : 0
-  if a:key =~# '\*'
-    let motion = 'lb'
-    let @/ = '\<' . escape(expand('<cword>'), s:regex_magic) . '\>\C'
-  elseif a:key =~# '&'
-    let motion = 'lB'
-    let @/ = '\(^\|\s\)\zs' . escape(expand('<cWORD>'), s:regex_magic) . '\ze\($\|\s\)\C'
-  elseif a:key =~# '#'
-    let motion = 'lb'
-    let scope = tags#get_scope()
-    let @/ = scope . '\<' . escape(expand('<cword>'), s:regex_magic) . '\>\C'
-  elseif a:key =~# '@'
-    let motion = 'lB'
-    let scope = tags#get_scope()
-    let @/ = '\(^\|\s\)\zs' . scope . escape(expand('<cWORD>'), s:regex_magic) . '\ze\($\|\s\)\C'
-  elseif a:key =~# '!'
-    let text = getline('.')
-    let @/ = empty(text) ? "\n" : escape(matchstr(text, '.', byteidx(text, col('.') - 1)), s:regex_magic)
-  endif  " otherwise keep current selection
-  if a:0 && a:1 && !empty(motion) && foldclosed('.') == -1
-    exe 'normal! ' . motion
+" calls <Plug>(indexed-search-index) --> :ShowSearchIndex... but causes change maps
+" to silently abort for some weird reason... so instead call this manually.
+function! s:get_item(key, ...) abort
+  let search = a:0 ? a:1 : 0
+  if a:key =~# '[*#]'
+    let item = escape(expand('<cword>'), s:regex_magic)
+    let item = item =~# '^\k\+$' ? search ? '\<' . item . '\>\C' : item : ''
+  elseif a:key =~# '[&@]'
+    let item = escape(expand('<cWORD>'), s:regex_magic)
+    let item = search ? '\(^\|\s\)\zs' . item . '\ze\($\|\s\)\C' : item
+  else  " ··· note col('.') and string[:idx] uses byte index
+    let item = strcharpart(strpart(getline('.'), col('.') - 1), 0, 1)
+    let item = escape(empty(item) ? "\n" : item, s:regex_magic)
   endif
+  return item
+endfunction
+function! tags#set_match(key, ...) abort
+  let item = s:get_item(a:key, 0)
+  if a:0 && a:1 && empty(item) && foldclosed('.') == -1
+    exe getline('.') =~# '^\s*$' ? '' : 'normal! B'
+  endif
+  let item = s:get_item(a:key, 1)
+  if !strwidth(item)
+    return
+  endif
+  let char = strcharpart(strpart(getline('.'), col('.') - 1), 0, 1)
+  let flags = char =~# '\s' || a:key =~# '[*#]' && char !~# '\k' ? 'cW' : 'cbW'
+  if a:0 && a:1 && strwidth(item) > 1
+    call search(item, flags, line('.'))
+  endif
+  let scope = a:key =~# '[#@]' ? tags#get_scope() : ''
+  let @/ = scope . item
   if empty(scope) && exists(':ShowSearchIndex')
     ShowSearchIndex
-  endif  " see top for notes about <Plug>(indexed-search-after)
+  endif
 endfunction
