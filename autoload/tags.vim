@@ -369,7 +369,7 @@ function! tags#find_tag(...) abort
   for [ipath, iline, iname; irest] in opts
     if name ==# iname
       call s:tag_sink([ipath, iline, iname])
-      echom 'Found tag: ' . iname | return
+      echom 'Tag: ' . iname | return
     endif
   endfor
   echohl ErrorMsg
