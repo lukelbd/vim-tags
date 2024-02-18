@@ -71,10 +71,11 @@ endfunction
 " Return [tab, buffer] number pairs in helpful order
 " Note: This is used to sort tag files by recent use or else tab adjacency
 " when displaying tags in window or running multi-file fzf selection.
-function! tags#buffer_paths() abort
+function! tags#buffer_paths(...) abort
   let tnr = tabpagenr()  " active tab
   let tleft = tnr
   let tright = tnr - 1  " initial value
+  let ftype = a:0 ? a:1 : ''  " restricted type
   let pairs = []  " [tnr, bnr] pairs
   while 1
     if tnr == tleft
@@ -91,8 +92,10 @@ function! tags#buffer_paths() abort
     endif
     for bnr in tabpagebuflist(tnr)
       let path = expand('#' . bnr . ':p')
-      let type = getbufvar(bnr, '&filetype')
-      if filereadable(path) && index(g:tags_skip_filetypes, type) == -1
+      let btype = getbufvar(bnr, '&filetype')
+      if !empty(ftype) && btype !=# ftype
+        continue
+      elseif filereadable(path) && index(g:tags_skip_filetypes, btype) == -1
         call add(pairs, [tnr, bnr]) | break  " one entry per tab
       endif
     endfor
@@ -225,6 +228,53 @@ endfunction
 "-----------------------------------------------------------------------------
 " Tag navigation utiltiies
 "-----------------------------------------------------------------------------
+" Show tags in the format: '[<file name>: ]<line number>: name (type, [scope])'
+" for selection by fzf. File name included only if 'global' was passed.
+" See: https://github.com/ludovicchabant/vim-gutentags/issues/349
+" See: https://github.com/junegunn/fzf/wiki/Examples-(vim)
+function! s:tag_sink(tag) abort
+  let parts = type(a:tag) == 1 ? split(a:tag, ':') : a:tag
+  if parts[0] =~# '^\s*\d\+'
+    call feedkeys("\<Cmd>" . parts[0] . "\<CR>", 'n')
+  elseif exists('*file#open_drop')
+    call file#open_drop(parts[0]) | call feedkeys("\<Cmd>" . parts[1] . "\<CR>", 'n')
+  else
+    call feedkeys("\<Cmd>tab drop " . parts[0] . "\<CR>\<Cmd>" . parts[1] . "\<CR>", 'n')
+  endif
+  call feedkeys('zv', 'n')
+endfunction
+function! s:tag_source(level, ...) abort
+  let source = []
+  if a:level > 1  " global paths
+    let paths = map(tags#buffer_paths(), 'v:val[1]')
+  elseif a:level > 0  " filetype paths
+    let paths = map(tags#buffer_paths(&filetype), 'v:val[1]')
+  else  " local path
+    let paths = [expand('%:p')]
+  endif
+  for path in paths
+    if exists('*RelativePath')
+      let path = RelativePath(path)  " vim-statusline function
+    else
+      let path = fnamemodify(path, ':~:.')
+    endif
+    let bnr = bufnr(path)  " buffer unique to path
+    let src = deepcopy(getbufvar(bnr, 'tags_by_name', []))
+    if a:0 && a:1
+      let src = map(src, 'v:val[1:1] + v:val[0:0] + v:val[2:]')
+      let src = a:level ? map(src, 'insert(v:val, path, 0)') : (src)
+      call extend(source, src)
+    else
+      let head = a:level ? string(path) . " . ': ' . " : ''
+      let head .= "printf('%4d', v:val[1]) . ': '"
+      let tail = "v:val[0] . ' (' . join(v:val[2:], ', ') . ')'"
+      let src = map(src, head . ' . ' . tail)
+      call extend(source, src)
+    endif
+  endfor
+  return source
+endfunction
+
 " Get the current tag from a list of tags
 " Note: This function searches exclusively (i.e. does not match the current line).
 " So only start at current line when jumping, otherwise start one line down.
@@ -267,7 +317,7 @@ function! tags#close_tag(line, major, forward, circular) abort
 endfunction
 
 " Get the 'current' tag defined as the tag under the cursor or preceding
-" Note: This is used with statusline
+" Note: This is used with statusline and :CurrentTag
 function! tags#current_tag(...) abort
   let lnum = line('.') + 1
   let info = tags#close_tag(lnum, 0, 0, 0)
@@ -305,12 +355,34 @@ function! tags#jump_tag(repeat, ...) abort
   return tag[1] . 'G'  " return cmd since cannot move cursor inside autoload function
 endfunction
 
+" Search for the tag under the cursor
+" Note: Vim does not natively support jumping https://superuser.com/a/154459/506762
+function! tags#find_tag(...) abort
+  let chars = &l:iskeyword
+  let &l:iskeyword = &l:filetype ==# 'vim' ? chars . ',:' : chars
+  let name = a:0 > 0 ? a:1 : expand('<cword>')
+  let level = a:0 > 1 ? a:2 : 0
+  let &l:iskeyword = chars
+  let name = substitute(name, '\(^\s*\|\s*$\)', '', 'g')
+  if empty(name) | return | endif
+  let opts = s:tag_source(1 + level, 1)
+  for [ipath, iline, iname; irest] in opts
+    if name ==# iname
+      call s:tag_sink([ipath, iline, iname])
+      echom 'Found tag: ' . iname | return
+    endif
+  endfor
+  echohl ErrorMsg
+  echom "Error: Tag '" . name . "' not found"
+  echohl None
+endfunction
+
 " Select a specific tag using fzf
 " Note: This matches construction of fzf mappings in vim-succinct.
 function! tags#select_tag(...) abort
-  let global = a:0 ? a:1 : 0
-  let prompt = global ? 'Tag> ' : 'BTag> '
-  let source = call('s:tag_source', a:000)
+  let level = a:0 ? a:1 : 0
+  let prompt = level > 1 ? 'Tag>' : level > 0 ? 'FTag> ' : 'BTag> '
+  let source = s:tag_source(level, 0)
   if empty(source)
     echohl WarningMsg
     echom 'Warning: Tags not found or not available.'
@@ -330,51 +402,6 @@ function! tags#select_tag(...) abort
     \ }))
 endfunction
 
-" Return strings in the format: '[<file name>: ]<line number>: name (type, [scope])'
-" for selection by fzf. File name included only if 'global' was passed.
-" Note: Tried gutentags, but too complicated, would need access to script variables
-" See: https://github.com/ludovicchabant/vim-gutentags/issues/349
-" See: https://github.com/junegunn/fzf/wiki/Examples-(vim)
-function! s:tag_sink(tag) abort
-  let parts = split(a:tag, ':')
-  if parts[0] =~# '^\s*\d\+'
-    exe parts[0]
-  elseif exists('*file#open_drop')
-    call file#open_drop(parts[0])
-    exe parts[1]
-  else
-    exe 'tab drop ' . parts[0]
-    exe parts[1]
-  endif
-  normal! zv
-endfunction
-function! s:tag_source(...) abort
-  let global = a:0 ? a:1 : 0
-  let source = []
-  if global  " global paths
-    let paths = map(tags#buffer_paths(), 'v:val[1]')
-  else  " local path
-    let paths = [expand('%:p')]
-  endif
-  for path in paths
-    let bnr = bufnr(path)  " buffer unique to path
-    let src = deepcopy(getbufvar(bnr, 'tags_by_name', []))
-    let head = "printf('%4d', v:val[1]) . ': '"
-    let tail = "v:val[0] . ' (' . join(v:val[2:], ', ') . ')'"
-    if global
-      if exists('*RelativePath')
-        let path = RelativePath(path)  " vim-statusline function
-      else
-        let path = fnamemodify(path, ':~:.')
-      endif
-      let head = string(path) . " . ': ' . " . head
-    endif
-    let src = map(src, head . ' . ' . tail)
-    call extend(source, src)
-  endfor
-  return source
-endfunction
-
 "-----------------------------------------------------------------------------
 " Refactoring-related utilities
 "-----------------------------------------------------------------------------
@@ -391,7 +418,7 @@ function! tags#count_match(key) abort
   let winview = winsaveview()  " store window as buffer variable
   let search = @/
   exe '%s@' . search . '@@gne'
-  call winrestview(b:winview)
+  call winrestview(winview)
 endfunction
 
 " Function that sets things up for maps that change text

@@ -59,6 +59,9 @@ endif
 if !exists('g:tags_drop_map')
   let g:tags_drop_map = '<Leader><Tab>'
 endif
+if !exists('g:tags_find_map')
+  let g:tags_drop_map = '<Leader><CR>'
+endif
 if !exists('g:tags_backward_map')
   let g:tags_backward_map = '[t'
 endif
@@ -77,8 +80,9 @@ endif
 "-----------------------------------------------------------------------------
 " Public commands
 " Note: The tags#current_tag() is also used in vim-statusline plugin.
+command! -bang -nargs=0 SelectTag call tags#select_tag(2 * <bang>0)
+command! -bang -nargs=? FindTag call tags#find_tag(<f-args>, <bang>0)
 command! -nargs=0 CurrentTag echom 'Current tag: ' . tags#current_tag()
-command! -bang -nargs=0 SelectTag call tags#select_tag(<bang>0)
 command! -bang -nargs=* -complete=filetype ShowKinds
   \ echo call('tags#table_kinds', <bang>0 ? ['all'] : [<f-args>])
 command! -bang -nargs=* -complete=file ShowTags
@@ -90,12 +94,14 @@ command! -bang -nargs=* -complete=file UpdateTags
 " Note: Must use :n instead of <expr> ngg so we can use <C-u> to discard count!
 exe 'map ' . g:tags_jump_map . ' <Plug>TagsJump'
 exe 'map ' . g:tags_drop_map . ' <Plug>TagsDrop'
+exe 'map ' . g:tags_find_map . ' <Plug>TagsFind'
 exe 'map <silent> ' . g:tags_forward_map . ' <Plug>TagsForwardAll'
 exe 'map <silent> ' . g:tags_backward_map . ' <Plug>TagsBackwardAll'
 exe 'map <silent> ' . g:tags_forward_top_map . ' <Plug>TagsForwardTop'
 exe 'map <silent> ' . g:tags_backward_top_map . ' <Plug>TagsBackwardTop'
 noremap <Plug>TagsJump <Cmd>call tags#select_tag(0)<CR>
-noremap <Plug>TagsDrop <Cmd>call tags#select_tag(1)<CR>
+noremap <Plug>TagsDrop <Cmd>call tags#select_tag(2)<CR>
+noremap <Plug>TagsFind <Cmd>call tags#find_tag()<CR>
 noremap <expr> <silent> <Plug>TagsForwardAll tags#jump_tag(v:count, 0, 1)
 noremap <expr> <silent> <Plug>TagsBackwardAll tags#jump_tag(v:count, 0, 0)
 noremap <expr> <silent> <Plug>TagsForwardTop tags#jump_tag(v:count, 1, 1)
