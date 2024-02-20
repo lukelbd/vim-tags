@@ -237,9 +237,11 @@ function! s:tag_sink(tag) abort
   if parts[0] =~# '^\s*\d\+'
     call feedkeys("\<Cmd>" . parts[0] . "\<CR>", 'n')
   elseif exists('*file#open_drop')
-    call file#open_drop(parts[0]) | call feedkeys("\<Cmd>" . parts[1] . "\<CR>", 'n')
+    call file#open_drop(parts[0])
+    call feedkeys("\<Cmd>" . parts[1] . "\<CR>", 'n')
   else
-    call feedkeys("\<Cmd>tab drop " . parts[0] . "\<CR>\<Cmd>" . parts[1] . "\<CR>", 'n')
+    call feedkeys("\<Cmd>tab drop " . fnameescape(parts[0]) . "\<CR>", 'n')
+    call feedkeys("\<Cmd>" . parts[1] . "\<CR>", 'n', 'n')  " do not add to jumplist
   endif
   call feedkeys('zv', 'n')
 endfunction
