@@ -383,7 +383,7 @@ endfunction
 " Note: This matches construction of fzf mappings in vim-succinct.
 function! tags#select_tag(...) abort
   let level = a:0 ? a:1 : 0
-  let prompt = level > 1 ? 'Tag>' : level > 0 ? 'FTag> ' : 'BTag> '
+  let prompt = level > 1 ? 'Tag> ' : level > 0 ? 'FTag> ' : 'BTag> '
   let source = s:tag_source(level, 0)
   if empty(source)
     echohl WarningMsg
