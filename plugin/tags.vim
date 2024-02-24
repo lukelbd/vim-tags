@@ -92,16 +92,16 @@ command! -bang -nargs=* -complete=file UpdateTags
 
 " Tag select maps
 " Note: Must use :n instead of <expr> ngg so we can use <C-u> to discard count!
-exe 'map ' . g:tags_jump_map . ' <Plug>TagsJump'
-exe 'map ' . g:tags_drop_map . ' <Plug>TagsDrop'
-exe 'map ' . g:tags_find_map . ' <Plug>TagsFind'
+exe 'nmap ' . g:tags_jump_map . ' <Plug>TagsJump'
+exe 'nmap ' . g:tags_drop_map . ' <Plug>TagsDrop'
+exe 'nmap ' . g:tags_find_map . ' <Plug>TagsFind'
 exe 'map <silent> ' . g:tags_forward_map . ' <Plug>TagsForwardAll'
 exe 'map <silent> ' . g:tags_backward_map . ' <Plug>TagsBackwardAll'
 exe 'map <silent> ' . g:tags_forward_top_map . ' <Plug>TagsForwardTop'
 exe 'map <silent> ' . g:tags_backward_top_map . ' <Plug>TagsBackwardTop'
-noremap <Plug>TagsJump <Cmd>call tags#select_tag(0)<CR>
-noremap <Plug>TagsDrop <Cmd>call tags#select_tag(2)<CR>
-noremap <Plug>TagsFind <Cmd>call tags#find_tag()<CR>
+nnoremap <Plug>TagsJump <Cmd>call tags#select_tag(0)<CR>
+nnoremap <Plug>TagsDrop <Cmd>call tags#select_tag(2)<CR>
+nnoremap <Plug>TagsFind <Cmd>call tags#find_tag()<CR>
 noremap <expr> <silent> <Plug>TagsForwardAll tags#jump_tag(v:count, 0, 1)
 noremap <expr> <silent> <Plug>TagsBackwardAll tags#jump_tag(v:count, 0, 0)
 noremap <expr> <silent> <Plug>TagsForwardTop tags#jump_tag(v:count, 1, 1)
