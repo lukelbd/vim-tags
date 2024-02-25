@@ -46,10 +46,10 @@ function! s:tags_parsed(path) abort
   return items
 endfunction
 
-" Return buffers by most recent
+" Return buffers by most recent access time
 " Note: Here try to detect tabs that were either accessed within session or were only
 " loaded on startup by finding the minimum access time that differs from neighbors.
-function! tags#buffers_recent(...) abort
+function! s:buffers_recent(...) abort
   let bufs = map(getbufinfo(), {idx, val -> [val['bufnr'], val['lastused']]})
   let mintime = a:0 ? a:1 : 0
   if a:0 == 0  " auto-detect threshold for sorting
@@ -68,10 +68,10 @@ function! tags#buffers_recent(...) abort
   return recent
 endfunction
 
-" Return [tab, buffer] number pairs in helpful order
-" Note: This is used to sort tag files by recent use or else tab adjacency
-" when displaying tags in window or running multi-file fzf selection.
-function! tags#buffer_paths(...) abort
+" Return [tab, buffer] number pairs in order of proximity to current tab
+" Note: This optionally filters out buffers not belonging to the active
+" filetype used for :tag-style definition jumping across multiple windows.
+function! s:buffers_close(...) abort
   let tnr = tabpagenr()  " active tab
   let tleft = tnr
   let tright = tnr - 1  " initial value
@@ -100,18 +100,31 @@ function! tags#buffer_paths(...) abort
       endif
     endfor
   endwhile
+  return pairs
+endfunction
+
+" Return [tab, buffer] pairs sorted by recent use
+" Note: This sorts buffers using three methods: first by recent use among the
+" author's vimrc 'tab stack' utility, second by recent use among all other tabs,
+" and third by physical proximity to the current tab. Useful for fzf selection.
+function! tags#buffer_paths(...) abort
+  let pairs = call('s:buffers_close', a:000)
+  let bnrs = map(copy(pairs), 'v:val[1]')
   let idxs = []
+  let stacked = []  " sorted by access time
   let temporal = []  " sorted by access time
   let physical = []  " ordered by adjacency
-  for bnr in tags#buffers_recent()
-    for idx in range(len(pairs))
-      let [tnr, inr] = pairs[idx]
-      if inr == bnr
-        let path = expand('#' . bnr . ':p')
-        call add(idxs, idx)
-        call add(temporal, [tnr, path])
-      endif
-    endfor
+  let stack = get(g:, 'tab_stack', [])  " stack of absolute paths
+  let stack = map(copy(stack), 'bufnr(v:val)')
+  for bnr in s:buffers_recent()
+    let idx = index(bnrs, bnr)
+    if idx != -1  " move to the front
+      let tnr = pairs[idx][0]
+      let path = expand('#' . bnr . ':p')
+      let items = index(stack, bnr) == -1 ? temporal : stacked
+      call add(idxs, idx)
+      call add(items, [tnr, path])
+    endif
   endfor
   for idx in range(len(pairs))
     if index(idxs, idx) == -1
@@ -120,7 +133,7 @@ function! tags#buffer_paths(...) abort
       call add(physical, [tnr, path])
     endif
   endfor
-  let pairs = temporal + physical
+  let pairs = stacked + temporal + physical
   return pairs  " prefer most recently visited then closest
 endfunction
 
