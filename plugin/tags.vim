@@ -102,10 +102,10 @@ exe 'map <silent> ' . g:tags_backward_top_map . ' <Plug>TagsBackwardTop'
 nnoremap <Plug>TagsJump <Cmd>call tags#select_tag(0)<CR>
 nnoremap <Plug>TagsDrop <Cmd>call tags#select_tag(2)<CR>
 nnoremap <Plug>TagsFind <Cmd>call tags#find_tag()<CR>
-noremap <expr> <silent> <Plug>TagsForwardAll tags#jump_tag(v:count, 0, 1)
-noremap <expr> <silent> <Plug>TagsBackwardAll tags#jump_tag(v:count, 0, 0)
-noremap <expr> <silent> <Plug>TagsForwardTop tags#jump_tag(v:count, 1, 1)
-noremap <expr> <silent> <Plug>TagsBackwardTop tags#jump_tag(v:count, 1, 0)
+noremap <expr> <silent> <Plug>TagsForwardAll  (v:count ? '<Esc>' : '') . tags#jump_tag(v:count, 0, 1)
+noremap <expr> <silent> <Plug>TagsBackwardAll (v:count ? '<Esc>' : '') . tags#jump_tag(v:count, 0, 0)
+noremap <expr> <silent> <Plug>TagsForwardTop  (v:count ? '<Esc>' : '') . tags#jump_tag(v:count, 1, 1)
+noremap <expr> <silent> <Plug>TagsBackwardTop (v:count ? '<Esc>' : '') . tags#jump_tag(v:count, 1, 0)
 
 "------------------------------------------------------------------------------
 " Refactoring commands and maps

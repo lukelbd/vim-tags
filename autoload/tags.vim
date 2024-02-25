@@ -340,21 +340,18 @@ endfunction
 " Note: This is used with bracket maps
 function! tags#jump_tag(repeat, ...) abort
   let repeat = a:repeat == 0 ? 1 : a:repeat
-  let args = copy(a:000)
-  call add(args, 1)  " enable circular searching
-  call insert(args, line('.'))  " start on current line
+  let args = [line('.')] + a:000 + [1]  " circular searching
   for idx in range(repeat)  " loop through repitition count
     let tag = call('tags#close_tag', args)
     if empty(tag)
       echohl WarningMsg
       echom 'Error: Tag jump failed.'
-      echohl None
-      return ''
+      echohl None | return ''
     endif
     let args[0] = str2nr(tag[1])  " adjust line number
   endfor
-  echom 'Tag: ' . tag[0]
-  return tag[1] . 'G'  " return cmd since cannot move cursor inside autoload function
+  echom 'Tag: ' . (tag[0])
+  return tag[1] . 'G'
 endfunction
 
 " Search for the tag under the cursor
