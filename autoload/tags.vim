@@ -580,10 +580,11 @@ endfunction
 " Helper functions
 " Note: Critical to feed repeat command and use : instead of <Cmd> or will
 " not work properly. See: https://vi.stackexchange.com/a/20661/8084
-function! s:feed_repeat(plug) abort
+function! s:feed_repeat(name, ...) abort
   if !exists('*repeat#set') | return | endif
-  let plug = '\<Plug>' . a:plug
-  let cmd = 'call repeat#set("' . plug . '", ' . v:count . ')'
+  let plug = '\<Plug>' . a:name
+  let cnt = a:0 ? a:1 : v:count
+  let cmd = 'call repeat#set("' . plug . '", ' . cnt . ')'
   call feedkeys("\<Cmd>" . cmd . "\<CR>", 'n')
 endfunction
 function! tags#count_search(key) abort
@@ -626,11 +627,12 @@ function! tags#delete_next(key, ...) abort
   call tags#set_match(a:key)
   if a:key !~# 'a'  " delete single item
     call feedkeys('dgnn', 'n')
+    call s:feed_repeat(a:key)
   else  " delete all matches
     let winview = winsaveview()
     exe 'keepjumps %s@' . @/ . '@@ge'
     call winrestview(winview)
-    call s:feed_repeat(a:key, v:count)
+    call s:feed_repeat(a:key)
   endif
 endfunction
 function! tags#change_next(key, ...) abort
