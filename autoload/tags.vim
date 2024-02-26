@@ -431,7 +431,7 @@ function! tags#jump_tag(count, major) abort
     let tag = call('s:close_tag', args)
     if empty(tag)
       echohl WarningMsg
-      echom 'Error: Tag jump failed.'
+      echom 'Error: Next tag not found'
       echohl None | return
     endif
     let args[0] = str2nr(tag[1])  " adjust line number
@@ -451,7 +451,7 @@ function! tags#jump_word(count, ...) abort
     call search(regex, flags, 0, 0, "utils#get_inside('Constant', 'Comment')")
     if getpos('.') == pos
       echohl WarningMsg
-      echom 'Error: Keyword jump failed.'
+      echom 'Error: Next keyword not found'
       echohl None | call winrestview(winview) | return
     endif
   endfor
