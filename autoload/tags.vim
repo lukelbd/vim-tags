@@ -24,28 +24,9 @@ function! s:sort_by_name(tag1, tag2) abort
   return str1 <# str2 ? -1 : str1 ==# str2 ? 0 : 1  " equality, lesser, and greater
 endfunction
 
-" Return command-line executable that prints tags to stdout
-" Note: Output should be in number mode (i.e. shows line number instead of full line)
-function! s:tags_command(path, ...) abort
-  let path = shellescape(expand(fnamemodify(a:path, ':p')))
-  let cmd = join(a:000, ' ') . ' ' . path
-  return s:tags_command . ' ' . cmd . ' 2>/dev/null' . " | cut -d'\t' -f1,3-5"
-endfunction
-
-" Return tags parsed and sorted by name and line
-" Note: This is used for buffer variables and unopened :ShowTags path(s)
-function! s:tags_parsed(path) abort
-  let type = getbufvar(bufnr(a:path), '&filetype')  " possibly empty string
-  let skip = get(g:tags_skip_kinds, type, '@')  " default dummy character
-  if index(g:tags_skip_filetypes, type) >= 0 | return [[], []] | endif
-  let flags = getline(1) =~# '#!.*python[23]' ? '--language-force=python' : ''
-  let items = system(s:tags_command(a:path, flags) . " | sed 's/;\"\t/\t/g'")
-  let items = map(split(items, '\n'), "split(v:val, '\t')")
-  let items = filter(items, "v:val[2] !~# '[" . skip . "]'")
-  let items = [sort(items, 's:sort_by_line'), sort(deepcopy(items), 's:sort_by_name')]
-  return items
-endfunction
-
+"-----------------------------------------------------------------------------"
+" Buffer listing utilities
+"-----------------------------------------------------------------------------"
 " Return buffers by most recent access time
 " Note: Here try to detect tabs that were either accessed within session or were only
 " loaded on startup by finding the minimum access time that differs from neighbors.
@@ -137,8 +118,31 @@ function! tags#buffer_paths(...) abort
   return pairs  " prefer most recently visited then closest
 endfunction
 
+"-----------------------------------------------------------------------------"
+" Tag generation utiliities
+"-----------------------------------------------------------------------------"
+" Return tags parsed and sorted by name and line
+" Note: This is used for buffer variables and unopened :ShowTags path(s)
+" Note: Output should be in number mode (i.e. shows line number instead of full line)
+function! s:tags_command(path, ...) abort
+  let path = shellescape(expand(fnamemodify(a:path, ':p')))
+  let cmd = join(a:000, ' ') . ' ' . path
+  return s:tags_command . ' ' . cmd . ' 2>/dev/null' . " | cut -d'\t' -f1,3-5"
+endfunction
+function! s:tags_parsed(path) abort
+  let type = getbufvar(bufnr(a:path), '&filetype')  " possibly empty string
+  let skip = get(g:tags_skip_kinds, type, '@')  " default dummy character
+  if index(g:tags_skip_filetypes, type) >= 0 | return [[], []] | endif
+  let flags = getline(1) =~# '#!.*python[23]' ? '--language-force=python' : ''
+  let items = system(s:tags_command(a:path, flags) . " | sed 's/;\"\t/\t/g'")
+  let items = map(split(items, '\n'), "split(v:val, '\t')")
+  let items = filter(items, "v:val[2] !~# '[" . skip . "]'")
+  return [sort(items, 's:sort_by_line'), sort(deepcopy(items), 's:sort_by_name')]
+endfunction
+
 " Generate tags and parse them into list of lists
-" Note: Files open in multiple windows use the same buffer number and same variables.
+" Note: This will only update when tag generation time more recent than last file
+" save time. Also note files open in multiple windows have the same buffer number
 function! tags#update_tags(...) abort
   let global = a:0 ? a:1 : 0
   if global  " global paths
@@ -158,9 +162,6 @@ function! tags#update_tags(...) abort
   endfor
 endfunction
 
-"-----------------------------------------------------------------------------
-" Tag display utiltiies
-"-----------------------------------------------------------------------------
 " Show the current file kinds
 " Note: Ctags cannot show specific filetype kinds so instead filter '--list-kinds=all'
 " Note: See https://stackoverflow.com/a/71334/4970632 for difference between \r and \n
@@ -239,25 +240,44 @@ function! tags#table_tags(...) abort
 endfunction
 
 "-----------------------------------------------------------------------------
-" Tag navigation utiltiies
+" Tag searching utiltiies
 "-----------------------------------------------------------------------------
-" Show tags in the format: '[<file name>: ]<line number>: name (type, [scope])'
-" for selection by fzf. File name included only if 'global' was passed.
-" See: https://github.com/ludovicchabant/vim-gutentags/issues/349
-" See: https://github.com/junegunn/fzf/wiki/Examples-(vim)
-function! s:tag_sink(tag) abort
-  let parts = type(a:tag) == 1 ? split(a:tag, ':') : a:tag
-  if parts[0] =~# '^\s*\d\+'
-    call feedkeys("\<Cmd>" . parts[0] . "\<CR>", 'n')
-  elseif exists('*file#open_drop')
-    call file#open_drop(parts[0])
-    call feedkeys("\<Cmd>" . parts[1] . "\<CR>", 'n')
-  else
-    call feedkeys("\<Cmd>tab drop " . fnameescape(parts[0]) . "\<CR>", 'n')
-    call feedkeys("\<Cmd>" . parts[1] . "\<CR>", 'n', 'n')  " do not add to jumplist
+" Navigate to input tag list or fzf selection
+" Note: Here optionally preserve jumps triggered by line change, and try
+" to position cursor on exact match instead of start-of-line.
+function! s:tag_sink(...) abort
+  let parts = a:0 == 1 ? split(a:1, ':') : a:000
+  let regex = '^\s*\(\(.*\):\s\+\)\?\(\d\+\):\s\+\(\S\+\)'
+  let abspath = expand('%:p')  " current path
+  if a:0 > 1  " non-fzf input
+    let [path, line, name] = a:0 == 2 ? [abspath] + a:000 : a:000
+  elseif a:1 =~# regex  " format '[<file>: ]<line>: name (type[, scope])'
+    let [path, line, name] = matchlist(a:1, regex)[2:4]
+  else  " e.g. cancelled selection
+    return
   endif
-  call feedkeys('zv', 'n')
+  let path = fnamemodify(empty(path) ? abspath : path, ':p')
+  if empty(parts) | return | endif
+  if path !=# abspath
+    if exists('*file#open_drop')  " dotfiles utility
+      call file#open_drop(path)
+    else  " built-in utility
+      exe 'tab drop ' . fnameescape(path)
+    endif
+  endif
+  if g:tags_keep_jumps  " no effect on jumplist
+    exe line | normal! 0zv
+  else  " updates jumplist
+    exe 'normal! ' . line . 'G0zv'
+  endif
+  let regex = escape(name, s:regex_magic)
+  silent call search(regex, 'cW', line)
+  echom 'Tag: ' . name
 endfunction
+
+" Return tags in the format '[<file>: ]<line>: name (type[, scope])'
+" for selection by fzf. File name included only if 'global' was passed.
+" See: https://github.com/junegunn/fzf/wiki/Examples-(vim)
 function! s:tag_source(level, ...) abort
   let source = []
   if a:level > 1  " global paths
@@ -290,10 +310,63 @@ function! s:tag_source(level, ...) abort
   return source
 endfunction
 
+" Search for the tag under the cursor
+" Note: Vim does not natively support jumping across separate
+" windows so implement this here: https://superuser.com/a/154459/506762
+function! tags#find_tag(...) abort
+  let level = a:0 > 1 ? a:2 : 0
+  let chars = &l:iskeyword
+  let keys = &l:filetype ==# 'vim' ? chars . ',:' : chars
+  try
+    let &l:iskeyword = keys | let name = a:0 > 0 ? a:1 : expand('<cword>')
+  finally
+    let &l:iskeyword = chars
+  endtry
+  let name = substitute(name, '\(^\s*\|\s*$\)', '', 'g')
+  if empty(name) | return | endif
+  let opts = s:tag_source(1 + level, 1)
+  for [ipath, iline, iname; irest] in opts
+    if name !=# iname | continue | endif
+    return s:tag_sink(ipath, iline, iname)
+  endfor
+  echohl ErrorMsg
+  echom "Error: Tag '" . name . "' not found"
+  echohl None
+endfunction
+
+" Select a specific tag using fzf
+" Note: This matches construction of fzf mappings in vim-succinct.
+" See: https://github.com/ludovicchabant/vim-gutentags/issues/349
+function! tags#select_tag(...) abort
+  let level = a:0 ? a:1 : 0
+  let prompt = level > 1 ? 'Tag> ' : level > 0 ? 'FTag> ' : 'BTag> '
+  let source = s:tag_source(level, 0)
+  if empty(source)
+    echohl WarningMsg
+    echom 'Warning: Tags not found or not available.'
+    echohl None
+    return
+  endif
+  if !exists('*fzf#run')
+    echohl WarningMsg
+    echom 'Warning: FZF plugin not found.'
+    echohl None
+    return
+  endif
+  call fzf#run(fzf#wrap({
+    \ 'source': source,
+    \ 'sink': function('s:tag_sink'),
+    \ 'options': '--no-sort --prompt=' . string(prompt),
+    \ }))
+endfunction
+
+"-----------------------------------------------------------------------------"
+" Tag navigation utilities
+"-----------------------------------------------------------------------------"
 " Get the current tag from a list of tags
 " Note: This function searches exclusively (i.e. does not match the current line).
 " So only start at current line when jumping, otherwise start one line down.
-function! tags#close_tag(line, major, forward, circular) abort
+function! s:close_tag(line, major, forward, circular) abort
   if a:major
     let kinds = get(g:tags_major_kinds, &filetype, 'f')
     let filt = "len(v:val) == 3 && v:val[2] =~# '[" . kinds . "]'"
@@ -335,7 +408,7 @@ endfunction
 " Note: This is used with statusline and :CurrentTag
 function! tags#current_tag(...) abort
   let lnum = line('.') + 1
-  let info = tags#close_tag(lnum, 0, 0, 0)
+  let info = s:close_tag(lnum, 0, 0, 0)
   let full = a:0 ? a:1 : 1  " print full tag
   if empty(info)
     let parts = []
@@ -349,141 +422,67 @@ function! tags#current_tag(...) abort
   return string
 endfunction
 
-" Get the line of the next or previous tag excluding under the cursor
-" Note: This is used with bracket maps
-function! tags#jump_tag(repeat, ...) abort
-  let repeat = a:repeat == 0 ? 1 : a:repeat
-  let args = [line('.')] + a:000 + [1]  " circular searching
-  for idx in range(repeat)  " loop through repitition count
-    let tag = call('tags#close_tag', args)
+" Jump to the next or previous tag under the cursor
+" Note: This is used with bracket t/T mappings
+function! tags#jump_tag(count, major) abort
+  let forward = a:count >= 0
+  let args = [line('.'), a:major, forward, 1]  " circular searching
+  for idx in range(abs(a:count))  " loop through repitition count
+    let tag = call('s:close_tag', args)
     if empty(tag)
       echohl WarningMsg
       echom 'Error: Tag jump failed.'
-      echohl None | return ''
+      echohl None | return
     endif
     let args[0] = str2nr(tag[1])  " adjust line number
   endfor
-  echom 'Tag: ' . (tag[0])
-  return tag[1] . 'G'
+  return s:tag_sink(tag[1], tag[0])  " jump to line then name
 endfunction
 
-" Search for the tag under the cursor
-" Note: Vim does not natively support jumping https://superuser.com/a/154459/506762
-function! tags#find_tag(...) abort
-  let chars = &l:iskeyword
-  let &l:iskeyword = &l:filetype ==# 'vim' ? chars . ',:' : chars
-  let name = a:0 > 0 ? a:1 : expand('<cword>')
-  let level = a:0 > 1 ? a:2 : 0
-  let &l:iskeyword = chars
-  let name = substitute(name, '\(^\s*\|\s*$\)', '', 'g')
-  if empty(name) | return | endif
-  let opts = s:tag_source(1 + level, 1)
-  for [ipath, iline, iname; irest] in opts
-    if name ==# iname
-      call s:tag_sink([ipath, iline, iname])
-      echom 'Tag: ' . iname | return
+" Jump to the next or previous word under the cursor
+" Note: This is used with bracket w/W mappings
+function! tags#jump_word(count, ...) abort
+  let match = a:0 && a:1 ? '*' : '#'
+  let winview = winsaveview()  " tags#set_match() moves to start of match
+  silent call tags#set_match(match, 1)  " suppress scope message for now
+  let regex = @/ | let flags = a:count >= 0 ? 'w' : 'bw'
+  for _ in range(abs(a:count))
+    let pos = getpos('.')
+    call search(regex, flags, 0, 0, "utils#get_inside('Constant', 'Comment')")
+    if getpos('.') == pos
+      echohl WarningMsg
+      echom 'Error: Keyword jump failed.'
+      echohl None | call winrestview(winview) | return
     endif
   endfor
-  echohl ErrorMsg
-  echom "Error: Tag '" . name . "' not found"
-  echohl None
+  call histdel('/', -1)
+  let parts = matchlist(regex, '^\(\\%>\(\d\+\)l\)\?\(\\%<\(\d\+\)l\)\?\(.*\)$')
+  let [line1, line2, word] = [parts[2], parts[4], parts[5]]
+  let [line1, line2] = [str2nr(line1), str2nr(line2)]  " note str2nr('') is zero
+  let word = substitute(word, '\\[<>cC]', '', 'g')
+  let range = line1 && line2 ? ' (lines ' . line1 . ' to ' . line2 . ')' : ''
+  exe 'normal! zv' | echom 'Keyword: ' . word . range
 endfunction
 
-" Select a specific tag using fzf
-" Note: This matches construction of fzf mappings in vim-succinct.
-function! tags#select_tag(...) abort
-  let level = a:0 ? a:1 : 0
-  let prompt = level > 1 ? 'Tag> ' : level > 0 ? 'FTag> ' : 'BTag> '
-  let source = s:tag_source(level, 0)
-  if empty(source)
-    echohl WarningMsg
-    echom 'Warning: Tags not found or not available.'
-    echohl None
-    return
-  endif
-  if !exists('*fzf#run')
-    echohl WarningMsg
-    echom 'Warning: FZF plugin not found.'
-    echohl None
-    return
-  endif
-  call fzf#run(fzf#wrap({
-    \ 'source': source,
-    \ 'sink': function('s:tag_sink'),
-    \ 'options': '--no-sort --prompt=' . string(prompt),
-    \ }))
-endfunction
-
-"-----------------------------------------------------------------------------
-" Refactoring-related utilities
-"-----------------------------------------------------------------------------
-" Count occurrences inside file
-" See: https://vi.stackexchange.com/a/20661/8084
-function! s:feed_repeat(plug)
-  if exists('*repeat#set')
-    let cmd = 'call repeat#set("\<Plug>' . a:plug . '")'
-    call feedkeys("\<Cmd>" . cmd . "\<CR>", 'n')
-  endif
-endfunction
-function! tags#count_match(key) abort
-  call tags#set_match(a:key)
-  let winview = winsaveview()  " store window as buffer variable
-  let search = @/
-  exe '%s@' . search . '@@gne'
-  call winrestview(winview)
-endfunction
-
-" Function that sets things up for maps that change text
-" Note: Unlike tags#delete_next we wait until
-function! tags#change_next(key, ...) abort
-  let s:change_key = a:0 && a:1 ? a:key : ''
-  call tags#set_match(a:key)
-  call feedkeys('cgn', 'n')
-  let s:change_next = 1
-  call s:feed_repeat('change_again')
-endfunction
-
-" Repeat previous change
-" Note: The 'cgn' command silently fails to trigger insert mode if no matches found
-" so we check for that. Putting <Esc> in feedkeys() cancels operation so must come
-" afterward (may be no-op) and the 'i' is necessary to insert <C-a> before <Esc>.
-function! tags#change_again() abort
-  let cmd = "mode() =~# 'i' ? '\<C-a>' : ''"
-  let cmd = 'feedkeys(' . cmd . ', "ni")'
-  let cmd = "cgn\<Cmd>call " . cmd . "\<CR>\<Esc>n"
-  call feedkeys(cmd, 'n')  " add previous insert if cgn succeeds
-  call s:feed_repeat('change_again')
-endfunction
-
-" Finish change after InsertLeave and automatically jump to next occurence
-" Note: Undo first change so subsequent undo reverts all changes. Also note
-" register may have keystrokes e.g. <80>kb (backspace) so must feed as 'typed'
-function! tags#change_finish() abort
-  let cmd = ''
-  let b:winview = winsaveview()
-  if !empty(get(s:, 'change_key', ''))
-    let cmd = 'u:keepjumps %s@' . @/ . '@' . @. . "@ge | call winrestview(b:winview)\<CR>"
-    call feedkeys(cmd, 'nt') | call s:feed_repeat(s:change_key)
-  elseif get(s:, 'change_next', 0)
-    call feedkeys('n', 'nt')
-    call s:feed_repeat('change_again')
-  endif
-  let [s:change_key, s:change_next] = ['', 0]
-endfunction
-
-" Delete next match
-" Note: Unlike 'change all' this can simply call :substitute. Also note that
-" hlsearch inside function fails: https://stackoverflow.com/q/1803539/4970632
-function! tags#delete_next(key, ...) abort
-  let all = a:0 ? a:1 : 0
-  call tags#set_match(a:key)
-  if all
-    let winview = winsaveview() | exe 'keepjumps %s@' . @/ . '@@ge'
-    call winrestview(winview)
+"-----------------------------------------------------------------------------"
+" Keyword searching utilities
+"-----------------------------------------------------------------------------"
+" Return whether cursor is inside the requested syntax element(s)
+" Note: This uses the searcy() 'skip' parameter to skip matches inside comments and
+" constants (i.e. strings). Similar method is used in succinct.vim for python docstrings
+function! tags#get_inside(arg, ...) abort
+  if type(a:arg)  " i.e. not numberic
+    let [offset; items] = [0, a:arg] + a:000
   else
-    call feedkeys('dgnn', 'n')
-    if exists('*repeat#set') | call repeat#set("\<Plug>" . a:key, v:count) | endif
+    let [offset; items] = [a:arg] + a:000
   endif
+  let [lnum, cnum] = [line('.'), col('.') + offset]
+  let cnum = min([max([cnum, 1]), col('$') - 1])  " col('$') is newline/end-of-file
+  let expr = "synIDattr(synIDtrans(v:val), 'name')"
+  let stack = map(synstack(lnum, cnum), expr)
+  for item in items  " iterate over options
+    if index(stack, item) != -1 | return 1 | endif
+  endfor | return 0
 endfunction
 
 " Return major tag folding scope
@@ -500,8 +499,7 @@ function! tags#get_scope(...) abort
   if empty(items)
     echohl WarningMsg
     echom 'Warning: Failed to restrict the search scope (tags unavailable).'
-    echohl None
-    return ''
+    echohl None | return ''
   endif
   " Find closing line and tag
   keepjumps normal! zv
@@ -573,5 +571,77 @@ function! tags#set_match(key, ...) abort
   endif
   if empty(scope) && exists(':ShowSearchIndex')
     call feedkeys("\<Cmd>ShowSearchIndex\<CR>", 'n')
+  endif
+endfunction
+
+"-----------------------------------------------------------------------------
+" Keyword manipulation utilities
+"-----------------------------------------------------------------------------
+" Helper functions
+" Note: Critical to feed repeat command and use : instead of <Cmd> or will
+" not work properly. See: https://vi.stackexchange.com/a/20661/8084
+function! s:feed_repeat(plug) abort
+  if !exists('*repeat#set') | return | endif
+  let plug = '\<Plug>' . a:plug
+  let cmd = 'call repeat#set("' . plug . '", ' . v:count . ')'
+  call feedkeys("\<Cmd>" . cmd . "\<CR>", 'n')
+endfunction
+function! tags#count_search(key) abort
+  call tags#set_match(a:key)
+  let winview = winsaveview()  " store window as buffer variable
+  exe '%s@' . @/ . '@@gne'
+  call winrestview(winview)
+endfunction
+
+" Set up repeat after finishing previous change on InsertLeave
+" Note: The 'cgn' command silently fails to trigger insert mode if no matches found
+" so we check for that. Putting <Esc> in feedkeys() cancels operation so must come
+" afterward (may be no-op) and the 'i' is necessary to insert <C-a> before <Esc>.
+function! tags#change_again() abort
+  let cmd = "mode() =~# 'i' ? '\<C-a>' : ''"
+  let cmd = 'feedkeys(' . cmd . ', "ni")'
+  let cmd = "cgn\<Cmd>call " . cmd . "\<CR>\<Esc>n"
+  call feedkeys(cmd, 'n')  " add previous insert if cgn succeeds
+  call s:feed_repeat('change_again')
+endfunction
+function! tags#change_finish() abort
+  let b:winview = winsaveview()
+  let cmd = 'u:keepjumps %s@' . @/ . '@' . @. . "@ge | call winrestview(b:winview)\<CR>"
+  if !empty(get(s:, 'change_key', ''))  " change all items
+    call feedkeys(cmd, 'nt')
+    call s:feed_repeat(s:change_key)
+  elseif get(s:, 'change_next', 0)  " change next items
+    call feedkeys('n', 'nt')
+    call s:feed_repeat('change_again')
+  endif
+  let [s:change_key, s:change_next] = ['', 0]
+endfunction
+
+" Change and delete next match
+" Note: Undo first change so subsequent undo reverts all changes. Also note
+" register may have keystrokes e.g. <80>kb (backspace) so must feed as 'typed'
+" Note: Unlike 'change all', 'delete all' can simply use :substitute. Also note
+" :hlsearch inside functions fails: https://stackoverflow.com/q/1803539/4970632
+function! tags#delete_next(key, ...) abort
+  call tags#set_match(a:key)
+  if a:key !~# 'a'  " delete single item
+    call feedkeys('dgnn', 'n')
+  else  " delete all matches
+    let winview = winsaveview()
+    exe 'keepjumps %s@' . @/ . '@@ge'
+    call winrestview(winview)
+    call s:feed_repeat(a:key, v:count)
+  endif
+endfunction
+function! tags#change_next(key, ...) abort
+  call tags#set_match(a:key)
+  let s:change_next = 1
+  call feedkeys('cgn', 'n')
+  if a:key !~# 'a'  " change single match
+    let s:change_key = ''
+    call s:feed_repeat('change_again')
+  else  " change all matches
+    let s:change_key = a:key
+    call s:feed_repeat(a:key)
   endif
 endfunction

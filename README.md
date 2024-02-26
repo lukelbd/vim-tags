@@ -45,6 +45,8 @@ Mappings
 | `<Leader><CR>` | Find the keyword under the cursor among the tag lists for all open tab page buffers and jump to the location if found. The map can be changed with `g:tags_find_map`. |
 | `[t`, `]t` | Jump to subsequent and preceding tags. The maps can be changed with `g:tags_backward_map` and `g:tags_forward_map`. |
 | `[T`, `]T` | Jump to subsequent and preceding top-level "significant" tags -- that is, omitting variable definitions, import statements, etc. Generally these are just function and class definitions. The maps can be changed with `g:tags_backward_top_map` and `g:tags_forward_top_map`. |
+| `[w`, `]w` | Jump to subsequent and preceding instances of the keyword under the cursor for the current local scope. The maps can be changed with `g:tags_prev_local_map` and `g:tags_next_local_map`. |
+| `[W`, `]W` | Jump to subsequent and preceding instances of the keyword under the cursor under global scope. The maps can be changed with `g:tags_prev_global_map` and `g:tags_next_global_map`. |
 | `!`, `*`, `&` | Select the character, word or WORD under the cursor. Unlike the vim `*` map, these do not move the cursor. |
 | `#`, `@` | As for `*` and `&`, but select only the approximate local scope instead of the entire file, detecting scope starts with "significant tag locations" (functions by default) and scope ends from syntax or expr-style folds that start on the same line.
 | `g/`, `g?` | As for `/` and `?`, but again select only the approximate local scope instead of the entire file.
