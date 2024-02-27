@@ -366,7 +366,7 @@ endfunction
 " Get the current tag from a list of tags
 " Note: This function searches exclusively (i.e. does not match the current line).
 " So only start at current line when jumping, otherwise start one line down.
-function! s:close_tag(line, major, forward, circular) abort
+function! tags#close_tag(line, major, forward, circular) abort
   if a:major
     let kinds = get(g:tags_major_kinds, &filetype, 'f')
     let filt = "len(v:val) == 3 && v:val[2] =~# '[" . kinds . "]'"
@@ -408,7 +408,7 @@ endfunction
 " Note: This is used with statusline and :CurrentTag
 function! tags#current_tag(...) abort
   let lnum = line('.') + 1
-  let info = s:close_tag(lnum, 0, 0, 0)
+  let info = tags#close_tag(lnum, 0, 0, 0)
   let full = a:0 ? a:1 : 1  " print full tag
   if empty(info)
     let parts = []
@@ -428,7 +428,7 @@ function! tags#jump_tag(count, major) abort
   let forward = a:count >= 0
   let args = [line('.'), a:major, forward, 1]  " circular searching
   for idx in range(abs(a:count))  " loop through repitition count
-    let tag = call('s:close_tag', args)
+    let tag = call('tags#close_tag', args)
     if empty(tag)
       echohl WarningMsg
       echom 'Error: Next tag not found'
