@@ -448,7 +448,7 @@ function! tags#jump_word(count, ...) abort
   let regex = @/ | let flags = a:count >= 0 ? 'w' : 'bw'
   for _ in range(abs(a:count))
     let pos = getpos('.')
-    call search(regex, flags, 0, 0, "utils#get_inside('Constant', 'Comment')")
+    call search(regex, flags, 0, 0, "tags#get_inside('Constant', 'Comment')")
     if getpos('.') == pos
       echohl WarningMsg
       echom 'Error: Next keyword not found'
