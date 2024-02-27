@@ -6,9 +6,9 @@ A set of basic tools for integrating vim with
 that help with refactoring and navigation in arbitrary file types.
 Includes the following features:
 
-* Jumping between tags or jumping to particular tags using a fuzzy-search algorithm
-  (via the [fzf](https://github.com/junegunn/fzf) plugin).
-* Quickly changing or deleting words, WORDS, and regular expressions one-by-one
+* Quickly moving between tags and keywords, jumping to tags under the cursor, or
+  jumping to particualr tags using a fuzzy-search algorithm (via the [fzf](https://github.com/junegunn/fzf) plugin).
+* Changing or deleting words, WORDS, and regular expressions one-by-one
   or all at once using insert mode rather than the `:s` command.
 * Changing or deleting words, WORDS, and regular expressions delimited by adjacent
   tags -- for example, successive function definitions.
@@ -48,12 +48,12 @@ Mappings
 | `[w`, `]w` | Jump to subsequent and preceding instances of the keyword under the cursor for the current local scope. The maps can be changed with `g:tags_prev_local_map` and `g:tags_next_local_map`. |
 | `[W`, `]W` | Jump to subsequent and preceding instances of the keyword under the cursor under global scope. The maps can be changed with `g:tags_prev_global_map` and `g:tags_next_global_map`. |
 | `!`, `*`, `&` | Select the character, word or WORD under the cursor. Unlike the vim `*` map, these do not move the cursor. |
-| `#`, `@` | As for `*` and `&`, but select only the approximate local scope instead of the entire file, detecting scope starts with "significant tag locations" (functions by default) and scope ends from syntax or expr-style folds that start on the same line.
-| `g/`, `g?` | As for `/` and `?`, but again select only the approximate local scope instead of the entire file.
-| `d/`, `d*`, `d&`, `d#`, `d@` | Delete the corresponding selection under the cursor and move to the next occurrence.  Hitting `.` deletes this occurrence and jumps to the next one. `d/` uses the last search pattern.
-| `c/`, `c*`, `c&`, `c#`, `c@` | Replace the corresponding selection under the cursor with user input text by (1) deleting the selection and (2) entering insert mode and allowing the user to type something. `c/` uses the last search pattern. When you exit insert mode we jump to the next occurrence. Hitting `.` replaces this with the text you previously typed. This is like `:s/pattern/replacement/g` but cleaner.
-| `da/`, `da*`, `da&`, `da#`, `da@` | As with `d/`, `d*`, `d&`, `d#`, `d@`, but delete *all* occurrences.
-| `ca/`, `ca*`, `ca&`, `ca#`, `ca@` | As with `c/`, `c*`, `c&`, `c#`, `c@`, but change *all* occurrences.
+| `#`, `@` | As for `*` and `&`, but select only the approximate local scope instead of the entire file, detecting scope starts with "significant tag locations" (functions by default) and scope ends from syntax or expr-style folds that start on the same line. |
+| `g/`, `g?` | As for `/` and `?`, but again select only the approximate local scope instead of the entire file. Typing only `g/` and `g?` will highlight the entire scope. |
+| `d/`, `d*`, `d&`, `d#`, `d@` | Delete the corresponding selection under the cursor and move to the next occurrence.  Hitting `.` deletes this occurrence and jumps to the next one. This is similar to `:substitute` but permits staying in normal mode. `d/` uses the last search pattern. |
+| `da/`, `da*`, `da&`, `da#`, `da@` | As with `d/`, `d*`, `d&`, `d#`, `d@`, but delete *all* occurrences. |
+| `c/`, `c*`, `c&`, `c#`, `c@` | Replace the corresponding selection under the cursor with user input text by entering insert mode and allowing the user to type something, then jumping to the next occurrence when you leave insert mode. `c/` uses the last search pattern. |
+| `ca/`, `ca*`, `ca&`, `ca#`, `ca@` | As with `c/`, `c*`, `c&`, `c#`, `c@`, but change *all* occurrences. |
 
 Options
 -------
