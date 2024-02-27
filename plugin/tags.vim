@@ -1,6 +1,5 @@
 "------------------------------------------------------------------------------
-" Author: Luke Davis (lukelbd@gmail.com)
-" Date:   2018-09-09
+" Author:  Luke Davis (lukelbd@gmail.com)
 " Tools for working with tags in vim. This plugin works as a lightweight companion to
 " more comprehensive utilities like gutentags, offering tag jumping across open
 " buffers and tag navigation and search-replace utilities within buffers.
