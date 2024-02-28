@@ -95,6 +95,23 @@ if !exists('g:tags_next_global_map')
   let g:tags_next_global_map = ']W'
 endif
 
+" Selectiong mappings
+if !exists('g:tags_char_global_map')
+  let g:tags_char_global_map = '!'
+endif
+if !exists('g:tags_word_global_map')
+  let g:tags_word_global_map = '*'
+endif
+if !exists('g:tags_WORD_global_map')
+  let g:tags_WORD_global_map = '&'
+endif
+if !exists('g:tags_word_local_map')
+  let g:tags_word_local_map = '#'
+endif
+if !exists('g:tags_WORD_local_map')
+  let g:tags_WORD_local_map = '@'
+endif
+
 "-----------------------------------------------------------------------------
 " Tag commands and maps
 "-----------------------------------------------------------------------------
@@ -149,66 +166,66 @@ command! -nargs=1 -range Search
 " character search, and forward and backward local scope search.
 " Note: current character copied from https://stackoverflow.com/a/23323958/4970632
 " Todo: Add scope-local matches? No because use those for other mappings.
-noremap * <Cmd>call tags#set_match('*', 1)<CR><Cmd>setlocal hlsearch<CR>
-noremap & <Cmd>call tags#set_match('&', 1)<CR><Cmd>setlocal hlsearch<CR>
-noremap # <Cmd>call tags#set_match('#', 1)<CR><Cmd>setlocal hlsearch<CR>
-noremap @ <Cmd>call tags#set_match('@', 1)<CR><Cmd>setlocal hlsearch<CR>
-noremap ! <Cmd>call tags#set_match('!', 1)<CR><Cmd>setlocal hlsearch<CR>
 noremap g/ /<C-r>=tags#get_scope()<CR>
 noremap g? ?<C-r>=tags#get_scope()<CR>
+exe 'noremap ' . g:tags_char_global_map . ' <Cmd>call tags#set_match(0, 0, 1)<CR><Cmd>setlocal hlsearch<CR>'
+exe 'noremap ' . g:tags_word_global_map . ' <Cmd>call tags#set_match(1, 0, 1)<CR><Cmd>setlocal hlsearch<CR>'
+exe 'noremap ' . g:tags_WORD_global_map . ' <Cmd>call tags#set_match(2, 0, 1)<CR><Cmd>setlocal hlsearch<CR>'
+exe 'noremap ' . g:tags_word_local_map . ' <Cmd>call tags#set_match(1, 1, 1)<CR><Cmd>setlocal hlsearch<CR>'
+exe 'noremap ' . g:tags_WORD_local_map . ' <Cmd>call tags#set_match(2, 1, 1)<CR><Cmd>setlocal hlsearch<CR>'
 
 " Normal mode mappings that replicate :s/regex/sub/ behavior and can be repeated
 " with '.'. The substitution is determined from the text inserted by the user and
 " the cursor automatically jumps to the next match. The 'a' mappings change matches
-nmap c* <Plug>c*
-nmap c& <Plug>c&
-nmap c# <Plug>c#
-nmap c@ <Plug>c@
-nmap c/ <Plug>c/
-nmap c? <Plug>c?
-nmap ca* <Plug>ca*
-nmap ca& <Plug>ca&
-nmap ca# <Plug>ca#
-nmap ca@ <Plug>ca@
-nmap ca/ <Plug>ca/
-nmap ca? <Plug>ca?
-nnoremap <Plug>c* <Cmd>call tags#change_next('c*')<CR>
-nnoremap <Plug>c& <Cmd>call tags#change_next('c&')<CR>
-nnoremap <Plug>c# <Cmd>call tags#change_next('c#')<CR>
-nnoremap <Plug>c@ <Cmd>call tags#change_next('c@')<CR>
-nnoremap <Plug>c/ <Cmd>call tags#change_next('c/')<CR>
-nnoremap <Plug>c? <Cmd>call tags#change_next('c?')<CR>
-nnoremap <Plug>ca* <Cmd>call tags#change_next('ca*')<CR>
-nnoremap <Plug>ca& <Cmd>call tags#change_next('ca&')<CR>
-nnoremap <Plug>ca# <Cmd>call tags#change_next('ca#')<CR>
-nnoremap <Plug>ca@ <Cmd>call tags#change_next('ca@')<CR>
-nnoremap <Plug>ca/ <Cmd>call tags#change_next('ca/')<CR>
-nnoremap <Plug>ca? <Cmd>call tags#change_next('ca?')<CR>
-nnoremap <Plug>change_again <Cmd>call tags#change_again()<CR>
+nmap c/ <Plug>TagsChangeMatchNext
+nmap c? <Plug>TagsChangeMatchPrev
+nmap ca/ <Plug>TagsChangeMatchesNext
+nmap ca? <Plug>TagsChangeMatchesPrev
+exe 'nmap c' . g:tags_word_global_map . ' <Plug>TagsChangeWordGlobal'
+exe 'nmap c' . g:tags_WORD_global_map . ' <Plug>TagsChangeWORDGlobal'
+exe 'nmap c' . g:tags_word_local_map . ' <Plug>TagsChangeWordLocal'
+exe 'nmap c' . g:tags_WORD_local_map . ' <Plug>TagsChangeWORDLocal'
+exe 'nmap ca' . g:tags_word_global_map . ' <Plug>TagsChangeWordsGlobal'
+exe 'nmap ca' . g:tags_WORD_global_map . ' <Plug>TagsChangeWORDSGlobal'
+exe 'nmap ca' . g:tags_word_local_map . ' <Plug>TagsChangeWordsLocal'
+exe 'nmap ca' . g:tags_WORD_local_map . ' <Plug>TagsChangeWORDSLocal'
+nnoremap <Plug>TagsChangeRepeat <Cmd>call tags#change_repeat()<CR>
+nnoremap <Plug>TagsChangeMatchNext <Cmd>call tags#change_next(-1, 0)<CR>
+nnoremap <Plug>TagsChangeMatchPrev <Cmd>call tags#change_next(-1, 0)<CR>
+nnoremap <Plug>TagsChangeMatchesNext <Cmd>call tags#change_next(-1, 0, 1)<CR>
+nnoremap <Plug>TagsChangeMatchesPrev <Cmd>call tags#change_next(-1, 0, 1)<CR>
+nnoremap <Plug>TagsChangeWordGlobal <Cmd>call tags#change_next(1, 0)<CR>
+nnoremap <Plug>TagsChangeWORDGlobal <Cmd>call tags#change_next(2, 0)<CR>
+nnoremap <Plug>TagsChangeWordLocal <Cmd>call tags#change_next(1, 1)<CR>
+nnoremap <Plug>TagsChangeWORDLocal <Cmd>call tags#change_next(2, 1)<CR>
+nnoremap <Plug>TagsChangeWordsGlobal <Cmd>call tags#change_next(1, 0, 1)<CR>
+nnoremap <Plug>TagsChangeWORDSGlobal <Cmd>call tags#change_next(2, 0, 1)<CR>
+nnoremap <Plug>TagsChangeWordsLocal <Cmd>call tags#change_next(1, 1, 1)<CR>
+nnoremap <Plug>TagsChangeWORDSLocal <Cmd>call tags#change_next(2, 1, 1)<CR>
 
 " Normal mode mappings that replicate :d/regex/ behavior and can be repeated with '.'.
 " Cursor automatically jumps to the next match. The 'a' mappings delete all matches.
-nmap d* <Plug>d*
-nmap d& <Plug>d&
-nmap d# <Plug>d#
-nmap d@ <Plug>d@
-nmap d/ <Plug>d/
-nmap d? <Plug>d?
-nmap da* <Plug>da*
-nmap da& <Plug>da&
-nmap da# <Plug>da#
-nmap da@ <Plug>da@
-nmap da/ <Plug>da/
-nmap da? <Plug>da?
-nnoremap <Plug>d* <Cmd>call tags#delete_next('d*')<CR>
-nnoremap <Plug>d& <Cmd>call tags#delete_next('d&')<CR>
-nnoremap <Plug>d# <Cmd>call tags#delete_next('d#')<CR>
-nnoremap <Plug>d@ <Cmd>call tags#delete_next('d@')<CR>
-nnoremap <Plug>d/ <Cmd>call tags#delete_next('d/')<CR>
-nnoremap <Plug>d? <Cmd>call tags#delete_next('d?')<CR>
-nnoremap <Plug>da* <Cmd>call tags#delete_next('da*')<CR>
-nnoremap <Plug>da& <Cmd>call tags#delete_next('da&')<CR>
-nnoremap <Plug>da# <Cmd>call tags#delete_next('da#')<CR>
-nnoremap <Plug>da@ <Cmd>call tags#delete_next('da@')<CR>
-nnoremap <Plug>da/ <Cmd>call tags#delete_next('da/')<CR>
-nnoremap <Plug>da? <Cmd>call tags#delete_next('da?')<CR>
+nmap d/ <Plug>TagsDeleteMatchNext
+nmap d? <Plug>TagsDeleteMatchPrev
+nmap da/ <Plug>TagsDeleteMatchesNext
+nmap da? <Plug>TagsDeleteMatchesPrev
+exe 'nmap d' . g:tags_word_global_map . ' <Plug>TagsDeleteWordGlobal'
+exe 'nmap d' . g:tags_WORD_global_map . ' <Plug>TagsDeleteWORDGlobal'
+exe 'nmap d' . g:tags_word_local_map . ' <Plug>TagsDeleteWordLocal'
+exe 'nmap d' . g:tags_WORD_local_map . ' <Plug>TagsDeleteWORDLocal'
+exe 'nmap da' . g:tags_word_global_map . ' <Plug>TagsDeleteWordsGlobal'
+exe 'nmap da' . g:tags_WORD_global_map . ' <Plug>TagsDeleteWORDSGlobal'
+exe 'nmap da' . g:tags_word_local_map . ' <Plug>TagsDeleteWordsLocal'
+exe 'nmap da' . g:tags_WORD_local_map . ' <Plug>TagsDeleteWORDSLocal'
+nnoremap <Plug>TagsDeleteMatchNext <Cmd>call tags#delete_next(-1, 0)<CR>
+nnoremap <Plug>TagsDeleteMatchPrev <Cmd>call tags#delete_next(-1, 0)<CR>
+nnoremap <Plug>TagsDeleteMatchesNext <Cmd>call tags#delete_next(-1, 0, 1)<CR>
+nnoremap <Plug>TagsDeleteMatchesPrev <Cmd>call tags#delete_next(-1, 0, 1)<CR>
+nnoremap <Plug>TagsDeleteWordGlobal <Cmd>call tags#delete_next(1, 0)<CR>
+nnoremap <Plug>TagsDeleteWORDGlobal <Cmd>call tags#delete_next(1, 0)<CR>
+nnoremap <Plug>TagsDeleteWordLocal <Cmd>call tags#delete_next(1, 1)<CR>
+nnoremap <Plug>TagsDeleteWORDLocal <Cmd>call tags#delete_next(2, 1)<CR>
+nnoremap <Plug>TagsDeleteWordsGlobal <Cmd>call tags#delete_next(1, 0, 1)<CR>
+nnoremap <Plug>TagsDeleteWORDSGlobal <Cmd>call tags#delete_next(2, 0, 1)<CR>
+nnoremap <Plug>TagsDeleteWordsLocal <Cmd>call tags#delete_next(1, 1, 1)<CR>
+nnoremap <Plug>TagsDeleteWORDSLocal <Cmd>call tags#delete_next(2, 1, 1)<CR>

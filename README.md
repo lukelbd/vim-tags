@@ -10,14 +10,15 @@ Includes the following features:
   jumping to particualr tags using a fuzzy-search algorithm (via the [fzf](https://github.com/junegunn/fzf) plugin).
 * Changing or deleting words, WORDS, and regular expressions one-by-one
   or all at once using insert mode rather than the `:s` command.
-* Changing or deleting words, WORDS, and regular expressions delimited by adjacent
-  tags -- for example, successive function definitions.
+* Changing or deleting words, WORDS, and regular expressions within the "local scope"
+  approximated by certain tag kinds and folds that start on the same line.
 
-The last feature is motivated by the idea that certain tags approximately delimit the
-variable scope boundaries. For example, given a consecutive series of function
-declarations in a python module, the lines between each declaration approximately denote
-the scope for variables declared inside the function. This approach is primitive and not
-always perfect, but works with arbitrary file types.
+The last feature is motivated by the idea that `expr` and `syntax` style folding
+schemes typically fold variable scopes associated with functions, classes, and
+modules, and any corresponding ctag kinds that start on the same line can be
+used to identify those folds from other non-scope folds. This approach is not always
+perfect but works with arbitrary filetypes. The "local scope" mappings always
+print or highlight the line range selected by the algorithm.
 
 Documentation
 =============
@@ -35,8 +36,8 @@ Commands
 | `:SelectTag` | Show a fuzzy-completion menu of tags and jump to the selected location. Use `:SelectTag!` to choose from tags across all open buffers instead of just the current buffer. |
 | `:FindTag` | Find and jump to the input tag (default is the keyword under the cursor). Use `:FindTag!` to search tags across buffers of any filetype instead of just the current filetype. |
 
-Mappings
---------
+Jumping maps
+------------
 
 | Mapping | Description |
 | ---- | ---- |
@@ -47,18 +48,24 @@ Mappings
 | `[T`, `]T` | Jump to subsequent and preceding top-level "significant" tags -- that is, omitting variable definitions, import statements, etc. Generally these are just function and class definitions. The maps can be changed with `g:tags_backward_top_map` and `g:tags_forward_top_map`. |
 | `[w`, `]w` | Jump to subsequent and preceding instances of the keyword under the cursor for the current local scope. The maps can be changed with `g:tags_prev_local_map` and `g:tags_next_local_map`. |
 | `[W`, `]W` | Jump to subsequent and preceding instances of the keyword under the cursor under global scope. The maps can be changed with `g:tags_prev_global_map` and `g:tags_next_global_map`. |
-| `!`, `*`, `&` | Select the character, word or WORD under the cursor. Unlike the vim `*` map, these do not move the cursor. |
-| `#`, `@` | As for `*` and `&`, but select only the approximate local scope instead of the entire file, detecting scope starts with "significant tag locations" (functions by default) and scope ends from syntax or expr-style folds that start on the same line. |
-| `g/`, `g?` | As for `/` and `?`, but again select only the approximate local scope instead of the entire file. Typing only `g/` and `g?` will highlight the entire scope. |
-| `d/`, `d*`, `d&`, `d#`, `d@` | Delete the corresponding selection under the cursor and move to the next occurrence.  Hitting `.` deletes this occurrence and jumps to the next one. This is similar to `:substitute` but permits staying in normal mode. `d/` uses the last search pattern. |
+
+Searching maps
+--------------
+
+| Mapping | Description |
+| ---- | ---- |
+| `!`, `*`, `&` | Select the character, word or WORD under the cursor. The maps can be changed with `g:tags_char_global_map` (default `!`), `g:tags_word_global_map` (default `*`), and `g:tags_WORD_global_map` (default `@`), respectively. |
+| `#`, `@` | As for `*` and `&`, but select only the "local" scope defined syntax or expr-style folds that begin on the same line as tag kind in `g:tags_major_kinds` (default is functions i.e. `f`). The maps can be changed with `g:tags_word_local_map` (default `#`) and `g:tags_WORD_local_map` (default `@`). |
+| `g/`, `g?` | As for `/` and `?`, but again select only the approximate local scope instead of the entire file. Typing only `g/` and `g?` will highlight the entire scope. These maps cannot be changed from the default. |
+| `d/`, `d*`, `d&`, `d#`, `d@` | Delete the corresponding selection under the cursor and move to the next occurrence (`d/` uses the most recent search pattern). Use `.` to delete additional occurrences (whether or not they are under the cursor) and then jump to following matches. This is similar to `:substitute` but permits staying in normal mode. The mapping suffixes can be changed with `g:tags_word_global_map`, `g:tags_WORD_global_map`, `g:tags_word_local_map`, and `g:tags_WORD_local_map` (see above). |
 | `da/`, `da*`, `da&`, `da#`, `da@` | As with `d/`, `d*`, `d&`, `d#`, `d@`, but delete *all* occurrences. |
-| `c/`, `c*`, `c&`, `c#`, `c@` | Replace the corresponding selection under the cursor with user input text by entering insert mode and allowing the user to type something, then jumping to the next occurrence when you leave insert mode. `c/` uses the last search pattern. |
+| `c/`, `c*`, `c&`, `c#`, `c@` | Replace the corresponding selection under the cursor in insert mode and jump to the next occurrence after leaving insert mode (`c/` uses the most recent search pattern). Use `.` to replace additional occurrences with what you typed on the first replacement and then jump to following matches. The mapping suffixes can be changed with `g:tags_word_global_map`, `g:tags_WORD_global_map`, `g:tags_word_local_map`, and `g:tags_WORD_local_map` (see above). |
 | `ca/`, `ca*`, `ca&`, `ca#`, `ca@` | As with `c/`, `c*`, `c&`, `c#`, `c@`, but change *all* occurrences. |
 
 Options
 -------
 
-| Option | Description |
+| Setting | Description |
 | ---- | ---- |
 | `g:tags_skip_filetypes` | List of filetypes for which we do not want to try to generate tags. Setting this variable could speed things up a bit. Default is `['diff', 'help', 'man', 'qf']`. |
 | `g:tags_skip_kinds` | Dictionary whose keys are filetypes and whose values are strings indicating the tag kinds to ignore. Default behavior is to include all tags. |

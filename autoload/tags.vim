@@ -532,38 +532,41 @@ function! tags#get_scope(...) abort
 endfunction
 
 " Set the last search register to some 'current pattern' under cursor
+" Note: Here level -1 is previous search, level 0 is current character, level 1 is
+" current word, and level 2 is current WORD. Second arg denotes scope boundary.
 " Note: Here '!' handles multi-byte characters using example in :help byteidx. Also
 " the native vim-indexed-search maps invoke <Plug>(indexed-search-after), which just
 " calls <Plug>(indexed-search-index) --> :ShowSearchIndex... but causes change maps
 " to silently abort for some weird reason... so instead call this manually.
-function! s:get_item(key, ...) abort
+function! s:get_item(level, ...) abort
   let search = a:0 ? a:1 : 0
-  if a:key =~# '[*#]'
-    let item = escape(expand('<cword>'), s:regex_magic)
-    let item = item =~# '^\k\+$' ? search ? '\<' . item . '\>\C' : item : ''
-  elseif a:key =~# '[&@]'
+  if a:level >= 2
     let item = escape(expand('<cWORD>'), s:regex_magic)
     let item = search ? '\(^\|\s\)\zs' . item . '\ze\($\|\s\)\C' : item
+  elseif a:level >= 1
+    let item = escape(expand('<cword>'), s:regex_magic)
+    let item = item =~# '^\k\+$' ? search ? '\<' . item . '\>\C' : item : ''
   else  " ··· note col('.') and string[:idx] uses byte index
     let item = strcharpart(strpart(getline('.'), col('.') - 1), 0, 1)
     let item = escape(empty(item) ? "\n" : item, s:regex_magic)
   endif
   return item
 endfunction
-function! tags#set_match(key, ...) abort
+function! tags#set_match(level, local, ...) abort
+  let adjust = a:0 && a:1
   let scope = ''
-  if a:key !~# '[/?]'
-    let item = s:get_item(a:key, 0)
-    if a:0 && a:1 && empty(item) && foldclosed('.') == -1
+  if a:level != -1  " previous search indicator
+    let item = s:get_item(a:level, 0)
+    if adjust && empty(item) && foldclosed('.') == -1
       exe getline('.') =~# '^\s*$' ? '' : 'normal! B'
     endif
-    let item = s:get_item(a:key, 1)
+    let item = s:get_item(a:level, 1)
     let char = strcharpart(strpart(getline('.'), col('.') - 1), 0, 1)
-    let flags = char =~# '\s' || a:key =~# '[*#]' && char !~# '\k' ? 'cW' : 'cbW'
+    let flags = char =~# '\s' || a:level == 1 && char !~# '\k' ? 'cW' : 'cbW'
     if a:0 && a:1 && strwidth(item) > 1
       call search(item, flags, line('.'))
     endif
-    let scope = a:key =~# '[#@]' ? tags#get_scope() : ''
+    let scope = a:local ? tags#get_scope() : ''
     let @/ = scope . item
   endif
   if a:0 && a:1 && foldclosed('.') != -1
@@ -590,7 +593,7 @@ endfunction
 function! tags#count_search(key) abort
   call tags#set_match(a:key)
   let winview = winsaveview()  " store window as buffer variable
-  exe '%s@' . @/ . '@@gne'
+  exe '%s@' . escape(@/, '@') . '@@gne'
   call winrestview(winview)
 endfunction
 
@@ -598,24 +601,25 @@ endfunction
 " Note: The 'cgn' command silently fails to trigger insert mode if no matches found
 " so we check for that. Putting <Esc> in feedkeys() cancels operation so must come
 " afterward (may be no-op) and the 'i' is necessary to insert <C-a> before <Esc>.
-function! tags#change_again() abort
+function! tags#change_repeat() abort
   let cmd = "mode() =~# 'i' ? '\<C-a>' : ''"
   let cmd = 'feedkeys(' . cmd . ', "ni")'
   let cmd = "cgn\<Cmd>call " . cmd . "\<CR>\<Esc>n"
   call feedkeys(cmd, 'n')  " add previous insert if cgn succeeds
-  call s:feed_repeat('change_again')
+  call s:feed_repeat('TagsChangeRepeat')
 endfunction
 function! tags#change_finish() abort
-  let b:winview = winsaveview()
-  let cmd = 'u:keepjumps %s@' . @/ . '@' . @. . "@ge | call winrestview(b:winview)\<CR>"
-  if !empty(get(s:, 'change_key', ''))  " change all items
+  let b:change_winview = winsaveview()
+  let cmd = 'u:keepjumps %s@' . escape(@/, '@') . '@' . escape(@., '@') . '@ge'
+  let cmd .= " | call winrestview(b:change_winview)\<CR>"
+  if !empty(get(s:, 'change_repeat', ''))  " change all items
     call feedkeys(cmd, 'nt')
-    call s:feed_repeat(s:change_key)
+    call s:feed_repeat(s:change_repeat)
   elseif get(s:, 'change_next', 0)  " change next items
     call feedkeys('n', 'nt')
-    call s:feed_repeat('change_again')
+    call s:feed_repeat('TagsChangeRepeat')
   endif
-  let [s:change_key, s:change_next] = ['', 0]
+  let [s:change_repeat, s:change_next] = ['', 0]
 endfunction
 
 " Change and delete next match
@@ -623,27 +627,36 @@ endfunction
 " register may have keystrokes e.g. <80>kb (backspace) so must feed as 'typed'
 " Note: Unlike 'change all', 'delete all' can simply use :substitute. Also note
 " :hlsearch inside functions fails: https://stackoverflow.com/q/1803539/4970632
-function! tags#delete_next(key, ...) abort
-  call tags#set_match(a:key)
-  if a:key !~# 'a'  " delete single item
+let s:level_object = {-1: 'Match', 0: 'Char', 1: 'Word', 2: 'WORD'}
+let s:level_objects = {-1: 'Matches', 0: 'Chars', 1: 'Words', 2: 'WORDS'}
+function! tags#delete_next(level, local, ...) abort
+  call tags#set_match(a:level, a:local)
+  let iterate = a:0 && a:1
+  let scope = a:local ? 'Local' : 'Global'
+  if !iterate  " delete single item
+    let plug = 'TagsDelete' . s:level_object[a:level] . scope
     call feedkeys('dgnn', 'n')
-    call s:feed_repeat(a:key)
+    call s:feed_repeat(plug)
   else  " delete all matches
+    let plug = 'TagsDelete' . s:level_objects[a:level] . scope
     let winview = winsaveview()
-    exe 'keepjumps %s@' . @/ . '@@ge'
+    exe 'keepjumps %s@' . escape(@/, '@') . '@@ge'
     call winrestview(winview)
-    call s:feed_repeat(a:key)
+    call s:feed_repeat(plug)
   endif
 endfunction
-function! tags#change_next(key, ...) abort
-  call tags#set_match(a:key)
+function! tags#change_next(level, local, ...) abort
+  call tags#set_match(a:level, a:local)
+  let iterate = a:0 && a:1
+  let scope = a:local ? 'Local' : 'Global'
   let s:change_next = 1
   call feedkeys('cgn', 'n')
-  if a:key !~# 'a'  " change single match
-    let s:change_key = ''
-    call s:feed_repeat('change_again')
+  if !iterate  " change single match
+    let s:change_repeat = ''
+    call s:feed_repeat('TagsChangeRepeat')
   else  " change all matches
-    let s:change_key = a:key
-    call s:feed_repeat(a:key)
+    let plug = 'TagsChange' . s:level_objects[a:level] . scope
+    let s:change_repeat = plug
+    call s:feed_repeat(plug)
   endif
 endfunction
