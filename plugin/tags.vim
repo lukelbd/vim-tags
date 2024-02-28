@@ -31,22 +31,22 @@ augroup tags
   au BufReadPost,BufWritePost * silent call tags#update_tags(expand('<afile>'))
 augroup END
 
-" Files that we wish to ignore
+" List of filetypes to fully skip
 if !exists('g:tags_skip_filetypes')
   let g:tags_skip_filetypes = ['diff', 'help', 'man', 'qf']
 endif
 
-" List of per-file/per-filetype tag kinds to skip. Can also use .ctags config
+" Lists of per-file/per-filetype tag kinds to fully skip. Can also use .ctags config
 if !exists('g:tags_skip_kinds')
   let g:tags_skip_kinds = {}
 endif
 
-" List of per-file/per-filetype tag kinds used as to for search scope and [T navigation
+" Lists of per-file/per-filetype tag kinds to use for search scope and [T navigation
 if !exists('g:tags_major_kinds')
   let g:tags_major_kinds = {}
 endif
 
-" List of per-file/per-filetype tag kinds skipped during [t navigation
+" Lists of per-file/per-filetype tag kinds skipped during [t navigation
 if !exists('g:tags_minor_kinds')
   let g:tags_minor_kinds = {}
 endif
