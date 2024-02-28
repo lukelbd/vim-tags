@@ -552,10 +552,15 @@ function! s:get_item(level, ...) abort
   endif
   return item
 endfunction
-function! tags#set_match(level, local, ...) abort
+function! tags#set_match(level, option, ...) abort
   let adjust = a:0 && a:1
   let scope = ''
-  if a:level != -1  " previous search indicator
+  if a:level < 0  " previous search
+    let prefix = 'Match'
+    let suffix = a:option ? 'Prev' : 'Next'
+  else  " cursor search
+    let prefix = a:level >= 2 ? 'WORD' : a:level >= 1 ? 'Word' : 'Char'
+    let suffix = a:option ? 'Local' : 'Global'
     let item = s:get_item(a:level, 0)
     if adjust && empty(item) && foldclosed('.') == -1
       exe getline('.') =~# '^\s*$' ? '' : 'normal! B'
@@ -566,7 +571,7 @@ function! tags#set_match(level, local, ...) abort
     if a:0 && a:1 && strwidth(item) > 1
       call search(item, flags, line('.'))
     endif
-    let scope = a:local ? tags#get_scope() : ''
+    let scope = a:option ? tags#get_scope() : ''
     let @/ = scope . item
   endif
   if a:0 && a:1 && foldclosed('.') != -1
@@ -575,6 +580,7 @@ function! tags#set_match(level, local, ...) abort
   if empty(scope) && exists(':ShowSearchIndex')
     call feedkeys("\<Cmd>ShowSearchIndex\<CR>", 'n')
   endif
+  return [prefix, suffix]
 endfunction
 
 "-----------------------------------------------------------------------------
@@ -627,36 +633,34 @@ endfunction
 " register may have keystrokes e.g. <80>kb (backspace) so must feed as 'typed'
 " Note: Unlike 'change all', 'delete all' can simply use :substitute. Also note
 " :hlsearch inside functions fails: https://stackoverflow.com/q/1803539/4970632
-let s:level_object = {-1: 'Match', 0: 'Char', 1: 'Word', 2: 'WORD'}
-let s:level_objects = {-1: 'Matches', 0: 'Chars', 1: 'Words', 2: 'WORDS'}
-function! tags#delete_next(level, local, ...) abort
-  call tags#set_match(a:level, a:local)
+function! tags#change_next(level, option, ...) abort
+  let [prefix, suffix] = tags#set_match(a:level, a:option)
   let iterate = a:0 && a:1
-  let scope = a:local ? 'Local' : 'Global'
-  if !iterate  " delete single item
-    let plug = 'TagsDelete' . s:level_object[a:level] . scope
-    call feedkeys('dgnn', 'n')
-    call s:feed_repeat(plug)
-  else  " delete all matches
-    let plug = 'TagsDelete' . s:level_objects[a:level] . scope
-    let winview = winsaveview()
-    exe 'keepjumps %s@' . escape(@/, '@') . '@@ge'
-    call winrestview(winview)
-    call s:feed_repeat(plug)
-  endif
-endfunction
-function! tags#change_next(level, local, ...) abort
-  call tags#set_match(a:level, a:local)
-  let iterate = a:0 && a:1
-  let scope = a:local ? 'Local' : 'Global'
   let s:change_next = 1
   call feedkeys('cgn', 'n')
   if !iterate  " change single match
     let s:change_repeat = ''
     call s:feed_repeat('TagsChangeRepeat')
   else  " change all matches
-    let plug = 'TagsChange' . s:level_objects[a:level] . scope
+    let plural = a:level < 0 ? 'es' : 's'
+    let plug = 'TagsChange' . prefix . plural . suffix
     let s:change_repeat = plug
+    call s:feed_repeat(plug)
+  endif
+endfunction
+function! tags#delete_next(level, option, ...) abort
+  let [prefix, suffix] = tags#set_match(a:level, a:option)
+  let iterate = a:0 && a:1
+  if !iterate  " delete single item
+    let plug = 'TagsDelete' . prefix . suffix
+    call feedkeys('dgnn', 'n')
+    call s:feed_repeat(plug)
+  else  " delete all matches
+    let plural = a:level < 0 ? 'es' : 's'
+    let plug = 'TagsDelete' . prefix . plural . suffix
+    let winview = winsaveview()
+    exe 'keepjumps %s@' . escape(@/, '@') . '@@ge'
+    call winrestview(winview)
     call s:feed_repeat(plug)
   endif
 endfunction
