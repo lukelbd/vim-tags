@@ -179,10 +179,12 @@ nmap c/ <Plug>TagsChangeMatchNext
 nmap c? <Plug>TagsChangeMatchPrev
 nmap ca/ <Plug>TagsChangeMatchesNext
 nmap ca? <Plug>TagsChangeMatchesPrev
+exe 'nmap c' . g:tags_char_global_map . ' <Plug>TagsChangeCharGlobal'
 exe 'nmap c' . g:tags_word_global_map . ' <Plug>TagsChangeWordGlobal'
 exe 'nmap c' . g:tags_WORD_global_map . ' <Plug>TagsChangeWORDGlobal'
 exe 'nmap c' . g:tags_word_local_map . ' <Plug>TagsChangeWordLocal'
 exe 'nmap c' . g:tags_WORD_local_map . ' <Plug>TagsChangeWORDLocal'
+exe 'nmap ca' . g:tags_char_global_map . ' <Plug>TagsChangeCharsGlobal'
 exe 'nmap ca' . g:tags_word_global_map . ' <Plug>TagsChangeWordsGlobal'
 exe 'nmap ca' . g:tags_WORD_global_map . ' <Plug>TagsChangeWORDSGlobal'
 exe 'nmap ca' . g:tags_word_local_map . ' <Plug>TagsChangeWordsLocal'
@@ -192,10 +194,12 @@ nnoremap <Plug>TagsChangeMatchNext <Cmd>call tags#change_next(-1, 0)<CR>
 nnoremap <Plug>TagsChangeMatchPrev <Cmd>call tags#change_next(-1, 1)<CR>
 nnoremap <Plug>TagsChangeMatchesNext <Cmd>call tags#change_next(-1, 0, 1)<CR>
 nnoremap <Plug>TagsChangeMatchesPrev <Cmd>call tags#change_next(-1, 1, 1)<CR>
+nnoremap <Plug>TagsChangeCharGlobal <Cmd>call tags#change_next(0, 0)<CR>
 nnoremap <Plug>TagsChangeWordGlobal <Cmd>call tags#change_next(1, 0)<CR>
 nnoremap <Plug>TagsChangeWORDGlobal <Cmd>call tags#change_next(2, 0)<CR>
 nnoremap <Plug>TagsChangeWordLocal <Cmd>call tags#change_next(1, 1)<CR>
 nnoremap <Plug>TagsChangeWORDLocal <Cmd>call tags#change_next(2, 1)<CR>
+nnoremap <Plug>TagsChangeCharsGlobal <Cmd>call tags#change_next(0, 0, 1)<CR>
 nnoremap <Plug>TagsChangeWordsGlobal <Cmd>call tags#change_next(1, 0, 1)<CR>
 nnoremap <Plug>TagsChangeWORDSGlobal <Cmd>call tags#change_next(2, 0, 1)<CR>
 nnoremap <Plug>TagsChangeWordsLocal <Cmd>call tags#change_next(1, 1, 1)<CR>
@@ -207,10 +211,12 @@ nmap d/ <Plug>TagsDeleteMatchNext
 nmap d? <Plug>TagsDeleteMatchPrev
 nmap da/ <Plug>TagsDeleteMatchesNext
 nmap da? <Plug>TagsDeleteMatchesPrev
+exe 'nmap d' . g:tags_char_global_map . ' <Plug>TagsDeleteCharGlobal'
 exe 'nmap d' . g:tags_word_global_map . ' <Plug>TagsDeleteWordGlobal'
 exe 'nmap d' . g:tags_WORD_global_map . ' <Plug>TagsDeleteWORDGlobal'
 exe 'nmap d' . g:tags_word_local_map . ' <Plug>TagsDeleteWordLocal'
 exe 'nmap d' . g:tags_WORD_local_map . ' <Plug>TagsDeleteWORDLocal'
+exe 'nmap da' . g:tags_char_global_map . ' <Plug>TagsDeleteCharsGlobal'
 exe 'nmap da' . g:tags_word_global_map . ' <Plug>TagsDeleteWordsGlobal'
 exe 'nmap da' . g:tags_WORD_global_map . ' <Plug>TagsDeleteWORDSGlobal'
 exe 'nmap da' . g:tags_word_local_map . ' <Plug>TagsDeleteWordsLocal'
@@ -219,10 +225,12 @@ nnoremap <Plug>TagsDeleteMatchNext <Cmd>call tags#delete_next(-1, 0)<CR>
 nnoremap <Plug>TagsDeleteMatchPrev <Cmd>call tags#delete_next(-1, 1)<CR>
 nnoremap <Plug>TagsDeleteMatchesNext <Cmd>call tags#delete_next(-1, 0, 1)<CR>
 nnoremap <Plug>TagsDeleteMatchesPrev <Cmd>call tags#delete_next(-1, 1, 1)<CR>
+nnoremap <Plug>TagsDeleteCharGlobal <Cmd>call tags#delete_next(0, 0)<CR>
 nnoremap <Plug>TagsDeleteWordGlobal <Cmd>call tags#delete_next(1, 0)<CR>
 nnoremap <Plug>TagsDeleteWORDGlobal <Cmd>call tags#delete_next(1, 0)<CR>
 nnoremap <Plug>TagsDeleteWordLocal <Cmd>call tags#delete_next(1, 1)<CR>
 nnoremap <Plug>TagsDeleteWORDLocal <Cmd>call tags#delete_next(2, 1)<CR>
+nnoremap <Plug>TagsDeleteCharsGlobal <Cmd>call tags#delete_next(0, 0, 1)<CR>
 nnoremap <Plug>TagsDeleteWordsGlobal <Cmd>call tags#delete_next(1, 0, 1)<CR>
 nnoremap <Plug>TagsDeleteWORDSGlobal <Cmd>call tags#delete_next(2, 0, 1)<CR>
 nnoremap <Plug>TagsDeleteWordsLocal <Cmd>call tags#delete_next(1, 1, 1)<CR>
