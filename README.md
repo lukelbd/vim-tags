@@ -3,7 +3,9 @@ Vim tags
 
 A set of basic tools for integrating vim with
 [exuberant ctags](http://ctags.sourceforge.net/) and [universal-ctags](https://docs.ctags.io/en/latest/index.html)
-that help with refactoring and navigation in arbitrary file types.
+that help with refactoring and navigation in arbitrary file types for vim
+sessions with many open windows.
+
 Includes the following features:
 
 * Jumping to the tag under the cursor across open tabs and windows using the default
