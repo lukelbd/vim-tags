@@ -54,9 +54,12 @@ features are motivated by the idea that `expr` and `syntax` style folding scheme
 typically includes folds that encompass the variable scopes associated with functions,
 classes, and modules, and the "kind" property of any corresponding ctag that starts on
 the same line can be used to distinguish scope-defining folds from other non-scope
-folds. This approach is not always perfect but works with arbitrary filetypes. Note the
-"local scope" mappings always print or highlight the line range selected by the
-algorithm.
+folds. This approach is not always perfect but works with arbitrary filetypes.
+
+Note the "local scope" mappings always print or highlight the line range selected by
+the algorithm, and the search/change/delete mappings always highlight the matches with
+`:hlsearch`. If [vim-indexed-search](https://github.com/henrik/vim-indexed-search) is installed, all the search/change delete mappings
+also print the number of matches and position of the cursor using `:echom`.
 
 Documentation
 =============
