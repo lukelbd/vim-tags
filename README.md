@@ -45,9 +45,9 @@ Includes the following features:
 * Deleting or changing *all* characters, words, and WORDS using the default mappings
   `[dc]a!`, `[dc]a*`, and `[dc]a&`, deleting or changing *all* words or WORDS in the
   current local variable scope using `[dc]a#`and `[dc]a@`, or deleting or *all* instances
-  of previous searches using `[dc]a/`or `[dc]a?`. A convenient use case is using the
-  one-by-one versions of the mappings to preview the changes and make sure they are
-  doing what you want, then hitting one of these mappings to finish the job.
+  of previous searches using `[dc]a/`or `[dc]a?`. A possible use case is typing one
+  of the one-by-one mappings e.g. `c#` to enter your result and highlight the remaining
+  matches, then typing one of these mappings e.g. `ca#` to finish the job.
 
 The `[w` and `]w` local-scope jumping features and `#` and `@` local-scope searching
 features are motivated by the idea that `expr` and `syntax` style folding schemes
