@@ -27,7 +27,7 @@ endif
 set cpoptions+=d
 augroup tags
   au!
-  au InsertLeave * silent call tags#change_finish()  " finish change operation and set repeat
+  au InsertLeave * silent call tags#change_setup()  " finish change operation and set repeat
   au BufReadPost,BufWritePost * silent call tags#update_tags(expand('<afile>'))
 augroup END
 
@@ -191,9 +191,9 @@ exe 'nmap ca' . g:tags_word_local_map . ' <Plug>TagsChangeWordsLocal'
 exe 'nmap ca' . g:tags_WORD_local_map . ' <Plug>TagsChangeWORDSLocal'
 nnoremap <Plug>TagsChangeRepeat <Cmd>call tags#change_repeat()<CR>
 nnoremap <Plug>TagsChangeMatchNext <Cmd>call tags#change_next(-1, 0)<CR>
-nnoremap <Plug>TagsChangeMatchPrev <Cmd>call tags#change_next(-1, 0)<CR>
+nnoremap <Plug>TagsChangeMatchPrev <Cmd>call tags#change_next(-1, 1)<CR>
 nnoremap <Plug>TagsChangeMatchesNext <Cmd>call tags#change_next(-1, 0, 1)<CR>
-nnoremap <Plug>TagsChangeMatchesPrev <Cmd>call tags#change_next(-1, 0, 1)<CR>
+nnoremap <Plug>TagsChangeMatchesPrev <Cmd>call tags#change_next(-1, 1, 1)<CR>
 nnoremap <Plug>TagsChangeWordGlobal <Cmd>call tags#change_next(1, 0)<CR>
 nnoremap <Plug>TagsChangeWORDGlobal <Cmd>call tags#change_next(2, 0)<CR>
 nnoremap <Plug>TagsChangeWordLocal <Cmd>call tags#change_next(1, 1)<CR>
@@ -218,9 +218,9 @@ exe 'nmap da' . g:tags_WORD_global_map . ' <Plug>TagsDeleteWORDSGlobal'
 exe 'nmap da' . g:tags_word_local_map . ' <Plug>TagsDeleteWordsLocal'
 exe 'nmap da' . g:tags_WORD_local_map . ' <Plug>TagsDeleteWORDSLocal'
 nnoremap <Plug>TagsDeleteMatchNext <Cmd>call tags#delete_next(-1, 0)<CR>
-nnoremap <Plug>TagsDeleteMatchPrev <Cmd>call tags#delete_next(-1, 0)<CR>
+nnoremap <Plug>TagsDeleteMatchPrev <Cmd>call tags#delete_next(-1, 1)<CR>
 nnoremap <Plug>TagsDeleteMatchesNext <Cmd>call tags#delete_next(-1, 0, 1)<CR>
-nnoremap <Plug>TagsDeleteMatchesPrev <Cmd>call tags#delete_next(-1, 0, 1)<CR>
+nnoremap <Plug>TagsDeleteMatchesPrev <Cmd>call tags#delete_next(-1, 1, 1)<CR>
 nnoremap <Plug>TagsDeleteWordGlobal <Cmd>call tags#delete_next(1, 0)<CR>
 nnoremap <Plug>TagsDeleteWORDGlobal <Cmd>call tags#delete_next(1, 0)<CR>
 nnoremap <Plug>TagsDeleteWordLocal <Cmd>call tags#delete_next(1, 1)<CR>

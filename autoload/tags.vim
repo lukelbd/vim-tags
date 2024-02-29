@@ -608,24 +608,28 @@ endfunction
 " so we check for that. Putting <Esc> in feedkeys() cancels operation so must come
 " afterward (may be no-op) and the 'i' is necessary to insert <C-a> before <Esc>.
 function! tags#change_repeat() abort
+  let motion = get(s:, 'change_motion', 'n')
   let cmd = "mode() =~# 'i' ? '\<C-a>' : ''"
   let cmd = 'feedkeys(' . cmd . ', "ni")'
-  let cmd = "cgn\<Cmd>call " . cmd . "\<CR>\<Esc>n"
+  let cmd = 'cg' . motion . "\<Cmd>call " . cmd . "\<CR>\<Esc>" . motion
   call feedkeys(cmd, 'n')  " add previous insert if cgn succeeds
   call s:feed_repeat('TagsChangeRepeat')
 endfunction
-function! tags#change_finish() abort
-  let b:change_winview = winsaveview()
-  let cmd = 'u:keepjumps %s@' . escape(@/, '@') . '@' . escape(@., '@') . '@ge'
-  let cmd .= " | call winrestview(b:change_winview)\<CR>"
-  if !empty(get(s:, 'change_repeat', ''))  " change all items
-    call feedkeys(cmd, 'nt')
-    call s:feed_repeat(s:change_repeat)
-  elseif get(s:, 'change_next', 0)  " change next items
-    call feedkeys('n', 'nt')
-    call s:feed_repeat('TagsChangeRepeat')
+function! tags#change_setup() abort
+  if !exists('s:change_setup')
+    return
   endif
-  let [s:change_repeat, s:change_next] = ['', 0]
+  if empty(s:change_setup)  " change single item
+    let motion = get(s:, 'change_motion', 'n')
+    call feedkeys(motion, 'nt')
+    call s:feed_repeat('TagsChangeRepeat')
+  else  " change all items
+    let b:change_winview = winsaveview()
+    let cmd = 'u:keepjumps %s@' . escape(@/, '@') . '@' . escape(@., '@') . '@ge'
+    call feedkeys(cmd . " | call winrestview(b:change_winview)\<CR>", 'nt')
+    call s:feed_repeat(s:change_setup)
+  endif
+  exe 'unlet s:change_setup'
 endfunction
 
 " Change and delete next match
@@ -636,24 +640,26 @@ endfunction
 function! tags#change_next(level, option, ...) abort
   let [prefix, suffix] = tags#set_match(a:level, a:option)
   let iterate = a:0 && a:1
-  let s:change_next = 1
-  call feedkeys('cgn', 'n')
+  let motion = a:level < 0 && a:option ? 'N' : 'n'
+  let s:change_motion = motion
+  call feedkeys('cg' . motion, 'n')
   if !iterate  " change single match
-    let s:change_repeat = ''
+    let s:change_setup = ''
     call s:feed_repeat('TagsChangeRepeat')
   else  " change all matches
     let plural = a:level < 0 ? 'es' : 's'
     let plug = 'TagsChange' . prefix . plural . suffix
-    let s:change_repeat = plug
+    let s:change_setup = plug
     call s:feed_repeat(plug)
   endif
 endfunction
 function! tags#delete_next(level, option, ...) abort
   let [prefix, suffix] = tags#set_match(a:level, a:option)
   let iterate = a:0 && a:1
+  let motion = a:level < 0 && a:option ? 'N' : 'n'
   if !iterate  " delete single item
     let plug = 'TagsDelete' . prefix . suffix
-    call feedkeys('dgnn', 'n')
+    call feedkeys('dg' . repeat(motion, 2), 'n')
     call s:feed_repeat(plug)
   else  " delete all matches
     let plural = a:level < 0 ? 'es' : 's'
