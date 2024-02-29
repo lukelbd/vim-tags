@@ -6,19 +6,57 @@ A set of basic tools for integrating vim with
 that help with refactoring and navigation in arbitrary file types.
 Includes the following features:
 
-* Quickly moving between tags and keywords, jumping to tags under the cursor, or
-  jumping to particualr tags using a fuzzy-search algorithm (via the [fzf](https://github.com/junegunn/fzf) plugin).
-* Changing or deleting words, WORDS, and regular expressions one-by-one
-  or all at once using insert mode rather than the `:s` command.
-* Changing or deleting words, WORDS, and regular expressions within the "local scope"
-  approximated by certain tag kinds and folds that start on the same line.
+* Jumping to the tag under the cursor across open tabs and windows using the default
+  mapping `<Leader><CR>` mapping. The tags are stored in buffer-local `b:tags_by_line`
+  and `b:tags_by_name` variables and auto-updated on `BufWritePost`. Note that tags
+  are not generated for filetypes in `g:tags_skip_filetypes`.
+* Selecting and jumping to tags in the current window or across all open windows from
+  an [fzf.vim](https://github.com/junegunn/fzf.vim) fuzzy-search window using the default mappings `<Leader><Leader>` and
+  `<Leader><Tab>` (respectively). For jumping to arbitrary tags across a project,
+  see the [vim-gutentags](https://github.com/ludovicchabant/vim-gutentags) plugin and the [fzf.vim](https://github.com/junegunn/fzf.vim) `:Tags` command.
+* Jumping between adjacent buffer tags with default bracket mappings `[t` and
+  `]t` for "non-minor" tag kinds (i.e. tags not present in `g:tags_minor_kinds`, e.g.
+  variable definitions; see `:ShowKinds` for options) or `[T` and `]T` for "major" tag
+  kinds (i.e. tags present in `g:tags_major_kinds`, e.g. functions and classes).
+* Jumping between adjacent keywords with default bracket mappings `[w` and
+  `]w` for the keyword under the cursor `<cword>` restricted to the local
+  variable scope, or `[W`, and `]W` for all keyword in the buffer. The local
+  scope is estimated from `g:tags_major_kinds` and fold boundaries (see below).
+* Selecting characters, words, or WORDS under the cursor without jumping to the
+  next occurrence using the default mappings `!`, `*`, and `&`. These integrate
+  with [vim-indexed-search](https://github.com/henrik/vim-indexed-search) by calling `:ShowSearchedIndex` after selection, and the
+  `!` current-character selection supports arbitrary multi-byte characters.
+* Selecting words or WORDS within the current local variable scope using the default
+  mappings `#` and `@`, or using `g/` or `g?` for manual local-scope searching with
+  `/` and `?`. As with local-scope `[w` and `]w` keyword jumping, the local scope is
+  estimated from  `g:tags_major_kinds` and fold boundaries (see below).
+* Deleting characters, words, or WORDS under the cursor using the default mappings
+  `d!`, `d*`, `d&` (respectively), deleting words or WORDS in the current local variable
+  scope using `d#` and `d@`, or deleting previous searches using `d/` or `d?`. These
+  automatically jump to the next match after deletion (or previous for `d?`). If
+  [vim-repeat](https://github.com/tpope/vim-repeat) is installed, hitting `.` will repeat the previous deletion and repeat
+  the jump. This is similar to `:s` but keeps you from having to leave normal mode.
+* Changing characters, words, or WORDS under the cursor using the default mappings
+  `c!`, `c*`, `c&` (respectively), changing words or WORDS in the current local
+  variable scope using `c#` and `c@`, or changing previous searches using `c/` or `c?`.
+  These enter insert mode, allowing you to type something, then automatically jump to
+  the next match after leaving insert mode (or previous for `c?`). As with the `d` maps,
+  hitting `.` will repeat the previous replacement and repeat the jump.
+* Deleting or changing *all* characters, words, and WORDS using the default mappings
+  `[dc]a!`, `[dc]a*`, and `[dc]a&`, deleting or changing *all* words or WORDS in the
+  current local variable scope using `[dc]a#`and `[dc]a@`, or deleting or *all* instances
+  of previous searches using `[dc]a/`or `[dc]a?`. A convenient use case is using the
+  one-by-one versions of the mappings to preview the changes and make sure they are
+  doing what you want, then hitting one of these mappings to finish the job.
 
-The last feature is motivated by the idea that `expr` and `syntax` style folding
-schemes typically fold variable scopes associated with functions, classes, and
-modules, and any corresponding ctag kinds that start on the same line can be
-used to identify those folds from other non-scope folds. This approach is not always
-perfect but works with arbitrary filetypes. The "local scope" mappings always
-print or highlight the line range selected by the algorithm.
+The `[w` and `]w` local-scope jumping features and `#` and `@` local-scope searching
+features are motivated by the idea that `expr` and `syntax` style folding schemes
+typically includes folds that encompass the variable scopes associated with functions,
+classes, and modules, and the "kind" property of any corresponding ctag that starts on
+the same line can be used to distinguish scope-defining folds from other non-scope
+folds. This approach is not always perfect but works with arbitrary filetypes. Note the
+"local scope" mappings always print or highlight the line range selected by the
+algorithm.
 
 Documentation
 =============
