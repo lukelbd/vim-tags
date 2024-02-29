@@ -19,12 +19,10 @@ call system('type ctags &>/dev/null')
 if v:shell_error " exit code
   echohl WarningMsg
   echom 'Error: vim-tags requires the command-line tool ctags, not found.'
-  echohl None
-  finish
+  echohl None | finish
 endif
 
 " Initial stuff
-set cpoptions+=d
 augroup tags
   au!
   au InsertLeave * silent call tags#change_setup()  " finish change operation and set repeat
