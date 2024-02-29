@@ -154,10 +154,10 @@ noremap <Plug>TagsNextGlobal <Cmd>call tags#jump_word(v:count1, 1)<CR>
 " Refactoring commands and maps
 "------------------------------------------------------------------------------
 " Public commands
-command! -nargs=1 -range Search
+command! -bang -nargs=1 -range Search
   \ let @/ = <line1> == <line2> ? <q-args> :
   \ printf('\%%>%dl\%%<%dl', <line1> - 1, <line2> + 1) . <q-args>
-  \ | call feedkeys(tags#count_search('/'))
+  \ | call feedkeys(tags#set_search(-1, <bang>0))
 
 " Global and local <cword>, global and local <cWORD>, local forward and backward,
 " and current character searches. Also include match counts.

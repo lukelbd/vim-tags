@@ -442,9 +442,9 @@ endfunction
 " Jump to the next or previous word under the cursor
 " Note: This is used with bracket w/W mappings
 function! tags#jump_word(count, ...) abort
-  let match = a:0 && a:1 ? '*' : '#'
+  let global = a:0 && a:1
   let winview = winsaveview()  " tags#set_match() moves to start of match
-  silent call tags#set_match(match, 1)  " suppress scope message for now
+  silent call tags#set_match(1, !global, 1)  " suppress scope message for now
   let regex = @/ | let flags = a:count >= 0 ? 'w' : 'bw'
   for _ in range(abs(a:count))
     let pos = getpos('.')
@@ -596,8 +596,8 @@ function! s:feed_repeat(name, ...) abort
   let cmd = 'call repeat#set("' . plug . '", ' . cnt . ')'
   call feedkeys("\<Cmd>" . cmd . "\<CR>", 'n')
 endfunction
-function! tags#count_search(key) abort
-  call tags#set_match(a:key)
+function! tags#set_search(level, option) abort
+  call tags#set_match(a:level, a:option)
   let winview = winsaveview()  " store window as buffer variable
   exe '%s@' . escape(@/, '@') . '@@gne'
   call winrestview(winview)
