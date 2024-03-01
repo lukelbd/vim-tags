@@ -50,13 +50,13 @@ Also includes the following related search-and-replace features:
   Use `ca!`, `ca*`, `ca&`, `ca#`, `ca@`, `ca/`, or `ca?` to change *all* matches.
 
 The `[w` and `]w` local-scope jumping feature and `#` and `@` local-scope searching
-features are motivated by the idea that `expr` and `syntax` style folding schemes
-typically includes folds that encompass the variable scopes associated with functions,
-classes, and modules, and the "kind" property of any corresponding ctag that starts on
-the same line can be used to distinguish scope-defining folds from other non-scope
-folds. This approach is not always perfect but works with arbitrary filetypes.
-Note the "local scope" mappings always print the line range selected by the
-scope-selection algorithm (or you can use `g/` or `g?` to highlight the entire range).
+features are motivated by the idea that `expr` and `syntax` style folds typically
+include regions that comprise the variable scopes associated with functions,
+classes, and modules, and the "kind" property of any tag that starts on the same
+line as a fold can be used to distinguish these scope-defining folds from other folds.
+This approach is not always perfect but works with arbitrary filetypes. Note the
+mappings with `#` and `@` always print the line range selected by the algorithm, or
+you can use `g/` or `g?` to highlight the entire range.
 
 Documentation
 =============
