@@ -8,46 +8,46 @@ sessions with many open windows.
 
 Includes the following features:
 
-* Jumping to the tag under the cursor across open tabs and windows using the default
-  mapping `<Leader><CR>` mapping. The tags are stored in buffer-local `b:tags_by_line`
-  and `b:tags_by_name` variables and auto-updated on `BufWritePost`. Note that tags
-  are not generated for filetypes in `g:tags_skip_filetypes`.
+* Jumping to the tag under the cursor across open tabs and windows with the default
+  mapping `<Leader><CR>`. Tags are generated with `ctags` executable whenever a
+  buffer is read or written, then stored in buffer-local variables. Any buffers that
+  belong to filetypes in `g:tags_skip_filetypes` are skipped.
 * Selecting and jumping to tags in the current window or across all open windows from
-  an [fzf.vim](https://github.com/junegunn/fzf.vim) fuzzy-search window using the default mappings `<Leader><Leader>` and
+  an [fzf.vim](https://github.com/junegunn/fzf.vim) fuzzy-search window with the default mappings `<Leader><Leader>` and
   `<Leader><Tab>` (respectively). For jumping to arbitrary tags across a project,
-  see the [vim-gutentags](https://github.com/ludovicchabant/vim-gutentags) plugin and the [fzf.vim](https://github.com/junegunn/fzf.vim) `:Tags` command.
-* Jumping between adjacent buffer tags with default bracket mappings `[t` and
-  `]t` for "non-minor" tag kinds (i.e. tags not present in `g:tags_minor_kinds`, e.g.
-  variable definitions; see `:ShowKinds` for options) or `[T` and `]T` for "major" tag
-  kinds (i.e. tags present in `g:tags_major_kinds`, e.g. functions and classes).
-* Jumping between adjacent keywords with default bracket mappings `[w` and
-  `]w` for the keyword under the cursor `<cword>` restricted to the local
-  variable scope, or `[W`, and `]W` for all keyword in the buffer. The local
-  scope is estimated from `g:tags_major_kinds` and fold boundaries (see below).
+  see `:help 'tags'`, [vim-gutentags](https://github.com/ludovicchabant/vim-gutentags), and the [fzf.vim](https://github.com/junegunn/fzf.vim) `:Tags` command.
+* Jumping between adjacent buffer tags with default bracket mappings `[t`, `]t`, `[T`,
+  and `]T`. The lowercase mappings ignore "minor" tags listed in `g:tags_minor_kinds`
+  (e.g. variable definitions; see `:ShowKinds` for options), and the uppercase mappings
+  only include "major" tags listed in `g:tags_major_kinds` (e.g. functions, classes).
+* Jumping between adjacent keywords with default bracket mappings `[w`, `]w`, `[W`,
+  and `]W`. The lowercase mappings restrict the search to the local variable scope
+  (estimated from the positions of "major" `g:tags_major_kinds` tags and fold boundaries;
+  see below). Both mappings skip any keywords in `Comment` blocks.
 * Selecting characters, words, or WORDS under the cursor without jumping to the
-  next occurrence using the default mappings `!`, `*`, and `&`. These integrate
-  with [vim-indexed-search](https://github.com/henrik/vim-indexed-search) by calling `:ShowSearchedIndex` after selection, and the
-  `!` current-character selection supports arbitrary multi-byte characters.
-* Selecting words or WORDS within the current local variable scope using the default
-  mappings `#` and `@`, or using `g/` or `g?` for manual local-scope searching with
-  `/` and `?`. As with local-scope `[w` and `]w` keyword jumping, the local scope is
-  estimated from  `g:tags_major_kinds` and fold boundaries (see below).
-* Deleting characters, words, or WORDS under the cursor using the default mappings
+  next occurrence with the default mappings `!`, `*`, and `&`. These integrate with
+  [vim-indexed-search](https://github.com/henrik/vim-indexed-search) by calling `:ShowSearchedIndex` after selection. The `!` search
+  works with multi-byte characters.
+* Selecting words or WORDS within the current local variable scopewithusing the default
+  mappings `#` and `@`, or searching the local scope manually with `g/` or `g?`
+  (analogous to `/` and `?`). As with the `[w` and `]w` mappings, local scope is
+  estimated from "major" tags and fold boundaries (see below).
+* Deleting characters, words, or WORDS under the cursor with the default mappings
   `d!`, `d*`, `d&` (respectively), deleting words or WORDS in the current local variable
-  scope using `d#` and `d@`, or deleting previous searches using `d/` or `d?`. These
+  scope with `d#` and `d@`, or deleting previous searches with `d/` or `d?`. These
   automatically jump to the next match after deletion (or previous for `d?`). If
   [vim-repeat](https://github.com/tpope/vim-repeat) is installed, hitting `.` will repeat the previous deletion and repeat
   the jump. This is similar to `:s` but keeps you from having to leave normal mode.
-* Changing characters, words, or WORDS under the cursor using the default mappings
-  `c!`, `c*`, `c&` (respectively), changing words or WORDS in the current local
-  variable scope using `c#` and `c@`, or changing previous searches using `c/` or `c?`.
+* Changing characters, words, or WORDS under the cursor with the default mappings
+  `c!`, `c*`, `c&` (respectively); changing words or WORDS in the current local
+  variable scope with `c#` and `c@`; or changing previous searches with `c/` or `c?`.
   These enter insert mode, allowing you to type something, then automatically jump to
   the next match after leaving insert mode (or previous for `c?`). As with the `d` maps,
   hitting `.` will repeat the previous replacement and repeat the jump.
-* Deleting or changing *all* characters, words, and WORDS using the default mappings
-  `[dc]a!`, `[dc]a*`, and `[dc]a&`, deleting or changing *all* words or WORDS in the
-  current local variable scope using `[dc]a#`and `[dc]a@`, or deleting or *all* instances
-  of previous searches using `[dc]a/`or `[dc]a?`. A possible use case is typing one
+* Deleting or changing *all* characters, words, and WORDS with the default mappings
+  `[dc]a!`, `[dc]a*`, and `[dc]a&`; deleting or changing *all* words or WORDS in the
+  current local variable scope with `[dc]a#`and `[dc]a@`; or deleting or *all* instances
+  of previous searches with `[dc]a/`or `[dc]a?`. A possible use case is typing one
   of the one-by-one mappings e.g. `c#` to enter your result and highlight the remaining
   matches, then typing one of these mappings e.g. `ca#` to finish the job.
 
