@@ -18,8 +18,8 @@ Includes the following features:
   see `:help 'tags'`, [vim-gutentags](https://github.com/ludovicchabant/vim-gutentags), and the [fzf.vim](https://github.com/junegunn/fzf.vim) `:Tags` command.
 * Jumping between adjacent buffer tags with default bracket mappings `[t`, `]t`, `[T`,
   and `]T`. The lowercase mappings ignore "minor" tags in `g:tags_minor_kinds` (e.g.
-  variable definitions; see `:ShowKinds` for options), and the uppercase mappings
-  only include "major" tags in `g:tags_major_kinds` (default is `f` for functions).
+  variables; see `:ShowKinds` for options), and the uppercase mappings only include
+  "major" tags in `g:tags_major_kinds` (default is `f` for functions).
 * Jumping between adjacent keywords with default bracket mappings `[w`, `]w`, `[W`,
   and `]W`. The lowercase mappings restrict the search to the local variable scope
   (estimated from the positions of "major" tags and fold boundaries; see below).
