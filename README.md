@@ -6,62 +6,57 @@ A set of basic tools for integrating vim with
 that help with refactoring and navigation in arbitrary file types for vim
 sessions with many open windows.
 
-Includes the following features:
+Includes the following `ctags`-powered navigation features:
 
 * Jumping to the tag under the cursor across open tabs and windows with the default
-  mapping `<Leader><CR>`. Tags are generated with `ctags` executable whenever a
-  buffer is read or written, then stored in buffer-local variables. Any buffers that
-  belong to filetypes in `g:tags_skip_filetypes` are skipped.
+  mapping `<Leader><CR>`. Tags are generated whenever a buffer is read or written,
+  then stored in buffer-local variables `b:tags_by_line` and `b:tags_by_name`. Any
+  buffers that belong to filetypes in `g:tags_skip_filetypes` are skipped.
 * Selecting and jumping to tags in the current window or across all open windows from
   an [fzf.vim](https://github.com/junegunn/fzf.vim) fuzzy-search window with the default mappings `<Leader><Leader>` and
   `<Leader><Tab>` (respectively). For jumping to arbitrary tags across a project,
   see `:help 'tags'`, [vim-gutentags](https://github.com/ludovicchabant/vim-gutentags), and the [fzf.vim](https://github.com/junegunn/fzf.vim) `:Tags` command.
-* Jumping between adjacent buffer tags with default bracket mappings `[t`, `]t`, `[T`,
+* Moving between adjacent buffer tags with default bracket mappings `[t`, `]t`, `[T`,
   and `]T`. The lowercase mappings ignore "minor" tags in `g:tags_minor_kinds` (e.g.
   variables; see `:ShowKinds` for options), and the uppercase mappings only include
   "major" tags in `g:tags_major_kinds` (default is `f` for functions).
-* Jumping between adjacent keywords with default bracket mappings `[w`, `]w`, `[W`,
+* Moving between adjacent keywords with default bracket mappings `[w`, `]w`, `[W`,
   and `]W`. The lowercase mappings restrict the search to the local variable scope
   (estimated from the positions of "major" tags and fold boundaries; see below).
   Both mappings skip any keywords in `Comment` blocks.
+
+Also includes the following related search-and-replace features:
+
 * Selecting characters, words, or WORDS under the cursor without jumping to the
-  next occurrence with the default mappings `!`, `*`, and `&`. These integrate with
-  [vim-indexed-search](https://github.com/henrik/vim-indexed-search) by calling `:ShowSearchedIndex` after selection. The `!` search
-  works with multi-byte characters.
-* Selecting words or WORDS within the current local variable scope with the default
-  mappings `#` and `@`, or searching the local scope manually with `g/` or `g?`
-  (analogous to `/` and `?`). As with the `[w` and `]w` mappings, local scope is
-  estimated from "major" tags and fold boundaries (see below).
+  next occurrence with the default mappings `!`, `*`, and `&`; selecting words or
+  WORDS within the current local variable scope with the default mappings `#` and
+  `@`; or searching the local scope manually with `g/` or `g?` (analogous to `/` and
+  `?`). As with the `[w` and `]w` mappings, local scope is estimated from "major" tags
+  and fold boundaries (see below). These highlight the matches with `:hlsearch` and
+  call [vim-indexed-search](https://github.com/henrik/vim-indexed-search) `:ShowSearchIndex` if it is available.
 * Deleting characters, words, or WORDS under the cursor with the default mappings
-  `d!`, `d*`, `d&` (respectively), deleting words or WORDS in the current local variable
-  scope with `d#` and `d@`, or deleting previous searches with `d/` or `d?`. These
-  automatically jump to the next match after deletion (or previous for `d?`). If
-  [vim-repeat](https://github.com/tpope/vim-repeat) is installed, hitting `.` will repeat the previous deletion and repeat
+  `d!`, `d*`, `d&` (respectively); deleting words or WORDS in the current local variable
+  scope with `d#` and `d@`; or deleting previous searches with `d/` or `d?`. These
+  automatically jump to the next match after deletion (or previous for `d?`).
+  If [vim-repeat](https://github.com/tpope/vim-repeat) is installed, hitting `.` will repeat the previous deletion and repeat
   the jump. This is similar to `:s` but keeps you from having to leave normal mode.
+  Use `da!`, `da*`, `da&`, `da#`, `da@`, `da/`, or `da?` to delete *all* matches.
 * Changing characters, words, or WORDS under the cursor with the default mappings
   `c!`, `c*`, `c&` (respectively); changing words or WORDS in the current local
   variable scope with `c#` and `c@`; or changing previous searches with `c/` or `c?`.
   These enter insert mode, allowing you to type something, then automatically jump to
-  the next match after leaving insert mode (or previous for `c?`). As with the `d` maps,
-  hitting `.` will repeat the previous replacement and repeat the jump.
-* Deleting or changing *all* characters, words, and WORDS with the default mappings
-  `[dc]a!`, `[dc]a*`, and `[dc]a&`; deleting or changing *all* words or WORDS in the
-  current local variable scope with `[dc]a#`and `[dc]a@`; or deleting or *all* instances
-  of previous searches with `[dc]a/`or `[dc]a?`. A possible use case is typing one
-  of the one-by-one mappings e.g. `c#` to enter your result and highlight the remaining
-  matches, then typing one of these mappings e.g. `ca#` to finish the job.
+  the next match after leaving insert mode (or previous for `c?`). As with the `d`
+  maps, hitting `.` will repeat the previous replacement and repeat the jump.
+  Use `ca!`, `ca*`, `ca&`, `ca#`, `ca@`, `ca/`, or `ca?` to change *all* matches.
 
-The `[w` and `]w` local-scope jumping features and `#` and `@` local-scope searching
+The `[w` and `]w` local-scope jumping feature and `#` and `@` local-scope searching
 features are motivated by the idea that `expr` and `syntax` style folding schemes
 typically includes folds that encompass the variable scopes associated with functions,
 classes, and modules, and the "kind" property of any corresponding ctag that starts on
 the same line can be used to distinguish scope-defining folds from other non-scope
-folds. This approach is not always perfect but works with arbitrary filetypes. Note the
-"local scope" mappings always print the line range selected by the scope-selection
-algorithm (or you can use `g/` or `g?` to highlight the entire range), and the
-search/change/delete mappings always highlight the matches with `:hlsearch`. If
-[vim-indexed-search](https://github.com/henrik/vim-indexed-search) is installed, all the search/change delete mappings also print
-the number of matches and position of the cursor.
+folds. This approach is not always perfect but works with arbitrary filetypes.
+Note the "local scope" mappings always print the line range selected by the
+scope-selection algorithm (or you can use `g/` or `g?` to highlight the entire range).
 
 Documentation
 =============
