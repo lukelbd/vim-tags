@@ -315,12 +315,12 @@ endfunction
 " windows so implement this here: https://superuser.com/a/154459/506762
 function! tags#find_tag(...) abort
   let level = a:0 > 1 ? a:2 : 0
-  let chars = &l:iskeyword
-  let keys = &l:filetype ==# 'vim' ? chars . ',:' : chars
+  let keys1 = &l:iskeyword
+  let keys2 = &l:filetype ==# 'vim' ? keys1 . ',:' : keys1
   try
-    let &l:iskeyword = keys | let name = a:0 > 0 ? a:1 : expand('<cword>')
+    let &l:iskeyword = keys2 | let name = a:0 > 0 ? a:1 : expand('<cword>')
   finally
-    let &l:iskeyword = chars
+    let &l:iskeyword = keys1
   endtry
   let name = substitute(name, '\(^\s*\|\s*$\)', '', 'g')
   if empty(name) | return | endif
@@ -455,7 +455,6 @@ function! tags#jump_word(count, ...) abort
       echohl None | call winrestview(winview) | return
     endif
   endfor
-  call histdel('/', -1)
   let parts = matchlist(regex, '^\(\\%>\(\d\+\)l\)\?\(\\%<\(\d\+\)l\)\?\(.*\)$')
   let [line1, line2, word] = [parts[2], parts[4], parts[5]]
   let [line1, line2] = [str2nr(line1), str2nr(line2)]  " note str2nr('') is zero
