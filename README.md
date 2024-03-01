@@ -28,7 +28,7 @@ Includes the following features:
   next occurrence with the default mappings `!`, `*`, and `&`. These integrate with
   [vim-indexed-search](https://github.com/henrik/vim-indexed-search) by calling `:ShowSearchedIndex` after selection. The `!` search
   works with multi-byte characters.
-* Selecting words or WORDS within the current local variable scopewithusing the default
+* Selecting words or WORDS within the current local variable scope with the default
   mappings `#` and `@`, or searching the local scope manually with `g/` or `g?`
   (analogous to `/` and `?`). As with the `[w` and `]w` mappings, local scope is
   estimated from "major" tags and fold boundaries (see below).
