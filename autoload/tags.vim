@@ -310,28 +310,45 @@ function! s:tag_source(level, ...) abort
   return source
 endfunction
 
-" Search for the tag under the cursor
-" Note: Vim does not natively support jumping across separate
-" windows so implement this here: https://superuser.com/a/154459/506762
-function! tags#find_tag(...) abort
-  let level = a:0 > 1 ? a:2 : 0
-  let keys1 = &l:iskeyword
-  let keys2 = &l:filetype ==# 'vim' ? keys1 . ',:' : keys1
-  try
-    let &l:iskeyword = keys2 | let name = a:0 > 0 ? a:1 : expand('<cword>')
-  finally
-    let &l:iskeyword = keys1
-  endtry
-  let name = substitute(name, '\(^\s*\|\s*$\)', '', 'g')
-  if empty(name) | return | endif
-  let opts = s:tag_source(1 + level, 1)
-  for [ipath, iline, iname; irest] in opts
-    if name !=# iname | continue | endif
-    return s:tag_sink(ipath, iline, iname)
-  endfor
-  echohl ErrorMsg
-  echom "Error: Tag '" . name . "' not found"
-  echohl None
+" Get the current tag from a list of tags
+" Note: This function searches exclusively (i.e. does not match the current line).
+" So only start at current line when jumping, otherwise start one line down.
+function! tags#close_tag(line, major, forward, circular) abort
+  if a:major
+    let kinds = get(g:tags_major_kinds, &filetype, 'f')
+    let filt = "len(v:val) == 3 && v:val[2] =~# '[" . kinds . "]'"
+  else
+    let kinds = get(g:tags_minor_kinds, &filetype, 'v')
+    let filt = "v:val[2] !~# '[" . kinds . "]'"
+  endif
+  silent! exe 'unlet! b:tags_scope_by_line'
+  silent! exe 'unlet! b:tags_top_by_line'
+  let tags = get(b:, 'tags_by_line', [])
+  let tags = filter(copy(tags), filt)
+  if empty(tags)
+    return []  " silent failure
+  endif
+  let lnum = a:line
+  if a:circular && a:forward && lnum >= tags[-1][1]
+    let idx = 0
+  elseif a:circular && !a:forward && lnum <= tags[0][1]
+    let idx = -1
+  else
+    for jdx in range(1, len(tags) - 1)  " in-between tags (endpoint inclusive)
+      if a:forward && lnum >= tags[-jdx - 1][1]
+        let idx = -jdx
+        break
+      endif
+      if !a:forward && lnum <= tags[jdx][1]
+        let idx = jdx - 1
+        break
+      endif
+    endfor
+    if !exists('idx')  " single tag or first or last tag
+      let idx = a:forward ? 0 : -1
+    endif
+  endif
+  return tags[idx]
 endfunction
 
 " Select a specific tag using fzf
@@ -363,47 +380,6 @@ endfunction
 "-----------------------------------------------------------------------------"
 " Tag navigation utilities
 "-----------------------------------------------------------------------------"
-" Get the current tag from a list of tags
-" Note: This function searches exclusively (i.e. does not match the current line).
-" So only start at current line when jumping, otherwise start one line down.
-function! tags#close_tag(line, major, forward, circular) abort
-  if a:major
-    let kinds = get(g:tags_major_kinds, &filetype, 'f')
-    let filt = "len(v:val) == 3 && v:val[2] =~# '[" . kinds . "]'"
-  else
-    let kinds = get(g:tags_minor_kinds, &filetype, 'v')
-    let filt = "v:val[2] !~# '[" . kinds . "]'"
-  endif
-  silent! unlet! b:tags_scope_by_line  " outdated
-  silent! unlet! b:tags_top_by_line  " outdated
-  let tags = get(b:, 'tags_by_line', [])
-  let tags = filter(copy(tags), filt)
-  if empty(tags)
-    return []  " silent failure
-  endif
-  let lnum = a:line
-  if a:circular && a:forward && lnum >= tags[-1][1]
-    let idx = 0
-  elseif a:circular && !a:forward && lnum <= tags[0][1]
-    let idx = -1
-  else
-    for jdx in range(1, len(tags) - 1)  " in-between tags (endpoint inclusive)
-      if a:forward && lnum >= tags[-jdx - 1][1]
-        let idx = -jdx
-        break
-      endif
-      if !a:forward && lnum <= tags[jdx][1]
-        let idx = jdx - 1
-        break
-      endif
-    endfor
-    if !exists('idx')  " single tag or first or last tag
-      let idx = a:forward ? 0 : -1
-    endif
-  endif
-  return tags[idx]
-endfunction
-
 " Get the 'current' tag defined as the tag under the cursor or preceding
 " Note: This is used with statusline and :CurrentTag
 function! tags#current_tag(...) abort
@@ -420,6 +396,31 @@ function! tags#current_tag(...) abort
   endif
   let string = join(parts, ':')
   return string
+endfunction
+
+" Search for the tag under the cursor
+" Note: Vim does not natively support jumping across separate
+" windows so implement this here: https://superuser.com/a/154459/506762
+function! tags#find_tag(...) abort
+  let level = a:0 > 1 ? a:2 : 0
+  let keys = &l:iskeyword
+  let mods = &l:filetype ==# 'vim' ? ',:' : ''
+  let &l:iskeyword = keys . mods
+  try
+    let name = a:0 > 0 ? a:1 : expand('<cword>')
+  finally
+    let &l:iskeyword = keys
+  endtry
+  let name = substitute(name, '\(^\s*\|\s*$\)', '', 'g')
+  if empty(name) | return | endif
+  let opts = s:tag_source(1 + level, 1)
+  for [ipath, iline, iname; irest] in opts
+    if name !=# iname | continue | endif
+    return s:tag_sink(ipath, iline, iname)
+  endfor
+  echohl ErrorMsg
+  echom "Error: Tag '" . name . "' not found"
+  echohl None
 endfunction
 
 " Jump to the next or previous tag under the cursor
@@ -444,7 +445,7 @@ endfunction
 function! tags#jump_word(count, ...) abort
   let global = a:0 && a:1
   let winview = winsaveview()  " tags#set_match() moves to start of match
-  silent call tags#set_match(1, !global, 1)  " suppress scope message for now
+  silent call tags#set_match(1, !global, 1)  " suppress scope emssage for now
   let regex = @/ | let flags = a:count >= 0 ? 'w' : 'bw'
   for _ in range(abs(a:count))
     let pos = getpos('.')
@@ -456,7 +457,7 @@ function! tags#jump_word(count, ...) abort
     endif
   endfor
   let parts = matchlist(regex, '^\(\\%>\(\d\+\)l\)\?\(\\%<\(\d\+\)l\)\?\(.*\)$')
-  let [line1, line2, word] = [parts[2], parts[4], parts[5]]
+  let [line1, line2, word] = [parts[2], parts[4], parts[5]]  " get scope from regex
   let [line1, line2] = [str2nr(line1), str2nr(line2)]  " note str2nr('') is zero
   let word = substitute(word, '\\[<>cC]', '', 'g')
   let range = line1 && line2 ? ' (lines ' . line1 . ' to ' . line2 . ')' : ''
