@@ -33,7 +33,7 @@ Also includes the following related search-and-replace features:
   `@`; or searching the local scope manually with `g/` or `g?` (analogous to `/` and
   `?`). As with the `[w` and `]w` mappings, local scope is estimated from "major" tags
   and fold boundaries (see below). These highlight the matches with `:hlsearch` and
-  call [vim-indexed-search](https://github.com/henrik/vim-indexed-search) `:ShowSearchIndex` if it is available.
+  call the [vim-indexed-search](https://github.com/henrik/vim-indexed-search) command `:ShowSearchIndex` if it is available.
 * Deleting characters, words, or WORDS under the cursor with the default mappings
   `d!`, `d*`, `d&` (respectively); deleting words or WORDS in the current local variable
   scope with `d#` and `d@`; or deleting previous searches with `d/` or `d?`. These
