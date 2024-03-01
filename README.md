@@ -10,7 +10,7 @@ Includes the following `ctags`-powered navigation features:
 
 * Jumping to the tag under the cursor across open tabs and windows with the default
   mapping `<Leader><CR>`. Tags are generated whenever a buffer is read or written,
-  then stored in buffer-local variables `b:tags_by_line` and `b:tags_by_name`. Any
+  then stored in buffer variables `b:tags_by_line` and `b:tags_by_name`. Any
   buffers that belong to filetypes in `g:tags_skip_filetypes` are skipped.
 * Selecting and jumping to tags in the current window or across all open windows from
   an [fzf.vim](https://github.com/junegunn/fzf.vim) fuzzy-search window with the default mappings `<Leader><Leader>` and
@@ -22,8 +22,8 @@ Includes the following `ctags`-powered navigation features:
   "major" tags in `g:tags_major_kinds` (default is `f` for functions).
 * Moving between adjacent keywords with default bracket mappings `[w`, `]w`, `[W`,
   and `]W`. The lowercase mappings restrict the search to the local variable scope
-  (estimated from the positions of "major" tags and fold boundaries; see below).
-  Both mappings skip any keywords in `Comment` blocks.
+  (estimated from the positions of "major" tags and fold boundaries; see below for
+  details). These mappings skip instances in `Comment` syntax blocks.
 
 Also includes the following related search-and-replace features:
 
