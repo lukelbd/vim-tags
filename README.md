@@ -55,7 +55,7 @@ include regions that comprise the variable scopes associated with functions,
 classes, and modules, and the "kind" property of any tag that starts on the same
 line as a fold can be used to distinguish these scope-defining folds from other folds.
 This approach is not always perfect but works with arbitrary filetypes. Note the
-`#`, `d#`, `c#`, `@`, `d@`, and `c@`` `mappings print the line range selected by
+`#`, `d#`, `c#`, `@`, `d@`, and `c@` mappings print the line range selected by
 the algorithm, or you can use `g/` or `g?` to highlight the entire range.
 
 Documentation
