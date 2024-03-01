@@ -61,7 +61,7 @@ folds. This approach is not always perfect but works with arbitrary filetypes. N
 algorithm (or you can use `g/` or `g?` to highlight the entire range), and the
 search/change/delete mappings always highlight the matches with `:hlsearch`. If
 [vim-indexed-search](https://github.com/henrik/vim-indexed-search) is installed, all the search/change delete mappings also print
-the number of matches and position of the cursor using `:echom`.
+the number of matches and position of the cursor.
 
 Documentation
 =============
