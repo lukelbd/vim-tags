@@ -17,13 +17,13 @@ Includes the following features:
   `<Leader><Tab>` (respectively). For jumping to arbitrary tags across a project,
   see `:help 'tags'`, [vim-gutentags](https://github.com/ludovicchabant/vim-gutentags), and the [fzf.vim](https://github.com/junegunn/fzf.vim) `:Tags` command.
 * Jumping between adjacent buffer tags with default bracket mappings `[t`, `]t`, `[T`,
-  and `]T`. The lowercase mappings ignore "minor" tags listed in `g:tags_minor_kinds`
-  (e.g. variable definitions; see `:ShowKinds` for options), and the uppercase mappings
-  only include "major" tags listed in `g:tags_major_kinds` (e.g. functions, classes).
+  and `]T`. The lowercase mappings ignore "minor" tags in `g:tags_minor_kinds` (e.g.
+  variable definitions; see `:ShowKinds` for options), and the uppercase mappings
+  only include "major" tags in `g:tags_major_kinds` (default is `f` for functions).
 * Jumping between adjacent keywords with default bracket mappings `[w`, `]w`, `[W`,
   and `]W`. The lowercase mappings restrict the search to the local variable scope
-  (estimated from the positions of "major" `g:tags_major_kinds` tags and fold boundaries;
-  see below). Both mappings skip any keywords in `Comment` blocks.
+  (estimated from the positions of "major" tags and fold boundaries; see below).
+  Both mappings skip any keywords in `Comment` blocks.
 * Selecting characters, words, or WORDS under the cursor without jumping to the
   next occurrence with the default mappings `!`, `*`, and `&`. These integrate with
   [vim-indexed-search](https://github.com/henrik/vim-indexed-search) by calling `:ShowSearchedIndex` after selection. The `!` search
