@@ -401,7 +401,7 @@ endfunction
 " Search for the tag under the cursor
 " Note: Vim does not natively support jumping across separate
 " windows so implement this here: https://superuser.com/a/154459/506762
-function! tags#find_tag(...) abort
+function! tags#jump_tag(...) abort
   let level = a:0 > 1 ? a:2 : 0
   let keys = &l:iskeyword
   let mods = &l:filetype ==# 'vim' ? ',:' : ''
@@ -425,7 +425,7 @@ endfunction
 
 " Jump to the next or previous tag under the cursor
 " Note: This is used with bracket t/T mappings
-function! tags#jump_tag(count, major) abort
+function! tags#next_tag(count, major) abort
   let forward = a:count >= 0
   let args = [line('.'), a:major, forward, 1]  " circular searching
   for idx in range(abs(a:count))  " loop through repitition count
@@ -442,7 +442,7 @@ endfunction
 
 " Jump to the next or previous word under the cursor
 " Note: This is used with bracket w/W mappings
-function! tags#jump_word(count, ...) abort
+function! tags#next_word(count, ...) abort
   let global = a:0 && a:1
   let winview = winsaveview()  " tags#set_match() moves to start of match
   silent call tags#set_match(1, !global, 1)  " suppress scope emssage for now
