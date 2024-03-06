@@ -27,32 +27,10 @@ endfunction
 "-----------------------------------------------------------------------------"
 " Buffer listing utilities
 "-----------------------------------------------------------------------------"
-" Return buffers by most recent access time
-" Note: Here try to detect tabs that were either accessed within session or were only
-" loaded on startup by finding the minimum access time that differs from neighbors.
-function! s:buffers_recent(...) abort
-  let bufs = map(getbufinfo(), {idx, val -> [val['bufnr'], val['lastused']]})
-  let mintime = a:0 ? a:1 : 0
-  if a:0 == 0  " auto-detect threshold for sorting
-    for btime in sort(map(copy(bufs), 'v:val[1]'))  " approximate loading time
-      if mintime && btime - mintime > 10 | break | endif | let mintime = btime
-    endfor
-  endif
-  let recent = []  " buffers used after mintime
-  for [bnr, btime] in bufs
-    if btime > mintime
-      call add(recent, [bnr, btime])
-    endif
-  endfor
-  let recent = sort(recent, {val1, val2 -> val2[1] - val1[1]})
-  let recent = map(recent, 'v:val[0]')
-  return recent
-endfunction
-
 " Return [tab, buffer] number pairs in order of proximity to current tab
 " Note: This optionally filters out buffers not belonging to the active
 " filetype used for :tag-style definition jumping across multiple windows.
-function! s:buffers_close(...) abort
+function! s:bufs_close(...) abort
   let tnr = tabpagenr()  " active tab
   let tleft = tnr
   let tright = tnr - 1  " initial value
@@ -84,12 +62,34 @@ function! s:buffers_close(...) abort
   return pairs
 endfunction
 
+" Return buffers by most recent access time
+" Note: Here try to detect tabs that were either accessed within session or were only
+" loaded on startup by finding the minimum access time that differs from neighbors.
+function! tags#bufs_recent(...) abort
+  let bufs = map(getbufinfo(), {idx, val -> [val['bufnr'], val['lastused']]})
+  let mintime = a:0 ? a:1 : 0
+  if a:0 == 0  " auto-detect threshold for sorting
+    for btime in sort(map(copy(bufs), 'v:val[1]'))  " approximate loading time
+      if mintime && btime - mintime > 10 | break | endif | let mintime = btime
+    endfor
+  endif
+  let recent = []  " buffers used after mintime
+  for [bnr, btime] in bufs
+    if btime > mintime
+      call add(recent, [bnr, btime])
+    endif
+  endfor
+  let recent = sort(recent, {val1, val2 -> val2[1] - val1[1]})
+  let recent = map(recent, 'v:val[0]')
+  return recent
+endfunction
+
 " Return [tab, buffer] pairs sorted by recent use
 " Note: This sorts buffers using three methods: first by recent use among the
 " author's vimrc 'tab stack' utility, second by recent use among all other tabs,
 " and third by physical proximity to the current tab. Useful for fzf selection.
 function! tags#buffer_paths(...) abort
-  let pairs = call('s:buffers_close', a:000)
+  let pairs = call('s:bufs_close', a:000)
   let bnrs = map(copy(pairs), 'v:val[1]')
   let idxs = []
   let stacked = []  " sorted by access time
@@ -97,7 +97,7 @@ function! tags#buffer_paths(...) abort
   let physical = []  " ordered by adjacency
   let stack = get(g:, 'tab_stack', [])  " stack of absolute paths
   let stack = map(copy(stack), 'bufnr(v:val)')
-  for bnr in s:buffers_recent()
+  for bnr in tags#bufs_recent()
     let idx = index(bnrs, bnr)
     if idx != -1  " move to the front
       let tnr = pairs[idx][0]
