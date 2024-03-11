@@ -155,9 +155,8 @@ noremap <Plug>TagsNextGlobal <Cmd>call tags#next_word(v:count1, 1)<CR>
 "------------------------------------------------------------------------------
 " Public commands
 command! -bang -nargs=1 -range Search
-  \ let @/ = <line1> == <line2> ? <q-args> :
-  \ printf('\%%>%dl\%%<%dl', <line1> - 1, <line2> + 1) . <q-args>
-  \ | call feedkeys(tags#set_search(-1, <bang>0))
+  \ let @/ = (<line1> == <line2> ? '' : printf('\%%>%dl\%%<%dl', <line1> - 1, <line2> + 1))
+  \ . <q-args> | call tags#search_match(-1, <bang>0)
 
 " Global and local <cword>, global and local <cWORD>, local forward and backward,
 " and current character searches. Also include match counts.

@@ -81,9 +81,9 @@ Jumping maps
 | ---- | ---- |
 | `<Leader><Leader>` | Show a fuzzy-completion menu of the tags and jump to the selected location. This is only defined if the [fzf](https://github.com/junegunn/fzf) plugin is installed. The map can be changed with `g:tags_bselect_map`. |
 | `<Leader><Tab>` | Show a fuzzy-completion menu of the tags across all open tab page buffers and jump to the location with `:tab drop <file> \| exe <line>`. The map can be changed with `g:tags_select_map`. |
-| `<Leader><CR>` | Jump to the window and line number corresponding to the tag under the cursor. If the no tag is found a warning is printed. The map can be changed with `g:tags_jump_map`. |
-| `[t`, `]t` | Jump to subsequent and preceding tags. The maps can be changed with `g:tags_backward_map` and `g:tags_forward_map`. |
-| `[T`, `]T` | Jump to subsequent and preceding top-level "significant" tags -- that is, omitting variable definitions, import statements, etc. Generally these are just function and class definitions. The maps can be changed with `g:tags_backward_top_map` and `g:tags_forward_top_map`. |
+| `<Leader><CR>` | Jump to the tag under the cursor. Similar to `:tag` but works without any `&tags` files and jumps to existing windows or new tabs. The map can be changed with `g:tags_jump_map`. |
+| `[t`, `]t` | Jump to subsequent and preceding tag locations. The maps can be changed with `g:tags_backward_map` and `g:tags_forward_map`. |
+| `[T`, `]T` | Jump to subsequent and preceding "major" tags from `g:tags_major_kinds`. These are function definitions by default (i.e. tag kind `f`). The maps can be changed with `g:tags_backward_top_map` and `g:tags_forward_top_map`. |
 | `[w`, `]w` | Jump to subsequent and preceding instances of the keyword under the cursor for the current local scope. The maps can be changed with `g:tags_prev_local_map` and `g:tags_next_local_map`. |
 | `[W`, `]W` | Jump to subsequent and preceding instances of the keyword under the cursor under global scope. The maps can be changed with `g:tags_prev_global_map` and `g:tags_next_global_map`. |
 

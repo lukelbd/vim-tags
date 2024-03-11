@@ -245,34 +245,30 @@ endfunction
 " Navigate to input tag list or fzf selection
 " Note: Here optionally preserve jumps triggered by line change, and try
 " to position cursor on exact match instead of start-of-line.
-function! s:tag_sink(...) abort
-  let parts = a:0 == 1 ? split(a:1, ':') : a:000
-  let regex = '^\s*\(\(.*\):\s\+\)\?\(\d\+\):\s\+\(\S\+\)'
-  let abspath = expand('%:p')  " current path
+function! s:tag_sink(open, ...) abort
+  let regex = '^\s*\(\(.*\):\s\+\)\?\(\d\+\):\s\+\(\S\+\)\s\+(\(.*\))$'
+  let path = expand('%:p')  " current path
   if a:0 > 1  " non-fzf input
-    let [path, line, name] = a:0 == 2 ? [abspath] + a:000 : a:000
+    let [ipath, iline, iname; irest] = a:0 < 3 ? [path] + a:000 : a:000
   elseif a:1 =~# regex  " format '[<file>: ]<line>: name (type[, scope])'
-    let [path, line, name] = matchlist(a:1, regex)[2:4]
+    let [ipath, iline, iname; irest] = matchlist(a:1, regex)[2:5]
   else  " e.g. cancelled selection
     return
   endif
-  let path = fnamemodify(empty(path) ? abspath : path, ':p')
-  if empty(parts) | return | endif
-  if path !=# abspath
+  let ipath = fnamemodify(empty(ipath) ? path : ipath, ':p')
+  exe "normal! m'"
+  if ipath !=# path
     if exists('*file#open_drop')  " dotfiles utility
-      call file#open_drop(path)
+      silent call file#open_drop(ipath)
     else  " built-in utility
-      exe 'tab drop ' . fnameescape(path)
+      silent exe 'tab drop ' . fnameescape(ipath)
     endif
   endif
-  if g:tags_keep_jumps  " no effect on jumplist
-    exe line | normal! 0zv
-  else  " updates jumplist
-    exe 'normal! ' . line . 'G0zv'
-  endif
-  let regex = escape(name, s:regex_magic)
-  silent call search(regex, 'cW', line)
-  echom 'Tag: ' . name
+  exe g:tags_keep_jumps ? iline : 'normal! ' . iline . 'G'
+  let regex = escape(iname, s:regex_magic)
+  exe 'normal! 0' | silent call search(regex, 'cW', iline)
+  echom 'Tag: ' . iname . (empty(irest) ? '' : ' (' . irest[0] . ')')
+  if a:open && &l:foldopen =~# '\<tag\>' | exe 'normal! zv' | endif
 endfunction
 
 " Return tags in the format '[<file>: ]<line>: name (type[, scope])'
@@ -361,18 +357,16 @@ function! tags#select_tag(...) abort
   if empty(source)
     echohl WarningMsg
     echom 'Warning: Tags not found or not available.'
-    echohl None
-    return
+    echohl None | return
   endif
   if !exists('*fzf#run')
     echohl WarningMsg
     echom 'Warning: FZF plugin not found.'
-    echohl None
-    return
+    echohl None | return
   endif
   call fzf#run(fzf#wrap({
     \ 'source': source,
-    \ 'sink': function('s:tag_sink'),
+    \ 'sink': function('s:tag_sink', [1]),
     \ 'options': '--no-sort --prompt=' . string(prompt),
     \ }))
 endfunction
@@ -398,31 +392,6 @@ function! tags#current_tag(...) abort
   return string
 endfunction
 
-" Search for the tag under the cursor
-" Note: Vim does not natively support jumping across separate
-" windows so implement this here: https://superuser.com/a/154459/506762
-function! tags#jump_tag(...) abort
-  let level = a:0 > 1 ? a:2 : 0
-  let keys = &l:iskeyword
-  let mods = &l:filetype ==# 'vim' ? ',:' : ''
-  let &l:iskeyword = keys . mods
-  try
-    let name = a:0 > 0 ? a:1 : expand('<cword>')
-  finally
-    let &l:iskeyword = keys
-  endtry
-  let name = substitute(name, '\(^\s*\|\s*$\)', '', 'g')
-  if empty(name) | return | endif
-  let opts = s:tag_source(1 + level, 1)
-  for [ipath, iline, iname; irest] in opts
-    if name !=# iname | continue | endif
-    return s:tag_sink(ipath, iline, iname)
-  endfor
-  echohl ErrorMsg
-  echom "Error: Tag '" . name . "' not found"
-  echohl None
-endfunction
-
 " Jump to the next or previous tag under the cursor
 " Note: This is used with bracket t/T mappings
 function! tags#next_tag(count, major) abort
@@ -437,7 +406,8 @@ function! tags#next_tag(count, major) abort
     endif
     let args[0] = str2nr(tag[1])  " adjust line number
   endfor
-  return s:tag_sink(tag[1], tag[0])  " jump to line then name
+  call s:tag_sink(0, tag[1], tag[0])  " jump to line then name
+  if &l:foldopen =~# '\<block\>' | exe 'normal! zv' | endif
 endfunction
 
 " Jump to the next or previous word under the cursor
@@ -459,9 +429,43 @@ function! tags#next_word(count, ...) abort
   let parts = matchlist(regex, '^\(\\%>\(\d\+\)l\)\?\(\\%<\(\d\+\)l\)\?\(.*\)$')
   let [line1, line2, word] = [parts[2], parts[4], parts[5]]  " get scope from regex
   let [line1, line2] = [str2nr(line1), str2nr(line2)]  " note str2nr('') is zero
-  let word = substitute(word, '\\[<>cC]', '', 'g')
-  let range = line1 && line2 ? ' (lines ' . line1 . ' to ' . line2 . ')' : ''
-  exe 'normal! zv' | echom 'Keyword: ' . word . range
+  let suffix = line1 && line2 ? ' (lines ' . line1 . ' to ' . line2 . ')' : ''
+  echom 'Keyword: ' . substitute(word, '\\[<>cC]', '', 'g') . suffix
+  if &l:foldopen =~# '\<block\>' | exe 'normal! zv' | endif
+endfunction
+
+" Search for the tag under the cursor
+" Note: Vim does not natively support jumping separate windows so implement here
+function! tags#jump_tag(...) abort
+  let level = a:0 > 1 ? 1 + a:2 : 1
+  let keys = &l:iskeyword
+  let mods = &l:filetype ==# 'vim' ? ',:' : ''
+  let &l:iskeyword = keys . mods
+  try
+    let name = a:0 > 0 ? a:1 : expand('<cword>')
+  finally
+    let &l:iskeyword = keys
+  endtry
+  let name = substitute(name, '\(^\s*\|\s*$\)', '', 'g')
+  if empty(name) | return | endif
+  let path = expand('%:p')
+  let itags = taglist(name, path)
+  for itag in itags  " search 'tags' files
+    if itag.name !=# name | continue | endif
+    let ipath = fnamemodify(itag.filename, ':p')
+    if level < 1 && ipath !=# path | continue | endif
+    let itype = getbufvar(bufnr(ipath), '&filetype')
+    if level < 2 && itype !=# &l:filetype | continue | endif
+    return s:tag_sink(1, ipath, itag.cmd, itag.name, itag.kind)
+  endfor
+  let itags = s:tag_source(level, 1)
+  for [ipath, iline, iname; irest] in itags  " search all files
+    if name !=# iname | continue | endif
+    return call('s:tag_sink', [1, ipath, iline, iname] + irest)
+  endfor
+  echohl ErrorMsg
+  echom "Error: Tag '" . name . "' not found"
+  echohl None
 endfunction
 
 "-----------------------------------------------------------------------------"
@@ -596,11 +600,13 @@ function! s:feed_repeat(name, ...) abort
   let cmd = 'call repeat#set("' . plug . '", ' . cnt . ')'
   call feedkeys("\<Cmd>" . cmd . "\<CR>", 'n')
 endfunction
-function! tags#set_search(level, option) abort
+function! tags#search_match(level, option) abort
   call tags#set_match(a:level, a:option)
   let winview = winsaveview()  " store window as buffer variable
-  exe '%s@' . escape(@/, '@') . '@@gne'
+  let result = execute('%s@' . escape(@/, '@') . '@@gne')
   call winrestview(winview)
+  call feedkeys("\<Cmd>setlocal hlsearch\<CR>", 'n')
+  return result
 endfunction
 
 " Set up repeat after finishing previous change on InsertLeave
