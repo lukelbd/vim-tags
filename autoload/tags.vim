@@ -246,7 +246,10 @@ endfunction
 " Note: Here optionally preserve jumps triggered by line change, and try
 " to position cursor on exact match instead of start-of-line.
 function! s:tag_sink(open, ...) abort
-  let regex = '^\s*\(\(.*\):\s\+\)\?\(\d\+\):\s\+\(\S\+\)\s\+(\(.*\))$'
+  let regex = '^\s*\(\(.*\):\s\+\)\?'  " tag file
+  let regex .= '\(\d\+\):\s\+'  " tag line
+  let regex .= '\(.\{-}\)\s\+'  " tag name
+  let regex .= '(\(\a\(,\s\+.\{-}\)\?\))$'  " tag kind and scope
   let path = expand('%:p')  " current path
   if a:0 > 1  " non-fzf input
     let [ipath, iline, iname; irest] = a:0 < 3 ? [path] + a:000 : a:000
@@ -436,11 +439,13 @@ endfunction
 
 " Search for the tag under the cursor
 " Note: Vim does not natively support jumping separate windows so implement here
+let s:keyword_mods = {'vim': ':', 'tex': ':-'}
 function! tags#jump_tag(...) abort
   let level = a:0 > 1 ? 1 + a:2 : 1
   let keys = &l:iskeyword
-  let mods = &l:filetype ==# 'vim' ? ',:' : ''
-  let &l:iskeyword = keys . mods
+  let mods = get(s:keyword_mods, &l:filetype, '')
+  let mods = split(mods, '\zs')
+  let &l:iskeyword = join([keys]+ mods, ',')
   try
     let name = a:0 > 0 ? a:1 : expand('<cword>')
   finally
