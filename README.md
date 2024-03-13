@@ -109,7 +109,8 @@ Options
 | `g:tags_skip_kinds` | Dictionary whose keys are filetypes and whose values are strings indicating the tag kinds to ignore. Default behavior is to include all tags. |
 | `g:tags_major_kinds` | Dictionary whose keys are filetypes and whose values are strings indicating the tag kinds defining search scope boundaries. Default is `'f'` i.e. function definition tags. |
 | `g:tags_minor_kinds` | Dictionary whose keys are filetypes and whose values are strings indicating the tag kinds to ignore during bracket navigation. Default is `'v'` i.e. variable definition tags. |
-| `g:tags_keep_jumps` | Whether to preserve the jumplist when navigating tags with bracket maps or jumping to tags under the cursor or selected from fzf. Default is ``0`` i.e. the jumplist is changed. |
+| `g:tags_keep_jumps` | Whether to preserve the jumplist when navigating tags with bracket maps. Default is ``0``. Note jumping to tags under the cursor or with fzf always changes the jumplist. |
+| `g:tags_keep_stack` | Whether to preserve the tag stack when jumping to tags under the cursor or with fzf. Default is ``0``. Note jumping to tags with bracket maps never changes the tag stack. |
 
 Installation
 ============

@@ -54,6 +54,11 @@ if !exists('g:tags_keep_jumps')
   let g:tags_keep_jumps = 0
 endif
 
+" Whether to keep tag stack during iteration
+if !exists('g:tags_keep_stack')
+  let g:tags_keep_stack = 0
+endif
+
 " Tag jumping mappings
 if !exists('g:tags_jump_map')
   let g:tags_jump_map = '<Leader><CR>'
@@ -130,14 +135,14 @@ command! -bang -nargs=* -complete=file UpdateTags
 exe 'nmap ' . g:tags_bselect_map . ' <Plug>TagsBSelect'
 exe 'nmap ' . g:tags_select_map . ' <Plug>TagsGSelect'
 exe 'nmap ' . g:tags_jump_map . ' <Plug>TagsJump'
-exe 'map <silent> ' . g:tags_forward_map . ' <Plug>TagsForwardAll'
-exe 'map <silent> ' . g:tags_forward_top_map . ' <Plug>TagsForwardTop'
-exe 'map <silent> ' . g:tags_backward_map . ' <Plug>TagsBackwardAll'
-exe 'map <silent> ' . g:tags_backward_top_map . ' <Plug>TagsBackwardTop'
-exe 'map <silent> ' . g:tags_next_local_map . ' <Plug>TagsNextLocal'
-exe 'map <silent> ' . g:tags_next_global_map . ' <Plug>TagsNextGlobal'
-exe 'map <silent> ' . g:tags_prev_local_map . ' <Plug>TagsPrevLocal'
-exe 'map <silent> ' . g:tags_prev_global_map . ' <Plug>TagsPrevGlobal'
+exe 'map ' . g:tags_forward_map . ' <Plug>TagsForwardAll'
+exe 'map ' . g:tags_forward_top_map . ' <Plug>TagsForwardTop'
+exe 'map ' . g:tags_backward_map . ' <Plug>TagsBackwardAll'
+exe 'map ' . g:tags_backward_top_map . ' <Plug>TagsBackwardTop'
+exe 'map ' . g:tags_next_local_map . ' <Plug>TagsNextLocal'
+exe 'map ' . g:tags_next_global_map . ' <Plug>TagsNextGlobal'
+exe 'map ' . g:tags_prev_local_map . ' <Plug>TagsPrevLocal'
+exe 'map ' . g:tags_prev_global_map . ' <Plug>TagsPrevGlobal'
 nnoremap <Plug>TagsJump <Cmd>call tags#jump_tag()<CR>
 nnoremap <Plug>TagsBSelect <Cmd>call tags#select_tag(0)<CR>
 nnoremap <Plug>TagsGSelect <Cmd>call tags#select_tag(2)<CR>

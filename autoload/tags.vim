@@ -245,33 +245,54 @@ endfunction
 " Navigate to input tag list or fzf selection
 " Note: Here optionally preserve jumps triggered by line change, and try
 " to position cursor on exact match instead of start-of-line.
-function! s:tag_sink(open, ...) abort
+function! s:tag_sink(block, ...) abort
+  " Parse tag input
   let regex = '^\s*\(\(.*\):\s\+\)\?'  " tag file
   let regex .= '\(\d\+\):\s\+'  " tag line
   let regex .= '\(.\{-}\)\s\+'  " tag name
   let regex .= '(\(\a\(,\s\+.\{-}\)\?\))$'  " tag kind and scope
   let path = expand('%:p')  " current path
   if a:0 > 1  " non-fzf input
-    let [ipath, iline, iname; irest] = a:0 < 3 ? [path] + a:000 : a:000
+    let [ibuf, ipos, iname; irest] = a:0 < 3 ? [path] + a:000 : a:000
   elseif a:1 =~# regex  " format '[<file>: ]<line>: name (type[, scope])'
-    let [ipath, iline, iname; irest] = matchlist(a:1, regex)[2:5]
+    let [ibuf, ipos, iname; irest] = matchlist(a:1, regex)[2:5]
   else  " e.g. cancelled selection
     return
   endif
-  let ipath = fnamemodify(empty(ipath) ? path : ipath, ':p')
-  exe "normal! m'"
-  if ipath !=# path
-    if exists('*file#open_drop')  " dotfiles utility
-      silent call file#open_drop(ipath)
-    else  " built-in utility
-      silent exe 'tab drop ' . fnameescape(ipath)
-    endif
+  " Jump to tag buffer
+  if empty(ibuf)
+    let ipath = path
+  elseif type(ibuf)
+    let ipath = fnamemodify(ibuf, ':p')
+  else
+    let ipath = expand('#' . ibuf . ':p')
   endif
-  exe g:tags_keep_jumps ? iline : 'normal! ' . iline . 'G'
+  if ipath ==# path  " record mark
+    exe a:block && g:tags_keep_jumps || getpos("''") == getpos('.') ? '' : "normal! m'"
+  elseif exists('*file#open_drop')  " dotfiles utility
+    silent call file#open_drop(ipath)
+  else  " built-in utility
+    silent exe 'tab drop ' . fnameescape(ipath)
+  endif
+  " Jump to tag position
+  let [bnum, from] = [bufnr(), getpos('.')]  " from position
+  let [lnum, cnum] = type(ipos) == 2 ? ipos : [ipos, 0]
+  call cursor(lnum, 0)
   let regex = escape(iname, s:regex_magic)
-  exe 'normal! 0' | silent call search(regex, 'cW', iline)
-  echom 'Tag: ' . iname . (empty(irest) ? '' : ' (' . irest[0] . ')')
-  if a:open && &l:foldopen =~# '\<tag\>' | exe 'normal! zv' | endif
+  if cnum == 0
+    silent call search(regex, 'cW', lnum)
+  elseif cnum > 1
+    exe 'normal! ' . (cnum - 1) . 'l'
+  endif
+  if !a:block && !g:tags_keep_stack
+    let item = {'bufnr': bnum, 'from': from, 'matchnr': 1, 'tagname': iname}
+    call settagstack(winnr(), {'items': [item]}, 'a')
+  endif
+  let type = a:block ? '\<block\>' : '\<tag\>'
+  exe &l:foldopen !~# '\<' . type . '\>' ? '' : 'normal! zv'
+  exe a:block && g:tags_keep_jumps ? '' : "normal! m'"
+  let msg = 'Tag: ' . iname . (empty(irest) ? '' : ' (' . irest[0] . ')')
+  call feedkeys("\<Cmd>echom " . string(msg) . "\<CR>", 'n')
 endfunction
 
 " Return tags in the format '[<file>: ]<line>: name (type[, scope])'
@@ -369,7 +390,7 @@ function! tags#select_tag(...) abort
   endif
   call fzf#run(fzf#wrap({
     \ 'source': source,
-    \ 'sink': function('s:tag_sink', [1]),
+    \ 'sink': function('s:tag_sink', [0]),
     \ 'options': '--no-sort --prompt=' . string(prompt),
     \ }))
 endfunction
@@ -409,7 +430,7 @@ function! tags#next_tag(count, major) abort
     endif
     let args[0] = str2nr(tag[1])  " adjust line number
   endfor
-  call s:tag_sink(0, tag[1], tag[0])  " jump to line then name
+  call s:tag_sink(1, tag[1], tag[0])  " jump to line then name
   if &l:foldopen =~# '\<block\>' | exe 'normal! zv' | endif
 endfunction
 
@@ -452,8 +473,14 @@ function! tags#jump_tag(...) abort
     let &l:iskeyword = keys
   endtry
   let name = substitute(name, '\(^\s*\|\s*$\)', '', 'g')
+  " tags#jump_tag
   if empty(name) | return | endif
   let path = expand('%:p')
+  let itags = gettagstack(win_getid())  " search tag stack
+  for itag in get(itags, 'items', [])
+    if itag.tagname !=# name | continue | endif
+    return s:tag_sink(0, bufname(itag.bufnr))
+  endfor
   let itags = taglist(name, path)
   for itag in itags  " search 'tags' files
     if itag.name !=# name | continue | endif
@@ -461,12 +488,12 @@ function! tags#jump_tag(...) abort
     if level < 1 && ipath !=# path | continue | endif
     let itype = getbufvar(bufnr(ipath), '&filetype')
     if level < 2 && itype !=# &l:filetype | continue | endif
-    return s:tag_sink(1, ipath, itag.cmd, itag.name, itag.kind)
+    return s:tag_sink(0, ipath, itag.cmd, itag.name, itag.kind)
   endfor
   let itags = s:tag_source(level, 1)
   for [ipath, iline, iname; irest] in itags  " search all files
     if name !=# iname | continue | endif
-    return call('s:tag_sink', [1, ipath, iline, iname] + irest)
+    return call('s:tag_sink', [0, ipath, iline, iname] + irest)
   endfor
   echohl ErrorMsg
   echom "Error: Tag '" . name . "' not found"
