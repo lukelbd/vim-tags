@@ -49,19 +49,17 @@ if !exists('g:tags_minor_kinds')
   let g:tags_minor_kinds = {}
 endif
 
-" Whether to keep jumps during iteration
+" Whether to keep jumps and stacks
 if !exists('g:tags_keep_jumps')
   let g:tags_keep_jumps = 0
 endif
-
-" Whether to keep tag stack during iteration
 if !exists('g:tags_keep_stack')
   let g:tags_keep_stack = 0
 endif
 
 " Tag jumping mappings
-if !exists('g:tags_jump_map')
-  let g:tags_jump_map = '<Leader><CR>'
+if !exists('g:tags_cursor_map')
+  let g:tags_cursor_map = '<Leader><CR>'
 endif
 if !exists('g:tags_bselect_map')
   let g:tags_bselect_map = '<Leader><Leader>'
@@ -121,8 +119,8 @@ endif
 " Public commands
 " Note: The tags#current_tag() is also used in vim-statusline plugin.
 command! -nargs=0 CurrentTag echom 'Current tag: ' . tags#current_tag()
-command! -bang -nargs=? JumpTag call tags#jump_tag(<f-args>, <bang>0)
-command! -bang -nargs=0 SelectTag call tags#select_tag(2 * <bang>0)
+command! -bang -nargs=? CursorTag call tags#cursor_tag(1 + <bang>0, <f-args>)
+command! -bang -nargs=? SelectTag call tags#select_tag(2 * <bang>0, <f-args>)
 command! -bang -nargs=* -complete=filetype ShowKinds
   \ echo call('tags#table_kinds', <bang>0 ? ['all'] : [<f-args>])
 command! -bang -nargs=* -complete=file ShowTags
@@ -134,7 +132,7 @@ command! -bang -nargs=* -complete=file UpdateTags
 " Note: Must use :n instead of <expr> ngg so we can use <C-u> to discard count!
 exe 'nmap ' . g:tags_bselect_map . ' <Plug>TagsBSelect'
 exe 'nmap ' . g:tags_select_map . ' <Plug>TagsGSelect'
-exe 'nmap ' . g:tags_jump_map . ' <Plug>TagsJump'
+exe 'nmap ' . g:tags_cursor_map . ' <Plug>TagsCursor'
 exe 'map ' . g:tags_forward_map . ' <Plug>TagsForwardAll'
 exe 'map ' . g:tags_forward_top_map . ' <Plug>TagsForwardTop'
 exe 'map ' . g:tags_backward_map . ' <Plug>TagsBackwardAll'
@@ -143,7 +141,7 @@ exe 'map ' . g:tags_next_local_map . ' <Plug>TagsNextLocal'
 exe 'map ' . g:tags_next_global_map . ' <Plug>TagsNextGlobal'
 exe 'map ' . g:tags_prev_local_map . ' <Plug>TagsPrevLocal'
 exe 'map ' . g:tags_prev_global_map . ' <Plug>TagsPrevGlobal'
-nnoremap <Plug>TagsJump <Cmd>call tags#jump_tag()<CR>
+nnoremap <Plug>TagsCursor <Cmd>call tags#cursor_tag()<CR>
 nnoremap <Plug>TagsBSelect <Cmd>call tags#select_tag(0)<CR>
 nnoremap <Plug>TagsGSelect <Cmd>call tags#select_tag(2)<CR>
 noremap <Plug>TagsForwardAll <Cmd>call tags#next_tag(v:count1, 0)<CR>
@@ -158,14 +156,12 @@ noremap <Plug>TagsNextGlobal <Cmd>call tags#next_word(v:count1, 1)<CR>
 "------------------------------------------------------------------------------
 " Refactoring commands and maps
 "------------------------------------------------------------------------------
-" Public commands
-command! -bang -nargs=1 -range Search
-  \ let @/ = (<line1> == <line2> ? '' : printf('\%%>%dl\%%<%dl', <line1> - 1, <line2> + 1))
+" Public command
+command! -bang -nargs=1 -range Search let @/ = 
+  \ join(slice([printf('\%%>%dl', <line1> - 1), printf('\%%<%dl', <line2> + 1)], 0, <range>), '')
   \ . <q-args> | call tags#search_match(-1, <bang>0)
 
-" Global and local <cword>, global and local <cWORD>, local forward and backward,
-" and current character searches. Also include match counts.
-" character search, and forward and backward local scope search.
+" Global and local <cword>, global and local <cWORD>, and current character searches.
 " Note: current character copied from https://stackoverflow.com/a/23323958/4970632
 " Todo: Add scope-local matches? No because use those for other mappings.
 noremap g/ /<C-r>=tags#get_scope()<CR>

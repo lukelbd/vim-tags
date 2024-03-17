@@ -72,7 +72,7 @@ Commands
 | `:CurrentTag` | Print the non-minor tag under or preceding the cursor. This can be shown in the status line by adding the associated function `tags#current_tag()` to `&statusline`. |
 | `:UpdateTags` | Manually refresh the buffer-scope variables used by this plugin. This is called whenever a file is read or written. Use `:UpdateTags!` to update tags for all open buffers. |
 | `:SelectTag` | Show a fuzzy-completion menu of tags and jump to the selected location. Use `:SelectTag!` to choose from tags across all open buffers instead of just the current buffer. |
-| `:JumpTag` | Find and jump to the input tag (default is the keyword under the cursor). Use `:JumpTag!` to search tags across buffers of any filetype instead of just the current filetype. |
+| `:CursorTag` | Jump to the tag under the cursor or passed to the command. Use `:CursorTag!` to search tags across buffers of any filetype instead of just the current filetype. |
 
 Jumping maps
 ------------
@@ -81,11 +81,11 @@ Jumping maps
 | ---- | ---- |
 | `<Leader><Leader>` | Show a fuzzy-completion menu of the tags and jump to the selected location. This is only defined if the [fzf](https://github.com/junegunn/fzf) plugin is installed. The map can be changed with `g:tags_bselect_map`. |
 | `<Leader><Tab>` | Show a fuzzy-completion menu of the tags across all open tab page buffers and jump to the location with `:tab drop <file> \| exe <line>`. The map can be changed with `g:tags_select_map`. |
-| `<Leader><CR>` | Jump to the tag under the cursor. Similar to `:tag`, but works both with and without tag files and jumps to existing windows/opens buffers in new tabs. The map can be changed with `g:tags_jump_map`. |
-| `[t`, `]t` | Jump to subsequent and preceding tag locations. The maps can be changed with `g:tags_backward_map` and `g:tags_forward_map`. |
-| `[T`, `]T` | Jump to subsequent and preceding "major" tags from `g:tags_major_kinds`. These are function definitions by default (i.e. tag kind `f`). The maps can be changed with `g:tags_backward_top_map` and `g:tags_forward_top_map`. |
-| `[w`, `]w` | Jump to subsequent and preceding instances of the keyword under the cursor for the current local scope. The maps can be changed with `g:tags_prev_local_map` and `g:tags_next_local_map`. |
-| `[W`, `]W` | Jump to subsequent and preceding instances of the keyword under the cursor under global scope. The maps can be changed with `g:tags_prev_global_map` and `g:tags_next_global_map`. |
+| `<Leader><CR>` | Jump to the tag under the cursor. Similar to `<C-]>`, but works both with and without tag files and jumps to existing windows/opens buffers in new tabs. The map can be changed with `g:tags_cursor_map`. |
+| `[t`, `]t` | Jump to previous and next tag locations. The cursor is positioned at the start of the tag name. The maps can be changed with `g:tags_backward_map` and `g:tags_forward_map`. |
+| `[T`, `]T` | Jump to previous and next "major" tags from `g:tags_major_kinds`. These are function definitions by default (i.e. tag kind `f`). The maps can be changed with `g:tags_backward_top_map` and `g:tags_forward_top_map`. |
+| `[w`, `]w` | Jump to previous and next instances of the keyword under the cursor for the current local scope. The maps can be changed with `g:tags_prev_local_map` and `g:tags_next_local_map`. |
+| `[W`, `]W` | Jump to previous and next instances of the keyword under the cursor under global scope. The maps can be changed with `g:tags_prev_global_map` and `g:tags_next_global_map`. |
 
 Searching maps
 --------------

@@ -398,7 +398,7 @@ endfunction
 "-----------------------------------------------------------------------------"
 " Tag navigation utilities
 "-----------------------------------------------------------------------------"
-" Get the 'current' tag defined as the tag under the cursor or preceding
+" Get the 'current' tag definition under or preceding the cursor
 " Note: This is used with statusline and :CurrentTag
 function! tags#current_tag(...) abort
   let lnum = line('.') + 1
@@ -458,42 +458,41 @@ function! tags#next_word(count, ...) abort
   if &l:foldopen =~# '\<block\>' | exe 'normal! zv' | endif
 endfunction
 
-" Search for the tag under the cursor
+" Go to the tag keyword under the cursor
 " Note: Vim does not natively support jumping separate windows so implement here
 let s:keyword_mods = {'vim': ':', 'tex': ':-'}
-function! tags#jump_tag(...) abort
-  let level = a:0 > 1 ? 1 + a:2 : 1
-  let keys = &l:iskeyword
-  let mods = get(s:keyword_mods, &l:filetype, '')
-  let mods = split(mods, '\zs')
-  let &l:iskeyword = join([keys]+ mods, ',')
-  try
-    let name = a:0 > 0 ? a:1 : expand('<cword>')
-  finally
-    let &l:iskeyword = keys
-  endtry
-  let name = substitute(name, '\(^\s*\|\s*$\)', '', 'g')
-  " tags#jump_tag
-  if empty(name) | return | endif
+function! tags#cursor_tag(...) abort
+  let level = a:0 ? a:1 : 1
   let path = expand('%:p')
-  let itags = gettagstack(win_getid())  " search tag stack
-  for itag in get(itags, 'items', [])
-    if itag.tagname !=# name | continue | endif
-    return s:tag_sink(0, bufname(itag.bufnr))
-  endfor
-  let itags = taglist(name, path)
-  for itag in itags  " search 'tags' files
-    if itag.name !=# name | continue | endif
-    let ipath = fnamemodify(itag.filename, ':p')
-    if level < 1 && ipath !=# path | continue | endif
-    let itype = getbufvar(bufnr(ipath), '&filetype')
-    if level < 2 && itype !=# &l:filetype | continue | endif
-    return s:tag_sink(0, ipath, itag.cmd, itag.name, itag.kind)
-  endfor
-  let itags = s:tag_source(level, 1)
-  for [ipath, iline, iname; irest] in itags  " search all files
-    if name !=# iname | continue | endif
-    return call('s:tag_sink', [0, ipath, iline, iname] + irest)
+  let keys = &l:iskeyword
+  let names = a:000[1:]
+  if empty(names)  " tag names
+    let mods = get(s:keyword_mods, &l:filetype, '')
+    let mods = split(mods, '\zs')
+    let &l:iskeyword = join([keys]+ mods, ',')
+    try
+      let names = [expand('<cword>'), expand('<cWORD>')]
+    finally
+      let &l:iskeyword = keys
+    endtry
+  endif
+  for name in names  " several attempts
+    let name = substitute(name, '\(^\s*\|\s*$\)', '', 'g')
+    if empty(name) | return | endif
+    let itags = taglist(escape(name, s:regex_magic), path)
+    for itag in itags  " search 'tags' files
+      if itag.name !=# name | continue | endif
+      let ipath = fnamemodify(itag.filename, ':p')
+      if level < 1 && ipath !=# path | continue | endif
+      let itype = getbufvar(bufnr(ipath), '&filetype')
+      if level < 2 && itype !=# &l:filetype | continue | endif
+      return s:tag_sink(0, ipath, itag.cmd, itag.name, itag.kind)
+    endfor
+    let itags = s:tag_source(level, 1)
+    for [ipath, iline, iname; irest] in itags  " search all files
+      if name !=# iname | continue | endif
+      return call('s:tag_sink', [0, ipath, iline, iname] + irest)
+    endfor
   endfor
   echohl ErrorMsg
   echom "Error: Tag '" . name . "' not found"
