@@ -49,7 +49,7 @@ if !exists('g:tags_minor_kinds')
   let g:tags_minor_kinds = {}
 endif
 
-" Whether to keep jumps and stacks
+" Tag jumping and stack options
 if !exists('g:tags_keep_jumps')
   let g:tags_keep_jumps = 0
 endif

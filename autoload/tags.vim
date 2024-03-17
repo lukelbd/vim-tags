@@ -277,7 +277,7 @@ function! s:tag_sink(block, ...) abort
   " Jump to tag position
   let [bnum, from] = [bufnr(), getpos('.')]  " from position
   let [lnum, cnum] = type(ipos) == 2 ? ipos : [ipos, 0]
-  call cursor(lnum, 0)
+  call cursor(lnum, 1)
   let regex = escape(iname, s:regex_magic)
   if cnum == 0
     silent call search(regex, 'cW', lnum)
@@ -453,8 +453,9 @@ function! tags#next_word(count, ...) abort
   let parts = matchlist(regex, '^\(\\%>\(\d\+\)l\)\?\(\\%<\(\d\+\)l\)\?\(.*\)$')
   let [line1, line2, word] = [parts[2], parts[4], parts[5]]  " get scope from regex
   let [line1, line2] = [str2nr(line1), str2nr(line2)]  " note str2nr('') is zero
+  let prefix = substitute(word, '\\[<>cC]', '', 'g')
   let suffix = line1 && line2 ? ' (lines ' . line1 . ' to ' . line2 . ')' : ''
-  echom 'Keyword: ' . substitute(word, '\\[<>cC]', '', 'g') . suffix
+  echom 'Keyword: ' . prefix . suffix
   if &l:foldopen =~# '\<block\>' | exe 'normal! zv' | endif
 endfunction
 
@@ -495,7 +496,7 @@ function! tags#cursor_tag(...) abort
     endfor
   endfor
   echohl ErrorMsg
-  echom "Error: Tag '" . name . "' not found"
+  echom "Error: Tag '" . names[0] . "' not found"
   echohl None
 endfunction
 
