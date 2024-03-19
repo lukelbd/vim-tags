@@ -507,17 +507,17 @@ endfunction
 " Note: This uses the searcy() 'skip' parameter to skip matches inside comments and
 " constants (i.e. strings). Similar method is used in succinct.vim for python docstrings
 function! tags#get_inside(arg, ...) abort
-  if type(a:arg)  " i.e. not numberic
-    let [offset; items] = [0, a:arg] + a:000
+  if type(a:arg)  " i.e. not numeric
+    let [offset; names] = [0, a:arg] + a:000
   else
-    let [offset; items] = [a:arg] + a:000
+    let [offset; names] = [a:arg] + a:000
   endif
   let [lnum, cnum] = [line('.'), col('.') + offset]
   let cnum = min([max([cnum, 1]), col('$') - 1])  " col('$') is newline/end-of-file
-  let expr = "synIDattr(synIDtrans(v:val), 'name')"
-  let stack = map(synstack(lnum, cnum), expr)
-  for item in items  " iterate over options
-    if index(stack, item) != -1 | return 1 | endif
+  let sids = map(synstack(lnum, cnum), 'synIDtrans(v:val)')
+  for name in names  " iterate over options
+    let sid = synIDtrans(hlID(name))
+    if sid && index(sids, sid) != -1 | return 1 | endif
   endfor | return 0
 endfunction
 
