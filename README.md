@@ -105,6 +105,9 @@ Options
 
 | Setting | Description |
 | ---- | ---- |
+| `g:tags_nomap` | Whether to disable the default maps. Default is `0`. If `1` you must add all maps manually (see `plugin/tags.vim`). |
+| `g:tags_nomap_jumps` | Whether to disable the maps that jump between ctag locations and keywords (e.g. `<Leader><CR>`, `]t`, `]w`, etc.). Default is `g:tags_nomap`. |
+| `g:tags_nomap_searches` | Whether to disable the maps used for searching and relacing words under the cursor (e.g. `*`, `d*`, `c*`, etc.). Default is `g:tags_nomap`. |
 | `g:tags_skip_filetypes` | List of filetypes for which we do not want to try to generate tags. Setting this variable could speed things up a bit. Default is `['diff', 'help', 'man', 'qf']`. |
 | `g:tags_skip_kinds` | Dictionary whose keys are filetypes and whose values are strings indicating the tag kinds to ignore. Default behavior is to include all tags. |
 | `g:tags_major_kinds` | Dictionary whose keys are filetypes and whose values are strings indicating the tag kinds defining search scope boundaries. Default is `'f'` i.e. function definition tags. |
