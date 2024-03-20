@@ -166,17 +166,27 @@ endfunction
 " Note: Ctags cannot show specific filetype kinds so instead filter '--list-kinds=all'
 " Note: See https://stackoverflow.com/a/71334/4970632 for difference between \r and \n
 function! tags#table_kinds(...) abort
+  let [umajor, uminor] = [copy(g:tags_major_kinds), copy(g:tags_minor_kinds)]
   if index(a:000, 'all') >= 0  " all open filetypes
     let flag = 'all'
+    let types = uniq(sort(umajor + uminor))
+    let major = map(copy(types), {idx, val -> val . ' ' . string(get(umajor, val, 'f'))})
+    let minor = map(copy(types), {idx, val -> val . ' ' . string(get(uminor, val, 'v'))})
+    let major = ['default ' . string('f')] + major
+    let minor = ['default ' . string('v')] + minor
     let types = uniq(map(tags#buffer_paths(), "getbufvar(v:val[1], '&filetype')"))
     let label = 'all buffer filetypes'
   elseif a:0  " input filetype(s)
     let flag = a:0 == 1 ? a:1 : 'all'
-    let types = copy(a:000)
+    let types = sort(copy(a:000))
+    let major = map(copy(types), {idx, val -> val . ' ' . string(get(umajor, val, 'f'))})
+    let minor = map(copy(types), {idx, val -> val . ' ' . string(get(uminor, val, 'v'))})
     let label = 'input filetype(s) ' . join(map(copy(types), 'string(v:val)'), ', ')
   else  " current filetype
-    let flag = &filetype
-    let types = [&filetype]
+    let flag = &l:filetype
+    let types = [&l:filetype]
+    let major = [string(get(umajor, flag, 'f'))]
+    let minor = [string(get(uminor, flag, 'v'))]
     let label = 'current filetype ' . string(&filetype)
   endif
   let cmd = s:tags_command('', '--list-kinds=' . string(flag))
@@ -190,7 +200,10 @@ function! tags#table_kinds(...) abort
     call substitute(table, regex, append, 'gn')
     let table = join(l:subs, '')
   endif
-  return 'Tag kinds for ' . label . ":\n" . trim(table)
+  let title = 'Tag kinds for ' . label
+  let major = 'Major tag kinds: ' . join(major, ' ')
+  let minor = 'Minor tag kinds: ' . join(minor, ' ')
+  return title . ":\n" . major . "\n" . minor . "\n" . trim(table)
 endfunction
 
 " Show the current file tags
