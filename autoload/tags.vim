@@ -333,11 +333,14 @@ endfunction
 " Get the current tag from a list of tags
 " Note: This function searches exclusively (i.e. does not match the current line).
 " So only start at current line when jumping, otherwise start one line down.
-function! tags#close_tag(line, major, forward, circular) abort
-  if a:major
+function! tags#close_tag(line, ...) abort
+  let major = a:0 > 0 ? a:1 : 0
+  let forward = a:0 > 1 ? a:2 : 0
+  let circular = a:0 > 2 ? a:3 : 0
+  if major  " major tags only
     let kinds = get(g:tags_major_kinds, &filetype, 'f')
     let filt = "len(v:val) == 3 && v:val[2] =~# '[" . kinds . "]'"
-  else
+  else  " all except minor
     let kinds = get(g:tags_minor_kinds, &filetype, 'v')
     let filt = "v:val[2] !~# '[" . kinds . "]'"
   endif
@@ -349,23 +352,23 @@ function! tags#close_tag(line, major, forward, circular) abort
     return []  " silent failure
   endif
   let lnum = a:line
-  if a:circular && a:forward && lnum >= tags[-1][1]
+  if circular && forward && lnum >= tags[-1][1]
     let idx = 0
-  elseif a:circular && !a:forward && lnum <= tags[0][1]
+  elseif circular && !forward && lnum <= tags[0][1]
     let idx = -1
-  else
-    for jdx in range(1, len(tags) - 1)  " in-between tags (endpoint inclusive)
-      if a:forward && lnum >= tags[-jdx - 1][1]
+  else  " search in between (endpoint inclusive)
+    for jdx in range(1, len(tags) - 1)
+      if forward && lnum >= tags[-jdx - 1][1]
         let idx = -jdx
         break
       endif
-      if !a:forward && lnum <= tags[jdx][1]
+      if !forward && lnum <= tags[jdx][1]
         let idx = jdx - 1
         break
       endif
     endfor
     if !exists('idx')  " single tag or first or last tag
-      let idx = a:forward ? 0 : -1
+      let idx = forward ? 0 : -1
     endif
   endif
   return tags[idx]
@@ -418,9 +421,9 @@ endfunction
 
 " Jump to the next or previous tag under the cursor
 " Note: This is used with bracket t/T mappings
-function! tags#next_tag(count, major) abort
+function! tags#next_tag(count, ...) abort
   let forward = a:count >= 0
-  let args = [line('.'), a:major, forward, 1]  " circular searching
+  let args = [line('.'), a:0 && a:1, forward, 1]  " circular searching
   for idx in range(abs(a:count))  " loop through repitition count
     let tag = call('tags#close_tag', args)
     if empty(tag)
