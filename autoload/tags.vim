@@ -590,7 +590,7 @@ endfunction
 " the native vim-indexed-search maps invoke <Plug>(indexed-search-after), which just
 " calls <Plug>(indexed-search-index) --> :ShowSearchIndex... but causes change maps
 " to silently abort for some weird reason... so instead call this manually.
-function! s:get_item(level, ...) abort
+function! tags#get_match(level, ...) abort
   let search = a:0 ? a:1 : 0
   if a:level >= 2
     let item = escape(expand('<cWORD>'), s:regex_magic)
@@ -613,11 +613,11 @@ function! tags#set_match(level, option, ...) abort
   else  " cursor search
     let prefix = a:level >= 2 ? 'WORD' : a:level >= 1 ? 'Word' : 'Char'
     let suffix = a:option ? 'Local' : 'Global'
-    let item = s:get_item(a:level, 0)
+    let item = tags#get_match(a:level, 0)
     if adjust && empty(item) && foldclosed('.') == -1
       exe getline('.') =~# '^\s*$' ? '' : 'normal! B'
     endif
-    let item = s:get_item(a:level, 1)
+    let item = tags#get_match(a:level, 1)
     let char = strcharpart(strpart(getline('.'), col('.') - 1), 0, 1)
     let flags = char =~# '\s' || a:level == 1 && char !~# '\k' ? 'cW' : 'cbW'
     if a:0 && a:1 && strwidth(item) > 1
