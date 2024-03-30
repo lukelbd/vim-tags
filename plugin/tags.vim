@@ -178,7 +178,7 @@ command! -bang -nargs=1 -range Search let @/ =
 " Note: current character copied from https://stackoverflow.com/a/23323958/4970632
 " Todo: Add scope-local matches? No because use those for other mappings.
 if !g:tags_nomap_searches
-  if empty(maparg('g//')) && empty(maparg('g??'))  " dotfiles workaround
+  if hasmapto('tags#get_scope')  " avoid overwriting
     noremap g/ /<C-r>=tags#get_scope()<CR>
     noremap g? ?<C-r>=tags#get_scope()<CR>
   endif
@@ -193,10 +193,12 @@ endif
 " with '.'. The substitution is determined from the text inserted by the user and
 " the cursor automatically jumps to the next match. The 'a' mappings change matches
 if !g:tags_nomap_searches
-  nmap c/ <Plug>TagsChangeMatchNext
-  nmap c? <Plug>TagsChangeMatchPrev
-  nmap ca/ <Plug>TagsChangeMatchesNext
-  nmap ca? <Plug>TagsChangeMatchesPrev
+  if !hasmapto('TagsChangeMatch')  " avoid overwriting
+    nmap c/ <Plug>TagsChangeMatchNext
+    nmap c? <Plug>TagsChangeMatchPrev
+    nmap ca/ <Plug>TagsChangeMatchesNext
+    nmap ca? <Plug>TagsChangeMatchesPrev
+  endif
   exe 'nmap c' . g:tags_char_global_map . ' <Plug>TagsChangeCharGlobal'
   exe 'nmap c' . g:tags_word_global_map . ' <Plug>TagsChangeWordGlobal'
   exe 'nmap c' . g:tags_WORD_global_map . ' <Plug>TagsChangeWORDGlobal'
@@ -227,10 +229,12 @@ nnoremap <Plug>TagsChangeWORDSLocal <Cmd>call tags#change_next(2, 1, 1)<CR>
 " Normal mode mappings that replicate :d/regex/ behavior and can be repeated with '.'.
 " Cursor automatically jumps to the next match. The 'a' mappings delete all matches.
 if !g:tags_nomap_searches
-  nmap d/ <Plug>TagsDeleteMatchNext
-  nmap d? <Plug>TagsDeleteMatchPrev
-  nmap da/ <Plug>TagsDeleteMatchesNext
-  nmap da? <Plug>TagsDeleteMatchesPrev
+  if !hasmapto('TagsDeleteMatch')
+    nmap d/ <Plug>TagsDeleteMatchNext
+    nmap d? <Plug>TagsDeleteMatchPrev
+    nmap da/ <Plug>TagsDeleteMatchesNext
+    nmap da? <Plug>TagsDeleteMatchesPrev
+  endif
   exe 'nmap d' . g:tags_char_global_map . ' <Plug>TagsDeleteCharGlobal'
   exe 'nmap d' . g:tags_word_global_map . ' <Plug>TagsDeleteWordGlobal'
   exe 'nmap d' . g:tags_WORD_global_map . ' <Plug>TagsDeleteWORDGlobal'
