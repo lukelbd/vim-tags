@@ -178,7 +178,7 @@ command! -bang -nargs=1 -range Search let @/ =
 " Note: current character copied from https://stackoverflow.com/a/23323958/4970632
 " Todo: Add scope-local matches? No because use those for other mappings.
 if !g:tags_nomap_searches
-  if hasmapto('tags#get_scope')  " avoid overwriting
+  if !hasmapto('tags#get_scope')  " avoid overwriting
     noremap g/ /<C-r>=tags#get_scope()<CR>
     noremap g? ?<C-r>=tags#get_scope()<CR>
   endif
