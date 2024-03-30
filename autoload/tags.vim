@@ -556,7 +556,7 @@ function! tags#get_scope(...) abort
   " Find closing line and tag
   let winview = winsaveview()
   exe a:0 ? a:1 : '' | let lnum = line('.')
-  let [iline, line1] = [lnum, -1]  " initial state
+  let [iline, line1, level1] = [-1, lnum, foldlevel('.')]
   while iline != line1 && index(lines, line1) == -1
     let [iline, ifold] = [line('.'), foldclosed('.')]
     exe ifold > 0 ? ifold : 'keepjumps normal! [z'
