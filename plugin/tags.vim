@@ -178,8 +178,10 @@ command! -bang -nargs=1 -range Search let @/ =
 " Note: current character copied from https://stackoverflow.com/a/23323958/4970632
 " Todo: Add scope-local matches? No because use those for other mappings.
 if !g:tags_nomap_searches
-  noremap g/ /<C-r>=tags#get_scope()<CR>
-  noremap g? ?<C-r>=tags#get_scope()<CR>
+  if empty(maparg('g//')) && empty(maparg('g??'))  " dotfiles workaround
+    noremap g/ /<C-r>=tags#get_scope()<CR>
+    noremap g? ?<C-r>=tags#get_scope()<CR>
+  endif
   exe 'noremap ' . g:tags_char_global_map . ' <Cmd>call tags#set_match(0, 0, 1)<CR><Cmd>setlocal hlsearch<CR>'
   exe 'noremap ' . g:tags_word_global_map . ' <Cmd>call tags#set_match(1, 0, 1)<CR><Cmd>setlocal hlsearch<CR>'
   exe 'noremap ' . g:tags_WORD_global_map . ' <Cmd>call tags#set_match(2, 0, 1)<CR><Cmd>setlocal hlsearch<CR>'
