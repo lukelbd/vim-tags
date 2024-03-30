@@ -62,13 +62,13 @@ function! s:bufs_close(...) abort
   return pairs
 endfunction
 
-" Return buffers by most recent access time
-" Note: Here try to detect tabs that were either accessed within session or were only
-" loaded on startup by finding the minimum access time that differs from neighbors.
+" Return buffers accessed after given time
+" Note: This defaults to returning tabs accessed after 'startup time' determined from
+" files with smallast access times and within 10 seconds of each other.
 function! tags#bufs_recent(...) abort
-  let bufs = map(getbufinfo(), {idx, val -> [val['bufnr'], val['lastused']]})
+  let bufs = map(getbufinfo(), {idx, val -> [val.bufnr, get(val, 'lastused', 0)]})
   let mintime = a:0 ? a:1 : 0
-  if a:0 == 0  " auto-detect threshold for sorting
+  if !a:0  " auto-detect threshold for sorting
     for btime in sort(map(copy(bufs), 'v:val[1]'))  " approximate loading time
       if mintime && btime - mintime > 10 | break | endif | let mintime = btime
     endfor
@@ -346,10 +346,11 @@ endfunction
 " Get the current tag from a list of tags
 " Note: This function searches exclusively (i.e. does not match the current line).
 " So only start at current line when jumping, otherwise start one line down.
-function! tags#close_tag(line, ...) abort
-  let major = a:0 > 0 ? a:1 : 0
-  let forward = a:0 > 1 ? a:2 : 0
-  let circular = a:0 > 2 ? a:3 : 0
+function! tags#close_tag(...) abort
+  let lnum = a:0 > 0 ? a:1 : line('.')
+  let major = a:0 > 1 ? a:2 : 0
+  let forward = a:0 > 2 ? a:3 : 0
+  let circular = a:0 > 3 ? a:4 : 0
   if major  " major tags only
     let kinds = get(g:tags_major_kinds, &filetype, 'f')
     let filt = "len(v:val) == 3 && v:val[2] =~# '[" . kinds . "]'"
@@ -364,7 +365,6 @@ function! tags#close_tag(line, ...) abort
   if empty(tags)
     return []  " silent failure
   endif
-  let lnum = a:line
   if circular && forward && lnum >= tags[-1][1]
     let idx = 0
   elseif circular && !forward && lnum <= tags[0][1]
@@ -664,7 +664,7 @@ function! tags#change_repeat() abort
   let motion = get(s:, 'change_motion', 'n')
   let cmd = "mode() =~# 'i' ? '\<C-a>' : ''"
   let cmd = 'feedkeys(' . cmd . ', "ni")'
-  let cmd = 'cg' . motion . "\<Cmd>call " . cmd . "\<CR>\<Esc>" . motion
+  let cmd = 'zvcg' . motion . "\<Cmd>call " . cmd . "\<CR>\<Esc>" . motion
   call feedkeys(cmd, 'n')  " add previous insert if cgn succeeds
   call s:feed_repeat('TagsChangeRepeat')
 endfunction
