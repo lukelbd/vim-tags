@@ -542,45 +542,44 @@ endfunction
 " See: http://vim.wikia.com/wiki/Search_in_current_function
 function! tags#get_scope(...) abort
   " Initial stuff
-  let kinds = get(g:tags_major_kinds, &filetype, 'f')
-  let filt = "v:val[2] =~# '[" . kinds . "]'"
-  let lnum = a:0 ? a:1 : line('.')
+  let trunc = 20  " truncate long labels
+  let opts = get(g:tags_major_kinds, &filetype, 'f')
+  let filt = "v:val[2] =~# '[" . opts . "]'"
   let items = get(b:, 'tags_by_line', [])
   let items = filter(copy(items), filt)
-  let lines = map(deepcopy(items), 'v:val[1]')
+  let lines = map(deepcopy(items), 'str2nr(v:val[1])')
   if empty(items)
     echohl WarningMsg
     echom 'Warning: Failed to restrict the search scope (tags unavailable).'
     echohl None | return ''
   endif
   " Find closing line and tag
-  keepjumps normal! zv
   let winview = winsaveview()
-  exe index(lines, lnum) >= 0 ? lnum + 1 : ''
-  let [kline, klevel] = [-1, -1]
-  while kline != line('.') && foldlevel('.') > klevel
-    let [kline, klevel] = [line('.'), foldlevel('.')]
-    keepjumps normal! [z
+  exe a:0 ? a:1 : '' | let lnum = line('.')
+  let [iline, line1] = [lnum, -1]  " initial state
+  while iline != line1 && index(lines, line1) == -1
+    let [iline, ifold] = [line('.'), foldclosed('.')]
+    exe ifold > 0 ? ifold : 'keepjumps normal! [z'
+    let [line1, level1] = [line('.'), foldlevel('.')]
   endwhile
-  let [iline, ilevel] = [line('.'), foldlevel('.')]
-  keepjumps normal! ]z
-  let [jline, jlevel] = [line('.'), foldlevel('.')]
+  let ifold = foldclosedend('.')
+  exe ifold > 0 ? ifold : 'keepjumps normal! ]z'
+  let [line2, level2] = [line('.'), foldlevel('.')]
   call winrestview(winview)
   " Return scope if within fold
-  let maxlen = 20  " truncate long labels
-  let idx = index(lines, string(iline))  " type matters for index()
-  if idx >= 0 && lnum >= iline && lnum <= jline && iline != jline && ilevel == jlevel
-    let [line1, line2] = [iline, jline]
-    let [label1, label2] = [items[idx][0], trim(getline(jline))]
+  let idx = index(lines, line1)
+  let isfold = level1 > 0 && line1 != line2
+  let iscursor = lnum >= line1 && lnum <= line2
+  if idx >= 0 && isfold && iscursor  " scope local search
+    let [label1, label2] = [items[idx][0], trim(getline(line2))]
   else  " fallback to global search
-    let [line1, line2] = [1, line('$')]
-    let [label1, label2] = ['START', 'END']
+    let [line1, line2, label1, label2] = [1, line('$'), 'START', 'END']
   endif
-  let label1 = len(label1) <= maxlen ? label1 : label1[:maxlen - 3] . '···'
-  let label2 = len(label2) <= maxlen ? label2 : label2[:maxlen - 3] . '···'
+  let label1 = len(label1) <= trunc ? label1 : label1[:trunc - 3] . '···'
+  let label2 = len(label2) <= trunc ? label2 : label2[:trunc - 3] . '···'
   let regex = printf('\%%>%dl\%%<%dl', line1 - 1, line2 + 1)
-  echom 'Selected lines ' . line1 . ' (' . label1 . ') to ' . line2 . ' (' . label2 . ').'
-  return regex
+  let msg = 'Selected lines ' . line1 . ' (' . label1 . ') to ' . line2 . ' (' . label2 . ').'
+  redraw | echom msg | return regex
 endfunction
 
 " Set the last search register to some 'current pattern' under cursor
