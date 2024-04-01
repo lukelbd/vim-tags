@@ -295,28 +295,33 @@ endfunction
 " to position cursor on exact match instead of start-of-line.
 function! tags#goto_tag(block, ...) abort
   " Parse tag input
-  let native = '^\s*\(.\{-}\)\t\(.\{-}\)\t\(\d\+\);"\s*\(.*\)$'
+  let raw = '^\s*\(.\{-}\) *\t\(.\{-}\) *\t\(\d\+\)'
+  let raw .= ';"\s*\(.\{-}\)\%( *\t\(.*\)\)\?$'
   let regex = '^\s*\%(\(.*\):\s\+\)\?'  " tag file
   let regex .= '\(\d\+\):\s\+'  " tag line
   let regex .= '\(.\{-}\)\s\+'  " tag name
   let regex .= '(\(\a\(,\s\+.\{-}\)\?\))$'  " tag kind and scope
   let path = expand('%:p')  " current path
+  let isrc = ''  " reference ctags file
+  echom 'Line: ' . a:1
   if a:0 > 1  " non-fzf input
     let [ibuf, ipos, iname; irest] = a:0 < 3 ? [path] + a:000 : a:000
   elseif a:1 =~# regex  " format '[<file>: ]<line>: name (type[, scope])'
-    let [ibuf, ipos, iname; irest] = matchlist(a:1, regex)[1:4]
-  elseif a:1 =~# native  " native format 'name<Tab>file<Tab>line;...'
-    let [iname, ibuf, ipos; irest] = matchlist(a:1, native)[1:4]
+    let [ibuf, ipos, iname, irest] = matchlist(a:1, regex)[1:4]
+  elseif a:1 =~# raw  " native format 'name<Tab>file<Tab>line;...'
+    let [iname, ibuf, ipos, irest, isrc] = matchlist(a:1, raw)[1:5]
   else  " e.g. cancelled selection
     return
   endif
   " Jump to tag buffer
   if empty(ibuf)
     let ipath = path
-  elseif type(ibuf)
-    let ipath = fnamemodify(ibuf, ':p')
-  else
+  elseif !type(ibuf)
     let ipath = expand('#' . ibuf . ':p')
+  elseif empty(isrc)
+    let ipath = fnamemodify(ibuf, ':p')
+  else  " relative to tags file
+    let ipath = fnamemodify(isrc, ':p:h') . '/' . ibuf
   endif
   if ipath ==# path  " record mark
     exe a:block && g:tags_keep_jumps || getpos("''") == getpos('.') ? '' : "normal! m'"
@@ -343,7 +348,9 @@ function! tags#goto_tag(block, ...) abort
   exe &l:foldopen !~# type ? 'zz' : 'normal! zvzz'
   exe a:block && g:tags_keep_jumps ? '' : "normal! m'"
   let b:tag_name = iname  " required for dotfiles utility
-  redraw | echom 'Tag: ' . iname . (empty(irest) ? '' : ' (' . irest[0] . ')')
+  let suffix = type(irest) <= 1 ? irest : get(irest, 0, '')
+  let suffix = empty(irest) ? '' : ' (' . suffix . ')'
+  redraw | echom 'Tag: ' . iname . suffix
 endfunction
 
 " Get the current tag from a list of tags
