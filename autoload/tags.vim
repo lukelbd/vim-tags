@@ -335,7 +335,7 @@ function! s:goto_tag(block, ...) abort
   endif
   " Jump to tag position
   let [bnum, from] = [bufnr(), getpos('.')]  " from position
-  let [lnum, cnum] = type(ipos) == 2 ? ipos : [ipos, 0]
+  let [lnum, cnum] = type(ipos) == type([]) ? ipos : [ipos, 0]
   call cursor(lnum, 1)
   let regex = escape(iname, s:regex_magic)
   if cnum == 0
@@ -343,12 +343,12 @@ function! s:goto_tag(block, ...) abort
   elseif cnum > 1
     exe 'normal! ' . (cnum - 1) . 'l'
   endif
-  if !a:block && !g:tags_keep_stack
+  if !a:block && !g:tags_keep_stack && iname !=# '<from>'
     let item = {'bufnr': bnum, 'from': from, 'matchnr': 1, 'tagname': iname}
     call settagstack(winnr(), {'items': [item]}, 'a')
   endif
   let type = a:block ? '\<block\>' : '\<tag\>'
-  exe &l:foldopen !~# type ? 'zz' : 'normal! zvzz'
+  exe &l:foldopen !~# type ? 'normal! zz' : 'normal! zvzz'
   exe a:block && g:tags_keep_jumps ? '' : "normal! m'"
   let b:tag_name = [ipath, lnum, iname]  " used for stacks
   let suffix = type(irest) <= 1 ? irest : get(irest, 0, '')
