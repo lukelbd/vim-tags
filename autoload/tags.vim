@@ -481,7 +481,7 @@ endfunction
 " Go to the tag keyword under the cursor
 " Note: Vim does not natively support jumping separate windows so implement here
 let s:keyword_mods = {'vim': ':', 'tex': ':-'}
-function! tags#cursor_tag(...) abort
+function! tags#goto_name(...) abort
   let level = a:0 ? a:1 : 1
   let path = expand('%:p')
   let keys = &l:iskeyword
@@ -514,7 +514,7 @@ function! tags#cursor_tag(...) abort
       return call('tags#goto_tag', [0, ipath, iline, iname] + irest)
     endfor
   endfor
-  echohl ErrorMsg
+  redraw | echohl ErrorMsg
   echom "Error: Tag '" . names[0] . "' not found"
   echohl None
 endfunction
