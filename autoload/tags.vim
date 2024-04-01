@@ -255,10 +255,45 @@ endfunction
 "-----------------------------------------------------------------------------
 " Tag searching utiltiies
 "-----------------------------------------------------------------------------
+" Return tags in the format '[<file>: ]<line>: name (type[, scope])'
+" for selection by fzf. File name included only if 'global' was passed.
+" See: https://github.com/junegunn/fzf/wiki/Examples-(vim)
+function! s:tag_source(level, ...) abort
+  let source = []
+  if a:level > 1  " global paths
+    let paths = map(tags#buffer_paths(), 'v:val[1]')
+  elseif a:level > 0  " filetype paths
+    let paths = map(tags#buffer_paths(&filetype), 'v:val[1]')
+  else  " local path
+    let paths = [expand('%:p')]
+  endif
+  for path in paths
+    if exists('*RelativePath')
+      let path = RelativePath(path)  " vim-statusline function
+    else
+      let path = fnamemodify(path, ':~:.')
+    endif
+    let bnr = bufnr(path)  " buffer unique to path
+    let src = deepcopy(getbufvar(bnr, 'tags_by_name', []))
+    if a:0 && a:1
+      let src = map(src, 'v:val[1:1] + v:val[0:0] + v:val[2:]')
+      let src = a:level ? map(src, 'insert(v:val, path, 0)') : (src)
+      call extend(source, src)
+    else
+      let head = a:level ? string(path) . " . ': ' . " : ''
+      let head .= "printf('%4d', v:val[1]) . ': '"
+      let tail = "v:val[0] . ' (' . join(v:val[2:], ', ') . ')'"
+      let src = map(src, head . ' . ' . tail)
+      call extend(source, src)
+    endif
+  endfor
+  return source
+endfunction
+
 " Navigate to input tag list or fzf selection
 " Note: Here optionally preserve jumps triggered by line change, and try
 " to position cursor on exact match instead of start-of-line.
-function! s:tag_sink(block, ...) abort
+function! tags#goto_tag(block, ...) abort
   " Parse tag input
   let regex = '^\s*\(\(.*\):\s\+\)\?'  " tag file
   let regex .= '\(\d\+\):\s\+'  " tag line
@@ -306,41 +341,6 @@ function! s:tag_sink(block, ...) abort
   exe a:block && g:tags_keep_jumps ? '' : "normal! m'"
   let msg = 'Tag: ' . iname . (empty(irest) ? '' : ' (' . irest[0] . ')')
   call feedkeys("\<Cmd>echom " . string(msg) . "\<CR>", 'n')
-endfunction
-
-" Return tags in the format '[<file>: ]<line>: name (type[, scope])'
-" for selection by fzf. File name included only if 'global' was passed.
-" See: https://github.com/junegunn/fzf/wiki/Examples-(vim)
-function! s:tag_source(level, ...) abort
-  let source = []
-  if a:level > 1  " global paths
-    let paths = map(tags#buffer_paths(), 'v:val[1]')
-  elseif a:level > 0  " filetype paths
-    let paths = map(tags#buffer_paths(&filetype), 'v:val[1]')
-  else  " local path
-    let paths = [expand('%:p')]
-  endif
-  for path in paths
-    if exists('*RelativePath')
-      let path = RelativePath(path)  " vim-statusline function
-    else
-      let path = fnamemodify(path, ':~:.')
-    endif
-    let bnr = bufnr(path)  " buffer unique to path
-    let src = deepcopy(getbufvar(bnr, 'tags_by_name', []))
-    if a:0 && a:1
-      let src = map(src, 'v:val[1:1] + v:val[0:0] + v:val[2:]')
-      let src = a:level ? map(src, 'insert(v:val, path, 0)') : (src)
-      call extend(source, src)
-    else
-      let head = a:level ? string(path) . " . ': ' . " : ''
-      let head .= "printf('%4d', v:val[1]) . ': '"
-      let tail = "v:val[0] . ' (' . join(v:val[2:], ', ') . ')'"
-      let src = map(src, head . ' . ' . tail)
-      call extend(source, src)
-    endif
-  endfor
-  return source
 endfunction
 
 " Get the current tag from a list of tags
@@ -406,7 +406,7 @@ function! tags#select_tag(...) abort
   endif
   call fzf#run(fzf#wrap({
     \ 'source': source,
-    \ 'sink': function('s:tag_sink', [0]),
+    \ 'sink': function('tags#goto_tag', [0]),
     \ 'options': '--no-sort --prompt=' . string(prompt),
     \ }))
 endfunction
@@ -446,7 +446,7 @@ function! tags#next_tag(count, ...) abort
     endif
     let args[0] = str2nr(tag[1])  " adjust line number
   endfor
-  call s:tag_sink(1, tag[1], tag[0])  " jump to line then name
+  call tags#goto_tag(1, tag[1], tag[0])  " jump to line then name
   if &l:foldopen =~# '\<block\>' | exe 'normal! zv' | endif
 endfunction
 
@@ -503,12 +503,12 @@ function! tags#cursor_tag(...) abort
       if level < 1 && ipath !=# path | continue | endif
       let itype = getbufvar(bufnr(ipath), '&filetype')
       if level < 2 && itype !=# &l:filetype | continue | endif
-      return s:tag_sink(0, ipath, itag.cmd, itag.name, itag.kind)
+      return tags#goto_tag(0, ipath, itag.cmd, itag.name, itag.kind)
     endfor
     let itags = s:tag_source(level, 1)
     for [ipath, iline, iname; irest] in itags  " search all files
       if name !=# iname | continue | endif
-      return call('s:tag_sink', [0, ipath, iline, iname] + irest)
+      return call('tags#goto_tag', [0, ipath, iline, iname] + irest)
     endfor
   endfor
   echohl ErrorMsg
