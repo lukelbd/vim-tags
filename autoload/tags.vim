@@ -340,10 +340,10 @@ function! tags#goto_tag(block, ...) abort
     call settagstack(winnr(), {'items': [item]}, 'a')
   endif
   let type = a:block ? '\<block\>' : '\<tag\>'
-  exe &l:foldopen !~# '\<' . type . '\>' ? 'zz' : 'normal! zvzz'
+  exe &l:foldopen !~# type ? 'zz' : 'normal! zvzz'
   exe a:block && g:tags_keep_jumps ? '' : "normal! m'"
-  let msg = 'Tag: ' . iname . (empty(irest) ? '' : ' (' . irest[0] . ')')
-  call feedkeys("\<Cmd>echom " . string(msg) . "\<CR>", 'n')
+  let b:tag_name = iname  " required for dotfiles utility
+  redraw | echom 'Tag: ' . iname . (empty(irest) ? '' : ' (' . irest[0] . ')')
 endfunction
 
 " Get the current tag from a list of tags
