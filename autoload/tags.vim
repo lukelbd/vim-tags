@@ -337,7 +337,7 @@ function! tags#goto_tag(block, ...) abort
     call settagstack(winnr(), {'items': [item]}, 'a')
   endif
   let type = a:block ? '\<block\>' : '\<tag\>'
-  exe &l:foldopen !~# '\<' . type . '\>' ? '' : 'normal! zv'
+  exe &l:foldopen !~# '\<' . type . '\>' ? 'zz' : 'normal! zvzz'
   exe a:block && g:tags_keep_jumps ? '' : "normal! m'"
   let msg = 'Tag: ' . iname . (empty(irest) ? '' : ' (' . irest[0] . ')')
   call feedkeys("\<Cmd>echom " . string(msg) . "\<CR>", 'n')
@@ -408,7 +408,7 @@ function! tags#select_tag(...) abort
     \ 'source': source,
     \ 'sink': function('tags#goto_tag', [0]),
     \ 'options': '--no-sort --prompt=' . string(prompt),
-    \ }))
+  \ }))
 endfunction
 
 "-----------------------------------------------------------------------------"
