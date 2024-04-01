@@ -229,8 +229,7 @@ function! tags#table_tags(...) abort
         redraw | echohl WarningMsg
         echom 'Warning: Path ' . string(path) . ' not open or not readable.'
         echohl None
-      endif
-      continue
+      endif | continue
     endif
     let path = exists('*RelativePath') ? RelativePath(path) : fnamemodify(path, ':~:.')
     let items = getbufvar(bufnr(path), 'tags_by_name', [])  " use buffer by default
@@ -292,7 +291,13 @@ endfunction
 " Navigate to input tag list or fzf selection
 " Note: Here optionally preserve jumps triggered by line change, and try
 " to position cursor on exact match instead of start-of-line.
-function! tags#goto_tag(block, ...) abort
+function! tags#goto_tag(...) abort
+  return call('s:goto_tag', [0] + a:000)
+endfunction
+function! tags#goto_block(...) abort
+  return call('s:goto_tag', [1] + a:000)
+endfunction
+function! s:goto_tag(block, ...) abort
   " Parse tag input
   let raw = '^\s*\(.\{-}\) *\t\(.\{-}\) *\t\(\d\+\)'
   let raw .= ';"\s*\(.\{-}\)\%( *\t\(.*\)\)\?$'
@@ -412,11 +417,14 @@ function! tags#select_tag(...) abort
     echom 'Warning: FZF plugin not found.'
     echohl None | return
   endif
-  call fzf#run(fzf#wrap({
-    \ 'source': source,
-    \ 'sink': function('tags#goto_tag', [0]),
-    \ 'options': '--no-sort --prompt=' . string(prompt),
-  \ }))
+  let flags = '--no-sort --prompt=' . string(prompt)
+  let options = {'source': source, 'options': flags}
+  if exists('*stack#push_stack')  " dotfiles utility
+    let options.sink = {arg -> stack#push_stack('tag', 'tags#goto_tag', arg, 0)}
+  else  " default sink
+    let options.sink = function('tags#goto_tag')
+  endif
+  call fzf#run(fzf#wrap(options))
 endfunction
 
 "-----------------------------------------------------------------------------"
@@ -454,7 +462,7 @@ function! tags#next_tag(count, ...) abort
     endif
     let args[0] = str2nr(tag[1])  " adjust line number
   endfor
-  call tags#goto_tag(1, tag[1], tag[0])  " jump to line then name
+  call tags#goto_block(tag[1], tag[0])  " jump to line then name
   if &l:foldopen =~# '\<block\>' | exe 'normal! zv' | endif
 endfunction
 
@@ -511,12 +519,12 @@ function! tags#goto_name(...) abort
       if level < 1 && ipath !=# path | continue | endif
       let itype = getbufvar(bufnr(ipath), '&filetype')
       if level < 2 && itype !=# &l:filetype | continue | endif
-      return tags#goto_tag(0, ipath, itag.cmd, itag.name, itag.kind)
+      return tags#goto_tag(ipath, itag.cmd, itag.name, itag.kind)
     endfor
     let itags = s:tag_source(level, 1)
     for [ipath, iline, iname; irest] in itags  " search all files
       if name !=# iname | continue | endif
-      return call('tags#goto_tag', [0, ipath, iline, iname] + irest)
+      return call('tags#goto_tag', [ipath, iline, iname] + irest)
     endfor
   endfor
   redraw | echohl ErrorMsg
