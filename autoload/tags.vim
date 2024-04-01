@@ -403,6 +403,13 @@ endfunction
 " Select a specific tag using fzf
 " Note: This matches construction of fzf mappings in vim-succinct.
 " See: https://github.com/ludovicchabant/vim-gutentags/issues/349
+function! tags#push_tag(...) abort
+  if exists('*stack#push_stack')
+    return stack#push_stack('tag', 'tags#goto_tag', a:000, 0)
+  else
+    return call('tags#goto_tag', a:000)
+  endif
+endfunction
 function! tags#select_tag(...) abort
   let level = a:0 ? a:1 : 0
   let prompt = level > 1 ? 'Tag> ' : level > 0 ? 'FTag> ' : 'BTag> '
@@ -418,12 +425,7 @@ function! tags#select_tag(...) abort
     echohl None | return
   endif
   let flags = '--no-sort --prompt=' . string(prompt)
-  let options = {'source': source, 'options': flags}
-  if exists('*stack#push_stack')  " dotfiles utility
-    let options.sink = {arg -> stack#push_stack('tag', 'tags#goto_tag', arg, 0)}
-  else  " default sink
-    let options.sink = function('tags#goto_tag')
-  endif
+  let options = {'source': source, 'sink': function('tags#push_tag'), 'options': flags}
   call fzf#run(fzf#wrap(options))
 endfunction
 
@@ -519,12 +521,12 @@ function! tags#goto_name(...) abort
       if level < 1 && ipath !=# path | continue | endif
       let itype = getbufvar(bufnr(ipath), '&filetype')
       if level < 2 && itype !=# &l:filetype | continue | endif
-      return tags#goto_tag(ipath, itag.cmd, itag.name, itag.kind)
+      return tags#push_tag(ipath, itag.cmd, itag.name, itag.kind)
     endfor
     let itags = s:tag_source(level, 1)
     for [ipath, iline, iname; irest] in itags  " search all files
       if name !=# iname | continue | endif
-      return call('tags#goto_tag', [ipath, iline, iname] + irest)
+      return call('tags#push_tag', [ipath, iline, iname] + irest)
     endfor
   endfor
   redraw | echohl ErrorMsg
