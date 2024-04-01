@@ -226,7 +226,7 @@ function! tags#table_tags(...) abort
     if !filereadable(path)
       let types = getcompletion(path, 'filetype')  " https://vi.stackexchange.com/a/14990/8084
       if index(types, path) < 0
-        echohl WarningMsg
+        redraw | echohl WarningMsg
         echom 'Warning: Path ' . string(path) . ' not open or not readable.'
         echohl None
       endif
@@ -244,10 +244,9 @@ function! tags#table_tags(...) abort
     if !empty(trim(table)) | call add(tables, trim(table)) | endif
   endfor
   if empty(tables)
-    echohl WarningMsg
+    redraw | echohl WarningMsg
     echom 'Warning: Tags not found or not available.'
-    echohl None
-    return ''
+    echohl None | return ''
   endif
   return 'Tags for ' . label . ":\n" . join(tables, "\n")
 endfunction
@@ -303,7 +302,6 @@ function! tags#goto_tag(block, ...) abort
   let regex .= '(\(\a\(,\s\+.\{-}\)\?\))$'  " tag kind and scope
   let path = expand('%:p')  " current path
   let isrc = ''  " reference ctags file
-  echom 'Line: ' . a:1
   if a:0 > 1  " non-fzf input
     let [ibuf, ipos, iname; irest] = a:0 < 3 ? [path] + a:000 : a:000
   elseif a:1 =~# regex  " format '[<file>: ]<line>: name (type[, scope])'
@@ -405,12 +403,12 @@ function! tags#select_tag(...) abort
   let prompt = level > 1 ? 'Tag> ' : level > 0 ? 'FTag> ' : 'BTag> '
   let source = s:tag_source(level, 0)
   if empty(source)
-    echohl WarningMsg
+    redraw | echohl WarningMsg
     echom 'Warning: Tags not found or not available.'
     echohl None | return
   endif
   if !exists('*fzf#run')
-    echohl WarningMsg
+    redraw | echohl WarningMsg
     echom 'Warning: FZF plugin not found.'
     echohl None | return
   endif
@@ -450,7 +448,7 @@ function! tags#next_tag(count, ...) abort
   for idx in range(abs(a:count))  " loop through repitition count
     let tag = call('tags#close_tag', args)
     if empty(tag)
-      echohl WarningMsg
+      redraw | echohl WarningMsg
       echom 'Error: Next tag not found'
       echohl None | return
     endif
@@ -471,7 +469,7 @@ function! tags#next_word(count, ...) abort
     let pos = getpos('.')
     call search(regex, flags, 0, 0, "tags#get_inside('Constant', 'Comment')")
     if getpos('.') == pos
-      echohl WarningMsg
+      redraw | echohl WarningMsg
       echom 'Error: Next keyword not found'
       echohl None | call winrestview(winview) | return
     endif
@@ -481,7 +479,7 @@ function! tags#next_word(count, ...) abort
   let [line1, line2] = [str2nr(line1), str2nr(line2)]  " note str2nr('') is zero
   let prefix = substitute(word, '\\[<>cC]', '', 'g')
   let suffix = line1 && line2 ? ' (lines ' . line1 . ' to ' . line2 . ')' : ''
-  echom 'Keyword: ' . prefix . suffix
+  redraw | echom 'Keyword: ' . prefix . suffix
   if &l:foldopen =~# '\<block\>' | exe 'normal! zv' | endif
 endfunction
 
@@ -559,7 +557,7 @@ function! tags#get_scope(...) abort
   let items = filter(copy(items), filt)
   let lines = map(deepcopy(items), 'str2nr(v:val[1])')
   if empty(items)
-    echohl WarningMsg
+    redraw | echohl WarningMsg
     echom 'Warning: Failed to restrict the search scope (tags unavailable).'
     echohl None | return ''
   endif
