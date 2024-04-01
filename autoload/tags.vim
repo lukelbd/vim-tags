@@ -295,7 +295,8 @@ endfunction
 " to position cursor on exact match instead of start-of-line.
 function! tags#goto_tag(block, ...) abort
   " Parse tag input
-  let regex = '^\s*\(\(.*\):\s\+\)\?'  " tag file
+  let native = '^\s*\(.\{-}\)\t\(.\{-}\)\t\(\d\+\);"\s*\(.*\)$'
+  let regex = '^\s*\%(\(.*\):\s\+\)\?'  " tag file
   let regex .= '\(\d\+\):\s\+'  " tag line
   let regex .= '\(.\{-}\)\s\+'  " tag name
   let regex .= '(\(\a\(,\s\+.\{-}\)\?\))$'  " tag kind and scope
@@ -303,7 +304,9 @@ function! tags#goto_tag(block, ...) abort
   if a:0 > 1  " non-fzf input
     let [ibuf, ipos, iname; irest] = a:0 < 3 ? [path] + a:000 : a:000
   elseif a:1 =~# regex  " format '[<file>: ]<line>: name (type[, scope])'
-    let [ibuf, ipos, iname; irest] = matchlist(a:1, regex)[2:5]
+    let [ibuf, ipos, iname; irest] = matchlist(a:1, regex)[1:4]
+  elseif a:1 =~# native  " native format 'name<Tab>file<Tab>line;...'
+    let [iname, ibuf, ipos; irest] = matchlist(a:1, native)[1:4]
   else  " e.g. cancelled selection
     return
   endif
