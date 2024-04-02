@@ -268,7 +268,7 @@ function! s:tag_index(name, ...) abort  " stack index
       call add(idxs, idx)
     endif
   endfor
-  return direc < 0 ? idxs[0] : idxs[-1]
+  return empty(idxs) ? -1 : direc < 0 ? idxs[0] : idxs[-1]
 endfunction
 
 " Return tags in the format '[<file>: ]<line>: name (type[, scope])'
@@ -368,7 +368,7 @@ function! s:goto_tag(iter, ...) abort
     call settagstack(winnr(), {'items': [item]}, 't')  " push from curidx to top
   elseif abs(a:iter) == 1  " perform :tag or :pop
     let idx = s:tag_index(iname, a:iter)
-    call settagstack(winnr(), {'curidx': idx})
+    call settagstack(winnr(), idx > 0 ? {'curidx': idx} : {})
   endif
   let type = a:iter ? '\<block\>' : '\<tag\>'
   exe &l:foldopen !~# type ? 'normal! zz' : 'normal! zvzz'
