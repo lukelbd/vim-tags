@@ -305,6 +305,7 @@ function! s:goto_tag(block, ...) abort
   let regex .= '\(\d\+\):\s\+'  " tag line
   let regex .= '\(.\{-}\)\s\+'  " tag name
   let regex .= '(\(\a\(,\s\+.\{-}\)\?\))$'  " tag kind and scope
+  let from = getpos('.')  " from position
   let path = expand('%:p')  " current path
   let isrc = ''  " reference file
   if a:0 > 1  " non-fzf input
@@ -334,18 +335,18 @@ function! s:goto_tag(block, ...) abort
     silent exe 'tab drop ' . fnameescape(ipath)
   endif
   " Jump to tag position
-  let g:tag_name = [ipath, ipos, iname]  " save for vim stacks
-  let [bnum, from] = [bufnr(), getpos('.')]  " from position
   let [lnum, cnum] = type(ipos) == type([]) ? ipos : [ipos, 0]
+  let g:tag_name = [ipath, ipos, iname]  " save for vim stacks
   call cursor(lnum, 1)
-  let regex = escape(iname, s:regex_magic)
-  if cnum == 0
+  if cnum <= 0
+    let regex = escape(iname, s:regex_magic)
     silent call search(regex, 'cW', lnum)
   elseif cnum > 1
-    exe 'normal! ' . (cnum - 1) . 'l'
+    let motion = (cnum - 1) . 'l'
+    exe 'normal! ' . motion
   endif
-  if !a:block && !g:tags_keep_stack && iname !=# '<from>'
-    let item = {'bufnr': bnum, 'from': from, 'matchnr': 1, 'tagname': iname}
+  if !a:block && !g:tags_keep_stack
+    let item = {'bufnr': bufnr(), 'from': from, 'matchnr': 1, 'tagname': iname}
     call settagstack(winnr(), {'items': [item]}, 'a')
   endif
   let type = a:block ? '\<block\>' : '\<tag\>'
