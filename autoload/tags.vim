@@ -336,7 +336,7 @@ function! s:goto_tag(iter, ...) abort
   let from = getpos('.')  " from position
   let path = expand('%:p')  " current path
   let isrc = ''  " reference file
-  if a:0 > 1  " non-fzf input
+  if a:0 > 0  " non-fzf input
     let [ibuf, ipos, iname; irest] = a:0 < 3 ? [path] + a:000 : a:000
   elseif a:1 =~# regex  " format '[<file>: ]<line>: name (type[, scope])'
     let [ibuf, ipos, iname, irest] = matchlist(a:1, regex)[1:4]
