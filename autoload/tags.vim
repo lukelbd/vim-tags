@@ -393,6 +393,7 @@ endfunction
 " So only start at current line when jumping, otherwise start one line down.
 function! tags#find_tag(...) abort
   let lnum = a:0 > 0 ? a:1 : line('.')
+  let lnum = type(lnum) ? str2nr(lnum) : lnum
   let major = a:0 > 1 ? a:2 : 0
   let forward = a:0 > 2 ? a:3 : 0
   let circular = a:0 > 3 ? a:4 : 0
@@ -405,22 +406,22 @@ function! tags#find_tag(...) abort
   endif
   silent! exe 'unlet! b:tags_scope_by_line'
   silent! exe 'unlet! b:tags_top_by_line'
-  let tags = get(b:, 'tags_by_line', [])
-  let tags = filter(copy(tags), filt)
-  if empty(tags)
+  let items = get(b:, 'tags_by_line', [])
+  let items = filter(copy(items), filt)
+  if empty(items)
     return []  " silent failure
   endif
-  if circular && forward && lnum >= tags[-1][1]
+  if circular && forward && lnum >= items[-1][1]
     let idx = 0
-  elseif circular && !forward && lnum <= tags[0][1]
+  elseif circular && !forward && lnum <= items[0][1]
     let idx = -1
   else  " search in between (endpoint inclusive)
-    for jdx in range(1, len(tags) - 1)
-      if forward && lnum >= tags[-jdx - 1][1]
+    for jdx in range(1, len(items) - 1)
+      if forward && lnum >= items[-jdx - 1][1]
         let idx = -jdx
         break
       endif
-      if !forward && lnum <= tags[jdx][1]
+      if !forward && lnum <= items[jdx][1]
         let idx = jdx - 1
         break
       endif
@@ -429,7 +430,7 @@ function! tags#find_tag(...) abort
       let idx = forward ? 0 : -1
     endif
   endif
-  return tags[idx]
+  return items[idx]
 endfunction
 
 " Select a specific tag using fzf
