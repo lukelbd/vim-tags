@@ -350,7 +350,7 @@ function! s:goto_tag(block, ...) abort
   let type = a:block ? '\<block\>' : '\<tag\>'
   exe &l:foldopen !~# type ? 'normal! zz' : 'normal! zvzz'
   exe a:block && g:tags_keep_jumps ? '' : "normal! m'"
-  let b:tag_name = [ipath, lnum, iname]  " used for stacks
+  let g:tag_name = [ipath, lnum, iname]  " used for stacks
   let suffix = type(irest) <= 1 ? irest : get(irest, 0, '')
   let suffix = empty(irest) ? '' : ' (' . suffix . ')'
   redraw | echom 'Tag: ' . iname . suffix
