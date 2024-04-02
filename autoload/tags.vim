@@ -468,7 +468,7 @@ function! tags#select_tag(level, ...) abort
   let options = {
     \ 'source': source,
     \ 'sink': function('tags#push_tag', [iter]),
-    \ 'options': '--layout=reverse-list --no-sort --prompt=' . string(char . 'Tag> ')
+    \ 'options': '--no-sort --prompt=' . string(char . 'Tag> ')
   \ }
   call fzf#run(fzf#wrap(options))
 endfunction
