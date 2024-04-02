@@ -253,6 +253,24 @@ endfunction
 "-----------------------------------------------------------------------------
 " Tag searching utiltiies
 "-----------------------------------------------------------------------------
+" Return index of input tag in the stack
+" Note: This is used to manually update the tag stack index, allowing us to emulate
+" native vim :tag with tags#iter_tags(1, ...) and :pop with tags#iter_tags(-1, ...).
+function! s:tag_index(name, ...) abort  " stack index
+  let direc = a:0 ? a:1 : 0
+  let stack = gettagstack(winnr())
+  let items = get(stack, 'items', [])
+  let idxs = []  " exact tag matches
+  for idx in range(len(items))  " search tag stack
+    let item = items[idx]
+    let name = get(item, 'tagname', '')
+    if !empty(name) && name ==# a:name
+      call add(idxs, idx)
+    endif
+  endfor
+  return direc < 0 ? idxs[0] : idxs[-1]
+endfunction
+
 " Return tags in the format '[<file>: ]<line>: name (type[, scope])'
 " for selection by fzf. File name included only if 'global' was passed.
 " See: https://github.com/junegunn/fzf/wiki/Examples-(vim)
@@ -291,13 +309,13 @@ endfunction
 " Navigate to input tag list or fzf selection
 " Note: Here optionally preserve jumps triggered by line change, and try
 " to position cursor on exact match instead of start-of-line.
-function! tags#goto_tag(...) abort
+function! tags#goto_tag(...) abort  " :tag <name> analogue
   return call('s:goto_tag', [0] + a:000)
 endfunction
-function! tags#goto_block(...) abort
-  return call('s:goto_tag', [1] + a:000)
+function! tags#iter_tag(iter, ...) abort  " 1:naked tag/pop, 2:bracket jump
+  return call('s:goto_tag', [a:iter] + a:000)
 endfunction
-function! s:goto_tag(block, ...) abort
+function! s:goto_tag(iter, ...) abort
   " Parse tag input
   let raw = '^\s*\(.\{-}\) *\t\(.\{-}\) *\t\(\d\+\)'
   let raw .= ';"\s*\(.\{-}\)\%( *\t\(.*\)\)\?$'
@@ -328,7 +346,7 @@ function! s:goto_tag(block, ...) abort
     let ipath = fnamemodify(isrc, ':p:h') . '/' . ibuf
   endif
   if ipath ==# path  " record mark
-    exe a:block && g:tags_keep_jumps || getpos("''") == getpos('.') ? '' : "normal! m'"
+    exe a:iter && g:tags_keep_jumps || getpos("''") == getpos('.') ? '' : "normal! m'"
   elseif exists('*file#open_drop')  " dotfiles utility
     silent call file#open_drop(ipath)
   else  " built-in utility
@@ -345,13 +363,16 @@ function! s:goto_tag(block, ...) abort
     let motion = (cnum - 1) . 'l'
     exe 'normal! ' . motion
   endif
-  if !a:block && !g:tags_keep_stack
+  if !a:iter && !g:tags_keep_stack
     let item = {'bufnr': bufnr(), 'from': from, 'matchnr': 1, 'tagname': iname}
-    call settagstack(winnr(), {'items': [item]}, 'a')
+    call settagstack(winnr(), {'items': [item]}, 't')  " push from curidx to top
+  elseif abs(a:iter) == 1  " perform :tag or :pop
+    let idx = s:tag_index(iname, a:iter)
+    call settagstack(winnr(), {'curidx': idx})
   endif
-  let type = a:block ? '\<block\>' : '\<tag\>'
+  let type = a:iter ? '\<block\>' : '\<tag\>'
   exe &l:foldopen !~# type ? 'normal! zz' : 'normal! zvzz'
-  exe a:block && g:tags_keep_jumps ? '' : "normal! m'"
+  exe a:iter && g:tags_keep_jumps || getpos("''") == getpos('.') ? '' : "normal! m'"
   let suffix = type(irest) <= 1 ? irest : get(irest, 0, '')
   let suffix = empty(irest) ? '' : ' (' . suffix . ')'
   redraw | echom 'Tag: ' . iname . suffix
@@ -465,7 +486,7 @@ function! tags#next_tag(count, ...) abort
     endif
     let args[0] = str2nr(tag[1])  " adjust line number
   endfor
-  call tags#goto_block(tag[1], tag[0])  " jump to line then name
+  call tags#iter_tag(2, tag[1], tag[0])  " jump to line then name
   if &l:foldopen =~# '\<block\>' | exe 'normal! zv' | endif
 endfunction
 
