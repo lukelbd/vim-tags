@@ -276,7 +276,11 @@ endfunction
 " See: https://github.com/junegunn/fzf/wiki/Examples-(vim)
 function! s:tag_source(level, ...) abort
   let source = []
-  if a:level > 1  " global paths
+  if a:0 && type(a:1) > 1  " user input tags
+    let paths = ['']
+  elseif type(a:level) > 1  " user input paths
+    let paths = deepcopy(a:level)
+  elseif a:level > 1  " global paths
     let paths = map(tags#buffer_paths(), 'v:val[1]')
   elseif a:level > 0  " filetype paths
     let paths = map(tags#buffer_paths(&filetype), 'v:val[1]')
@@ -284,24 +288,27 @@ function! s:tag_source(level, ...) abort
     let paths = [expand('%:p')]
   endif
   for path in paths
+    let show = type(a:level) > 1 ? 2 : a:level  " include path
     if exists('*RelativePath')
       let path = RelativePath(path)  " vim-statusline function
     else
       let path = fnamemodify(path, ':~:.')
     endif
-    let bnr = bufnr(path)  " buffer unique to path
-    let src = deepcopy(getbufvar(bnr, 'tags_by_name', []))
-    if a:0 && a:1
-      let src = map(src, 'v:val[1:1] + v:val[0:0] + v:val[2:]')
-      let src = a:level ? map(src, 'insert(v:val, path, 0)') : (src)
-      call extend(source, src)
-    else
-      let head = a:level ? string(path) . " . ': ' . " : ''
-      let head .= "printf('%4d', v:val[1]) . ': '"
-      let tail = "v:val[0] . ' (' . join(v:val[2:], ', ') . ')'"
-      let src = map(src, head . ' . ' . tail)
-      call extend(source, src)
+    if a:0 && type(a:1) > 1  " [line, name, other] or [path, line, name, other]
+      let [opts, print] = [deepcopy(a:1), 1]
+    else  " note buffer number is unique to path (i.e. windows show same buffer)
+      let opts = deepcopy(getbufvar(bufnr(path), 'tags_by_name', []))
+      let opts = map(deepcopy(opts), '[v:val[1]] + [v:val[0]] + v:val[2:]')
+      let opts = map(opts, show ? 'insert(v:val, path, 0)' : 'v:val')
     endif
+    if a:0 && !empty(a:1)  " line:name (other) or file:line:name (other)
+      let show = type(a:level) > 1 ? 2 : a:level  " show path
+      let [idx, jdx] = show ? [2, 3] : [1, 2]
+      let fmt = (show ? '%s:' : '') . '%4d: %s (%s)'
+      let opts = map(opts, 'add(v:val[:' . idx . '], join(v:val[' . jdx . ':], ", "))')
+      let opts = map(opts, 'call("printf", [' . string(fmt) . '] + v:val)')
+    endif
+    call extend(source, opts)
   endfor
   return source
 endfunction
@@ -381,7 +388,7 @@ endfunction
 " Get the current tag from a list of tags
 " Note: This function searches exclusively (i.e. does not match the current line).
 " So only start at current line when jumping, otherwise start one line down.
-function! tags#close_tag(...) abort
+function! tags#find_tag(...) abort
   let lnum = a:0 > 0 ? a:1 : line('.')
   let major = a:0 > 1 ? a:2 : 0
   let forward = a:0 > 2 ? a:3 : 0
@@ -423,19 +430,24 @@ function! tags#close_tag(...) abort
 endfunction
 
 " Select a specific tag using fzf
-" Note: This matches construction of fzf mappings in vim-succinct.
 " See: https://github.com/ludovicchabant/vim-gutentags/issues/349
-function! tags#push_tag(...) abort
+" Note: Usage is tags#select_tag(paths_or_level, options_or_iter) where second
+" argument indicates whether stacks should be updated (tags#goto_tag) or not
+" (tags#iter_tag) and first argument indicates the paths to search and whether to
+" display the path in the fzf prompt. The second argument can also be a list of tags
+" in the format [line, name, other] (or [path, line, name, other] if level > 0)
+function! tags#push_tag(iter, ...) abort
+  let cmd = a:iter ? 'tags#iter_tag' : 'tags#goto_tag'
   if exists('*stack#push_stack')
-    return stack#push_stack('tag', 'tags#goto_tag', a:000, 0)
+    return stack#push_stack('tag', cmd, a:000, 0)
   else
-    return call('tags#goto_tag', a:000)
+    return call(cmd, a:000)
   endif
 endfunction
-function! tags#select_tag(...) abort
-  let level = a:0 ? a:1 : 0
-  let prompt = level > 1 ? 'Tag> ' : level > 0 ? 'FTag> ' : 'BTag> '
-  let source = s:tag_source(level, 0)
+function! tags#select_tag(level, ...) abort
+  let [iter, opts] = a:0 ? type(a:1) ? [1, a:1] : [a:1, 1] : [0, 1]
+  let char = a:0 || type(a:level) > 1 ? 'S' : a:level < 1 ? 'B' : a:level < 2 ? 'F' : ''
+  let source = s:tag_source(a:level, a:0 ? a:1 : 1)
   if empty(source)
     redraw | echohl WarningMsg
     echom 'Warning: Tags not found or not available.'
@@ -446,8 +458,11 @@ function! tags#select_tag(...) abort
     echom 'Warning: FZF plugin not found.'
     echohl None | return
   endif
-  let flags = '--no-sort --prompt=' . string(prompt)
-  let options = {'source': source, 'sink': function('tags#push_tag'), 'options': flags}
+  let options = {
+    \ 'source': source,
+    \ 'sink': function('tags#push_tag', [iter]),
+    \ 'options': '--no-sort --prompt=' . string(char . 'Tag> ')
+  \ }
   call fzf#run(fzf#wrap(options))
 endfunction
 
@@ -458,7 +473,7 @@ endfunction
 " Note: This is used with statusline and :CurrentTag
 function! tags#current_tag(...) abort
   let lnum = line('.') + 1
-  let info = tags#close_tag(lnum, 0, 0, 0)
+  let info = tags#find_tag(lnum, 0, 0, 0)
   let full = a:0 ? a:1 : 1  " print full tag
   if empty(info)
     let parts = []
@@ -478,7 +493,7 @@ function! tags#next_tag(count, ...) abort
   let forward = a:count >= 0
   let args = [line('.'), a:0 && a:1, forward, 1]  " circular searching
   for idx in range(abs(a:count))  " loop through repitition count
-    let tag = call('tags#close_tag', args)
+    let tag = call('tags#find_tag', args)
     if empty(tag)
       redraw | echohl WarningMsg
       echom 'Error: Next tag not found'
@@ -543,17 +558,17 @@ function! tags#goto_name(...) abort
       if level < 1 && ipath !=# path | continue | endif
       let itype = getbufvar(bufnr(ipath), '&filetype')
       if level < 2 && itype !=# &l:filetype | continue | endif
-      return tags#push_tag(ipath, itag.cmd, itag.name, itag.kind)
+      return tags#push_tag(0, ipath, itag.cmd, itag.name, itag.kind)
     endfor
-    let itags = s:tag_source(level, 1)
+    let itags = s:tag_source(level)
     for [ipath, iline, iname; irest] in itags  " search all files
       if name !=# iname | continue | endif
-      return call('tags#push_tag', [ipath, iline, iname] + irest)
+      return call('tags#push_tag', [0, ipath, iline, iname] + irest)
     endfor
   endfor
   redraw | echohl ErrorMsg
-  echom "Error: Tag '" . names[0] . "' not found"
-  echohl None
+  echom 'Error: Tag ' . string(names[0]) . ' not found'
+  echohl None | return 1
 endfunction
 
 "-----------------------------------------------------------------------------"
