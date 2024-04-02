@@ -277,6 +277,7 @@ endfunction
 " See: https://github.com/junegunn/fzf/wiki/Examples-(vim)
 function! s:tag_source(level, ...) abort
   let source = []
+  let show = type(a:level) > 1 ? 1 : a:level  " whether to show path
   if a:0 && type(a:1) > 1  " user input tags
     let paths = ['']
   elseif type(a:level) > 1  " user input paths
@@ -289,27 +290,28 @@ function! s:tag_source(level, ...) abort
     let paths = [expand('%:p')]
   endif
   for path in paths
-    let show = type(a:level) > 1 ? 2 : a:level  " include path
-    if exists('*RelativePath')
-      let path = RelativePath(path)  " vim-statusline function
-    else
-      let path = fnamemodify(path, ':~:.')
-    endif
     if a:0 && type(a:1) > 1  " [line, name, other] or [path, line, name, other]
       let [opts, print] = [deepcopy(a:1), 1]
     else  " note buffer number is unique to path (i.e. windows show same buffer)
+      let path = fnamemodify(path, ':p')
       let opts = deepcopy(getbufvar(bufnr(path), 'tags_by_name', []))
-      let opts = map(deepcopy(opts), '[v:val[1]] + [v:val[0]] + v:val[2:]')
-      let opts = map(opts, show ? 'insert(v:val, path, 0)' : 'v:val')
+      call map(opts, '[v:val[1]] + [v:val[0]] + v:val[2:]')
+      call map(opts, show ? 'insert(v:val, path, 0)' : 'v:val')
+    endif
+    if show  " format input paths
+      if exists('*RelativePath')
+        call map(opts, '[RelativePath(v:val[0])] + v:val[1:]')
+      else
+        call map(opts, '[fnamemodify(v:val, ":~:.")] + v:val[1:]')
+      endif
     endif
     if a:0 && !empty(a:1)  " line:name (other) or file:line:name (other)
-      let show = type(a:level) > 1 ? 2 : a:level  " show path
       let [idx, jdx] = show ? [2, 3] : [1, 2]
       let fmt = (show ? '%s:' : '') . '%4d: %s (%s)'
-      let opts = map(opts, 'add(v:val[:' . idx . '], join(v:val[' . jdx . ':], ", "))')
-      let opts = map(opts, 'call("printf", [' . string(fmt) . '] + v:val)')
+      call map(opts, 'add(v:val[:' . idx . '], join(v:val[' . jdx . ':], ", "))')
+      call map(opts, 'call("printf", [' . string(fmt) . '] + v:val)')
     endif
-    call extend(source, opts)
+    call extend(source, uniq(opts))  " ignore duplicates
   endfor
   return source
 endfunction
