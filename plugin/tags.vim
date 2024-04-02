@@ -137,8 +137,8 @@ command! -bang -nargs=* -complete=file UpdateTags
   \ call call('tags#update_tags', <bang>0 ? ['all'] : [<f-args>])
 command! -bang -nargs=? -complete=tag CursorTag
   \ call tags#goto_name(1 + <bang>0, <f-args>)
-command! -bang -nargs=? -complete=buffer SelectTag
-  \ call tags#select_tag(empty([<f-args>]) ? 2 * <bang>0 : [<f-args>])
+command! -bang -count=0 -nargs=* -complete=buffer SelectTag
+  \ call tags#select_tag(!empty(<q-args>) ? [<f-args>] : <bang>0 ? 2 : <count>)
 
 " Tag select maps
 " Note: Must use :n instead of <expr> ngg so we can use <C-u> to discard count!
