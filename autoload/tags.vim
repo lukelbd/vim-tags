@@ -264,7 +264,8 @@ function! s:tag_index(name, ...) abort  " stack index
   for idx in range(len(items))  " search tag stack
     let item = items[idx]
     let name = get(item, 'tagname', '')
-    if !empty(name) && name ==# a:name
+    let bnr = get(item, 'bufnr', 0)
+    if name ==# a:name && bnr == bufnr()
       call add(idxs, idx)
     endif
   endfor
