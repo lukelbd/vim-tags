@@ -329,8 +329,8 @@ function! s:goto_tag(iter, ...) abort
   " Parse tag input
   let raw = '^\s*\(.\{-}\) *\t\(.\{-}\) *\t\(\d\+\)'
   let raw .= ';"\s*\(.\{-}\)\%( *\t\(.*\)\)\?$'
-  let regex = '^\s*\%(\(.*\):\s\+\)\?'  " tag file
-  let regex .= '\(\d\+\):\s\+'  " tag line
+  let regex = '^\%(\(.\{-}\):\)\?'  " tag file
+  let regex .= '\s*\(\d\+\):\s\+'  " tag line
   let regex .= '\(.\{-}\)\s\+'  " tag name
   let regex .= '(\(\a\(,\s\+.\{-}\)\?\))$'  " tag kind and scope
   let from = getpos('.')  " from position
@@ -345,7 +345,6 @@ function! s:goto_tag(iter, ...) abort
   else  " e.g. cancelled selection
     return
   endif
-  echom 'Result!!! ' . iname . ' ' . ibuf . ' ' . string(ipos)
   " Jump to tag buffer
   if empty(ibuf)
     let ipath = path
