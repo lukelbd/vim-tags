@@ -336,7 +336,7 @@ function! s:goto_tag(iter, ...) abort
   let from = getpos('.')  " from position
   let path = expand('%:p')  " current path
   let isrc = ''  " reference file
-  if a:0 > 0  " non-fzf input
+  if a:0 > 1  " non-fzf input
     let [ibuf, ipos, iname; irest] = a:0 < 3 ? [path] + a:000 : a:000
   elseif a:1 =~# regex  " format '[<file>: ]<line>: name (type[, scope])'
     let [ibuf, ipos, iname, irest] = matchlist(a:1, regex)[1:4]
@@ -345,6 +345,7 @@ function! s:goto_tag(iter, ...) abort
   else  " e.g. cancelled selection
     return
   endif
+  echom 'Result!!! ' . iname . ' ' . ibuf . ' ' . string(ipos)
   " Jump to tag buffer
   if empty(ibuf)
     let ipath = path
@@ -439,18 +440,21 @@ endfunction
 " (tags#iter_tag) and first argument indicates the paths to search and whether to
 " display the path in the fzf prompt. The second argument can also be a list of tags
 " in the format [line, name, other] (or [path, line, name, other] if level > 0)
-function! tags#push_tag(iter, ...) abort
-  let cmd = a:iter ? 'tags#iter_tag' : 'tags#goto_tag'
+function! tags#push_tag(iter, item) abort
+  let name = a:iter ? 'tags#iter_tag' : 'tags#goto_tag'
   if exists('*stack#push_stack')
-    return stack#push_stack('tag', cmd, a:000, 0)
+    let arg = a:iter ? type(a:item) > 1 ? [a:iter] + a:item : [a:iter, a:item] : a:item
+    return stack#push_stack('tag', name, arg, 0)
   else
-    return call(cmd, a:000)
+    let arg = a:iter ? [a:iter, a:item] : [a:item]
+    return call(name, arg)
   endif
 endfunction
 function! tags#select_tag(level, ...) abort
-  let [iter, opts] = a:0 ? type(a:1) ? [1, a:1] : [a:1, 1] : [0, 1]
-  let char = a:0 || type(a:level) > 1 ? 'S' : a:level < 1 ? 'B' : a:level < 2 ? 'F' : ''
-  let source = s:tag_source(a:level, a:0 ? a:1 : 1)
+  let input = a:0 && !empty(a:1)
+  let iter = a:0 > 1 ? a:2 : 0
+  let char = input || type(a:level) > 1 ? 'S' : a:level < 1 ? 'B' : a:level < 2 ? 'F' : ''
+  let source = s:tag_source(a:level, input ? a:1 : 1)
   if empty(source)
     redraw | echohl WarningMsg
     echom 'Warning: Tags not found or not available.'
@@ -464,7 +468,7 @@ function! tags#select_tag(level, ...) abort
   let options = {
     \ 'source': source,
     \ 'sink': function('tags#push_tag', [iter]),
-    \ 'options': '--no-sort --prompt=' . string(char . 'Tag> ')
+    \ 'options': '--layout=reverse-list --no-sort --prompt=' . string(char . 'Tag> ')
   \ }
   call fzf#run(fzf#wrap(options))
 endfunction
@@ -561,12 +565,12 @@ function! tags#goto_name(...) abort
       if level < 1 && ipath !=# path | continue | endif
       let itype = getbufvar(bufnr(ipath), '&filetype')
       if level < 2 && itype !=# &l:filetype | continue | endif
-      return tags#push_tag(0, ipath, itag.cmd, itag.name, itag.kind)
+      return tags#push_tag(0, [ipath, itag.cmd, itag.name, itag.kind])
     endfor
     let itags = s:tag_source(level)
     for [ipath, iline, iname; irest] in itags  " search all files
       if name !=# iname | continue | endif
-      return call('tags#push_tag', [0, ipath, iline, iname] + irest)
+      return tags#push_tag(0, [ipath, iline, iname] + irest)
     endfor
   endfor
   redraw | echohl ErrorMsg
