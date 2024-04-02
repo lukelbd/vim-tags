@@ -334,6 +334,7 @@ function! s:goto_tag(iter, ...) abort
   let regex .= '\(.\{-}\)\s\+'  " tag name
   let regex .= '(\(\a\(,\s\+.\{-}\)\?\))$'  " tag kind and scope
   let from = getpos('.')  " from position
+  let from[0] = bufnr()  " ensure correct buffer
   let path = expand('%:p')  " current path
   let isrc = ''  " reference file
   if a:0 > 1  " non-fzf input
