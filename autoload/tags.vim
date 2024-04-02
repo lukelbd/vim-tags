@@ -363,7 +363,7 @@ function! s:goto_tag(iter, ...) abort
     let motion = (cnum - 1) . 'l'
     exe 'normal! ' . motion
   endif
-  if !a:iter && !g:tags_keep_stack
+  if !a:iter && !g:tags_keep_stack && iname !=# '<top>'
     let item = {'bufnr': bufnr(), 'from': from, 'matchnr': 1, 'tagname': iname}
     call settagstack(winnr(), {'items': [item]}, 't')  " push from curidx to top
   elseif abs(a:iter) == 1  " perform :tag or :pop
