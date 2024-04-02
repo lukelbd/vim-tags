@@ -306,7 +306,7 @@ function! s:goto_tag(block, ...) abort
   let regex .= '\(.\{-}\)\s\+'  " tag name
   let regex .= '(\(\a\(,\s\+.\{-}\)\?\))$'  " tag kind and scope
   let path = expand('%:p')  " current path
-  let isrc = ''  " reference ctags file
+  let isrc = ''  " reference file
   if a:0 > 1  " non-fzf input
     let [ibuf, ipos, iname; irest] = a:0 < 3 ? [path] + a:000 : a:000
   elseif a:1 =~# regex  " format '[<file>: ]<line>: name (type[, scope])'
@@ -334,6 +334,7 @@ function! s:goto_tag(block, ...) abort
     silent exe 'tab drop ' . fnameescape(ipath)
   endif
   " Jump to tag position
+  let g:tag_name = [ipath, ipos, iname]  " save for vim stacks
   let [bnum, from] = [bufnr(), getpos('.')]  " from position
   let [lnum, cnum] = type(ipos) == type([]) ? ipos : [ipos, 0]
   call cursor(lnum, 1)
@@ -350,7 +351,6 @@ function! s:goto_tag(block, ...) abort
   let type = a:block ? '\<block\>' : '\<tag\>'
   exe &l:foldopen !~# type ? 'normal! zz' : 'normal! zvzz'
   exe a:block && g:tags_keep_jumps ? '' : "normal! m'"
-  let g:tag_name = [ipath, lnum, iname]  " used for stacks
   let suffix = type(irest) <= 1 ? irest : get(irest, 0, '')
   let suffix = empty(irest) ? '' : ' (' . suffix . ')'
   redraw | echom 'Tag: ' . iname . suffix
