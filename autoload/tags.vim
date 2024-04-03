@@ -141,14 +141,11 @@ function! tags#type_regex(...) abort
   return join(uniq(sort(opts)), '\|')
 endfunction
 function! tags#type_match(path, ...) abort
+  let ftype = a:0 > 0 ? a:1 : &l:filetype
   let cache = a:0 > 2 ? a:3 : {}
-  if a:0 > 1
-    let [ftype, regex] = [a:1, a:2]
-  elseif a:0
-    let [ftype, regex] = [a:1, tags#type_regex(a:1)]
-  else
-    let [ftype, regex] = [&l:filetype, tags#type_regex()]
-  endif
+  let itype = get(cache, a:path, '')
+  if !empty(itype) | return itype ==# ftype | endif
+  let regex = a:0 > 1 ? a:2 : tags#type_regex(ftype)
   let name = fnamemodify(a:path, ':t')
   let ptype = getbufvar(bufnr(a:path), '&filetype', '')
   if !empty(ptype) && ptype ==# ftype
@@ -161,8 +158,6 @@ function! tags#type_match(path, ...) abort
     let imatch = name =~# regex
   endif
   if !imatch && name !~# '\.' && a:0 && !empty(a:1) && filereadable(a:path)
-    let imatch = get(cache, a:path, -1)
-    if imatch >= 0 | return imatch | endif
     let head = readfile(a:path, '', 1)
     let head = empty(head) ? '' : get(head, 0, '')
     if head !~# '^#!'
@@ -173,8 +168,9 @@ function! tags#type_match(path, ...) abort
       let imatch = cmd =~# '^' . ftype . '\d*$'
       let imatch = imatch || 'name.' . cmd =~# regex
     endif
-    let cache[a:path] = imatch
-  endif | return imatch
+  endif
+  if imatch | let cache[a:path] = ftype | endif
+  return imatch
 endfunction
 
 "-----------------------------------------------------------------------------"
