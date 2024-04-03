@@ -62,27 +62,6 @@ function! s:bufs_close(...) abort
   return pairs
 endfunction
 
-" Return regex for paths matching the current filetype
-" Note: This allows us to filter tag source to specific filetypes before loading
-" into buffers. Helps reduce false positives when tag jumping in large repos.
-function! tags#type_paths(...) abort
-  let ftype = a:0 > 1 ? a:2 : &l:filetype
-  let paths = a:0 ? copy(a:1) : map(tags#buffer_paths(), 'v:val[1]')
-  let rtype = tags#type_regex(ftype)  " auto-construct filetype regex
-  let btype = "getbufvar(bufnr(v:val), '&filetype', '') ==# " . string(ftype)
-  return filter(copy(paths), btype . ' || v:val =~# ' . string(rtype))
-endfunction
-function! tags#type_regex(...) abort
-  let ftype = a:0 ? a:1 : &l:filetype
-  let suffix = '\<' . ftype. '\>\s*$'  " commands should end with filetype
-  let regex = 'setf\(iletype\)\?\s\+' . suffix  " 'setf type' 'setfiletype type'
-  let regex .= '\|\%(ft\|filetype\)\s*=\s*' . suffix  " 'set ft=type' 'set filetype=type'
-  let opts = autocmd_get({'event': 'BufNewFile'})
-  let opts = filter(opts, 'v:val.cmd =~# ' . string(regex))
-  let opts = map(opts, 'glob2regpat(v:val.pattern)')
-  return join(uniq(sort(opts)), '\|')
-endfunction
-
 " Return buffers accessed after given time
 " Note: This defaults to returning tabs accessed after 'startup time' determined from
 " files with smallast access times and within 10 seconds of each other.
@@ -137,6 +116,65 @@ function! tags#buffer_paths(...) abort
   endfor
   let pairs = stacked + temporal + physical
   return pairs  " prefer most recently visited then closest
+endfunction
+
+" Filter paths matching the current or requested filetype
+" Note: This lets us restrict tag sources to specific filetypes before searching
+" for matches. Helps reduce false positives when tag jumping in large sessions.
+function! tags#type_paths(...) abort
+  let cache = {}  " cached matches
+  let paths = []
+  let ftype = a:0 > 1 ? a:2 : &l:filetype
+  let paths = a:0 && type(a:1) > 1 ? copy(a:1) : map(tags#buffer_paths(), 'v:val[1]')
+  let regex = tags#type_regex(ftype)  " auto-construct filetype regex
+  let paths = filter(paths, {idx, val -> tags#type_match(val, ftype, regex, cache)})
+  return paths
+endfunction
+function! tags#type_regex(...) abort
+  let ftype = a:0 ? a:1 : &l:filetype
+  let suffix = '\<' . ftype. '\>\s*$'  " commands should end with filetype
+  let regex = 'setf\(iletype\)\?\s\+' . suffix  " 'setf type' 'setfiletype type'
+  let regex .= '\|\%(ft\|filetype\)\s*=\s*' . suffix  " 'set ft=type' 'set filetype=type'
+  let opts = autocmd_get({'event': 'BufNewFile'})
+  let opts = filter(opts, 'v:val.cmd =~# ' . string(regex))
+  let opts = map(opts, 'glob2regpat(v:val.pattern)')
+  return join(uniq(sort(opts)), '\|')
+endfunction
+function! tags#type_match(path, ...) abort
+  let cache = a:0 > 2 ? a:3 : {}
+  if a:0 > 1
+    let [ftype, regex] = [a:1, a:2]
+  elseif a:0
+    let [ftype, regex] = [a:1, tags#type_regex(a:1)]
+  else
+    let [ftype, regex] = [&l:filetype, tags#type_regex()]
+  endif
+  let name = fnamemodify(a:path, ':t')
+  let ptype = getbufvar(bufnr(a:path), '&filetype', '')
+  if !empty(ptype) && ptype ==# ftype
+    let imatch = 1
+  elseif empty(regex)
+    let imatch = 0
+  elseif &fileignorecase
+    let imatch = name =~? regex
+  else
+    let imatch = name =~# regex
+  endif
+  if !imatch && name !~# '\.' && a:0 && !empty(a:1) && filereadable(a:path)
+    let imatch = get(cache, a:path, -1)
+    if imatch >= 0 | return imatch | endif
+    let head = readfile(a:path, '', 1)
+    let head = empty(head) ? '' : get(head, 0, '')
+    if head !~# '^#!'
+      let imatch = 0
+    else  " check shebang
+      let cmd = substitute(head, '^#!.*/', '', 'g')
+      let cmd = split(cmd, '', 1)[-1]
+      let imatch = cmd =~# '^' . ftype . '\d*$'
+      let imatch = imatch || 'name.' . cmd =~# regex
+    endif
+    let cache[a:path] = imatch
+  endif | return imatch
 endfunction
 
 "-----------------------------------------------------------------------------"
