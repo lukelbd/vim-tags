@@ -155,7 +155,7 @@ if !g:tags_nomap_jumps
   exe 'map ' . g:tags_prev_local_map . ' <Plug>TagsPrevLocal'
   exe 'map ' . g:tags_prev_global_map . ' <Plug>TagsPrevGlobal'
 endif
-nnoremap <Plug>TagsCursor <Cmd>call tags#goto_name(2)<CR>
+nnoremap <Plug>TagsCursor <Cmd>call tags#goto_name(1)<CR>
 nnoremap <Plug>TagsBSelect <Cmd>call tags#select_tag(0)<CR>
 nnoremap <Plug>TagsGSelect <Cmd>call tags#select_tag(2)<CR>
 noremap <Plug>TagsForwardAll <Cmd>call tags#next_tag(v:count1, 0)<CR>

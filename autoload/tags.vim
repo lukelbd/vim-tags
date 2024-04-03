@@ -66,18 +66,21 @@ endfunction
 " Note: This allows us to filter tag source to specific filetypes before loading
 " into buffers. Helps reduce false positives when tag jumping in large repos.
 function! tags#type_paths(...) abort
-  let paths = a:0 > 0 ? copy(a:1) : map(tags#buffer_paths(), 'v:val[1]')
   let ftype = a:0 > 1 ? a:2 : &l:filetype
+  let paths = a:0 ? copy(a:1) : map(tags#buffer_paths(), 'v:val[1]')
+  let rtype = tags#type_regex(ftype)  " auto-construct filetype regex
+  let btype = "getbufvar(bufnr(v:val), '&filetype', '') ==# " . string(ftype)
+  return filter(copy(paths), btype . ' || v:val =~# ' . string(rtype))
+endfunction
+function! tags#type_regex(...) abort
+  let ftype = a:0 ? a:1 : &l:filetype
   let suffix = '\<' . ftype. '\>\s*$'  " commands should end with filetype
   let regex = 'setf\(iletype\)\?\s\+' . suffix  " 'setf type' 'setfiletype type'
   let regex .= '\|\%(ft\|filetype\)\s*=\s*' . suffix  " 'set ft=type' 'set filetype=type'
   let opts = autocmd_get({'event': 'BufNewFile'})
   let opts = filter(opts, 'v:val.cmd =~# ' . string(regex))
   let opts = map(opts, 'glob2regpat(v:val.pattern)')
-  let filt1 = 'getbufvar(bufnr(v:val), ''&filetype'', '''') ==# ' . string(ftype)
-  let filt2 = 'v:val =~# ' . string(join(uniq(sort(opts)), '\|'))
-  let paths = filter(copy(paths), filt1 . ' || ' . filt2)
-  return paths  " filtered paths
+  return join(uniq(sort(opts)), '\|')
 endfunction
 
 " Return buffers accessed after given time
