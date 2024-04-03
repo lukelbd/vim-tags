@@ -123,10 +123,9 @@ endfunction
 " for matches. Helps reduce false positives when tag jumping in large sessions.
 function! tags#type_paths(...) abort
   let cache = {}  " cached matches
-  let paths = []
   let ftype = a:0 > 1 ? a:2 : &l:filetype
-  let paths = a:0 && type(a:1) > 1 ? copy(a:1) : map(tags#buffer_paths(), 'v:val[1]')
   let regex = tags#type_regex(ftype)  " auto-construct filetype regex
+  let paths = a:0 && type(a:1) > 1 ? copy(a:1) : map(tags#buffer_paths(), 'v:val[1]')
   let paths = filter(paths, {idx, val -> tags#type_match(val, ftype, regex, cache)})
   return paths
 endfunction
@@ -141,14 +140,20 @@ function! tags#type_regex(...) abort
   return join(uniq(sort(opts)), '\|')
 endfunction
 function! tags#type_match(path, ...) abort
-  let ftype = a:0 > 0 ? a:1 : &l:filetype
-  let cache = a:0 > 2 ? a:3 : {}
-  let itype = get(cache, a:path, '')
-  if !empty(itype) | return itype ==# ftype | endif
+  let ftype = a:0 > 0 ? a:1 : &l:filetype  " filetype to match
+  let cache = a:0 > 2 ? a:3 : {}  " entries {'path': 'type', 'path': ''}
+  let fast = a:0 > 3 ? a:4 : 0  " already checked this filetype
+  let path = fnamemodify(a:path, ':p')
+  if has_key(cache, path)
+    let ctype = cache[path]
+    if !empty(ctype) || fast
+      return ctype ==# ftype
+    endif
+  endif
   let regex = a:0 > 1 ? a:2 : tags#type_regex(ftype)
-  let name = fnamemodify(a:path, ':t')
-  let ptype = getbufvar(bufnr(a:path), '&filetype', '')
-  if !empty(ptype) && ptype ==# ftype
+  let name = fnamemodify(path, ':t')
+  let btype = getbufvar(bufnr(path), '&filetype', '')
+  if !empty(btype) && btype ==# ftype
     let imatch = 1
   elseif empty(regex)
     let imatch = 0
@@ -157,8 +162,8 @@ function! tags#type_match(path, ...) abort
   else
     let imatch = name =~# regex
   endif
-  if !imatch && name !~# '\.' && a:0 && !empty(a:1) && filereadable(a:path)
-    let head = readfile(a:path, '', 1)
+  if !imatch && name !~# '\.' && a:0 && !empty(a:1) && filereadable(path)
+    let head = readfile(path, '', 1)
     let head = empty(head) ? '' : get(head, 0, '')
     if head !~# '^#!'
       let imatch = 0
@@ -169,7 +174,8 @@ function! tags#type_match(path, ...) abort
       let imatch = imatch || 'name.' . cmd =~# regex
     endif
   endif
-  if imatch | let cache[a:path] = ftype | endif
+  let ctype = imatch ? ftype : !empty(btype) ? btype : ''
+  let cache[path] = ctype
   return imatch
 endfunction
 
