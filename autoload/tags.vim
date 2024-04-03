@@ -376,10 +376,14 @@ function! s:goto_tag(iter, ...) abort
   endif
   if !a:iter && !g:tags_keep_stack && iname !=# '<top>'
     let item = {'bufnr': bufnr(), 'from': from, 'matchnr': 1, 'tagname': iname}
-    call settagstack(winnr(), {'items': [item]}, 't')  " push from curidx to top
+    if item.bufnr != from[0] || lnum != from[1]  " push from curidx to top
+      call settagstack(winnr(), {'items': [item]}, 't')
+    endif
   elseif abs(a:iter) == 1  " perform :tag or :pop
     let idx = s:tag_index(iname, a:iter)
-    call settagstack(winnr(), idx > 0 ? {'curidx': idx} : {})
+    if idx > 0  " assign new stack index
+      call settagstack(winnr(), {'curidx': idx})
+    endif
   endif
   let type = a:iter ? '\<block\>' : '\<tag\>'
   exe &l:foldopen !~# type ? 'normal! zz' : 'normal! zvzz'
