@@ -7,8 +7,8 @@
 " Global tags command
 " Note: Keep in sync with g:fzf_tags_command
 scriptencoding utf-8
-let s:tags_command = 'ctags -f - --excmd=number'
 let s:regex_magic = '[]\/.*$~'
+let s:tags_command = 'ctags -f - --excmd=number'
 
 " Numerical sorting of tag lines
 function! s:sort_by_line(tag1, tag2) abort
@@ -336,7 +336,24 @@ endfunction
 " Return tags in the format '[<file>: ]<line>: name (type[, scope])'
 " for selection by fzf. File name included only if 'global' was passed.
 " See: https://github.com/junegunn/fzf/wiki/Examples-(vim)
+let s:path_roots = {}
+function! s:trunc_path(path) abort
+  let abs = fnamemodify(a:path, ':p')
+  let bnr = bufnr(a:path)
+  let git = exists('*FugitiveGitDir') ? FugitiveGitDir(bnr) : ''
+  let base = empty(git) ? '' : fnamemodify(git, ':h')  " remove '.git' heading
+  let root = empty(git) ? '' : fnamemodify(fnamemodify(base, ':h'), ':p')  " root with trailing slash
+  if strpart(getcwd(), 0, len(base)) !=# base && strpart(abs, 0, len(root)) ==# root
+    let trunc = strpart(abs, len(root)) | let s:path_roots[trunc] = root
+  elseif exists('*RelativePath')
+    let trunc = RelativePath(abs)
+  else  " default display
+    let trunc = fnamemodify(abs, ':~:.')
+  endif
+  return trunc
+endfunction
 function! s:tag_source(level, ...) abort
+  let s:path_roots = {}
   let source = []
   let show = type(a:level) > 1 ? 1 : a:level  " whether to show path
   if a:0 && type(a:1) > 1  " user input tags
@@ -354,21 +371,14 @@ function! s:tag_source(level, ...) abort
     if a:0 && type(a:1) > 1  " [line, name, other] or [path, line, name, other]
       let [opts, print] = [deepcopy(a:1), 1]
     else  " note buffer number is unique to path (i.e. windows show same buffer)
-      let path = fnamemodify(path, ':p')
       let opts = deepcopy(getbufvar(bufnr(path), 'tags_by_name', []))
       call map(opts, '[v:val[1]] + [v:val[0]] + v:val[2:]')
       call map(opts, show ? 'insert(v:val, path, 0)' : 'v:val')
     endif
-    if show  " format input paths
-      if exists('*RelativePath')
-        call map(opts, '[RelativePath(v:val[0])] + v:val[1:]')
-      else
-        call map(opts, '[fnamemodify(v:val, ":~:.")] + v:val[1:]')
-      endif
-    endif
     if a:0 && !empty(a:1)  " line:name (other) or file:line:name (other)
-      let [idx, jdx] = show ? [2, 3] : [1, 2]
       let fmt = (show ? '%s:' : '') . '%4d: %s (%s)'
+      let [idx, jdx] = show ? [2, 3] : [1, 2]
+      call map(opts, '[s:trunc_path(v:val[0])] + v:val[1:]')
       call map(opts, 'add(v:val[:' . idx . '], join(v:val[' . jdx . ':], ", "))')
       call map(opts, 'call("printf", [' . string(fmt) . '] + v:val)')
     endif
@@ -412,10 +422,12 @@ function! s:goto_tag(iter, ...) abort
     let ipath = path
   elseif !type(ibuf)
     let ipath = expand('#' . ibuf . ':p')
-  elseif empty(isrc)
+  elseif !empty(isrc)  " relative to tags file
+    let ipath = fnamemodify(fnamemodify(isrc, ':p:h'), ':p') . ibuf
+  elseif has_key(s:path_roots, ibuf)  " relative to git repo
+    let ipath = s:path_roots[ibuf] . ibuf
+  else  " absolute path
     let ipath = fnamemodify(ibuf, ':p')
-  else  " relative to tags file
-    let ipath = fnamemodify(isrc, ':p:h') . '/' . ibuf
   endif
   if ipath ==# path  " record mark
     exe a:iter && g:tags_keep_jumps || getpos("''") == getpos('.') ? '' : "normal! m'"
@@ -602,7 +614,7 @@ endfunction
 " Note: Vim does not natively support jumping separate windows so implement here
 let s:keyword_mods = {'vim': ':', 'tex': ':-'}
 function! tags#goto_name(...) abort
-  let level = a:0 ? a:1 : 1
+  let level = a:0 ? a:1 : 0
   let path = expand('%:p')
   let keys = &l:iskeyword
   let names = a:000[1:]
@@ -628,7 +640,7 @@ function! tags#goto_name(...) abort
       if level < 2 && empty(itype) | continue | endif
       return tags#push_tag(0, [ipath, itag.cmd, itag.name, itag.kind])
     endfor
-    let itags = s:tag_source(level)
+    let itags = s:tag_source(level, 0)
     for [ipath, iline, iname; irest] in itags  " search all files
       if name !=# iname | continue | endif
       return tags#push_tag(0, [ipath, iline, iname] + irest)
