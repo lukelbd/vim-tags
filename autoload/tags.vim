@@ -458,21 +458,20 @@ endfunction
 " Note: This function searches exclusively (i.e. does not match the current line).
 " So only start at current line when jumping, otherwise start one line down.
 function! tags#find_tag(...) abort
-  let lnum = a:0 > 0 ? a:1 : line('.')
-  let lnum = type(lnum) ? str2nr(lnum) : lnum
+  let pos = a:0 > 0 ? a:1 : line('.')
+  let bnum = type(pos) > 1 && !empty(pos[0]) ? bufnr(pos[0]) : bufnr()
+  let lnum = type(pos) > 1 ? pos[1] : type(pos) ? str2nr(pos) : pos
   let major = a:0 > 1 ? a:2 : 0
   let forward = a:0 > 2 ? a:3 : 0
   let circular = a:0 > 3 ? a:4 : 0
   if major  " major tags only
     let kinds = get(g:tags_major_kinds, &filetype, 'f')
-    let filt = "len(v:val) == 3 && v:val[2] =~# '[" . kinds . "]'"
+    let filt = 'len(v:val) == 3 && v:val[2] =~# ' . string('[' . kinds . ']')
   else  " all except minor
     let kinds = get(g:tags_minor_kinds, &filetype, 'v')
-    let filt = "v:val[2] !~# '[" . kinds . "]'"
+    let filt = 'v:val[2] !~# ' . string('[' . kinds . ']')
   endif
-  silent! exe 'unlet! b:tags_scope_by_line'
-  silent! exe 'unlet! b:tags_top_by_line'
-  let items = get(b:, 'tags_by_line', [])
+  let items = getbufvar(bnum, 'tags_by_line', [])
   let items = filter(copy(items), filt)
   if empty(items)
     return []  " silent failure
@@ -482,19 +481,15 @@ function! tags#find_tag(...) abort
   elseif circular && !forward && lnum <= items[0][1]
     let idx = -1
   else  " search in between (endpoint inclusive)
+    let idx = forward ? 0 : -1
     for jdx in range(1, len(items) - 1)
       if forward && lnum >= items[-jdx - 1][1]
-        let idx = -jdx
-        break
+        let idx = -jdx | break
       endif
-      if !forward && lnum <= items[jdx][1]
-        let idx = jdx - 1
-        break
+      if !forward && lnum < items[jdx][1]
+        let idx = jdx - 1 | break
       endif
     endfor
-    if !exists('idx')  " single tag or first or last tag
-      let idx = forward ? 0 : -1
-    endif
   endif
   return items[idx]
 endfunction
@@ -545,7 +540,7 @@ endfunction
 " Get the 'current' tag definition under or preceding the cursor
 " Note: This is used with statusline and :CurrentTag
 function! tags#current_tag(...) abort
-  let lnum = line('.') + 1
+  let lnum = line('.')
   let info = tags#find_tag(lnum, 0, 0, 0)
   let full = a:0 ? a:1 : 1  " print full tag
   if empty(info)
