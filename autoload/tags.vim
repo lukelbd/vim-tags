@@ -343,7 +343,9 @@ function! s:trunc_path(path) abort
   let git = exists('*FugitiveGitDir') ? FugitiveGitDir(bnr) : ''
   let base = empty(git) ? '' : fnamemodify(git, ':h')  " remove '.git' heading
   let root = empty(git) ? '' : fnamemodify(fnamemodify(base, ':h'), ':p')  " root with trailing slash
-  if strpart(getcwd(), 0, len(base)) !=# base && strpart(abs, 0, len(root)) ==# root
+  let igit = strpart(abs, 0, len(root)) ==# root
+  let icwd = strpart(getcwd(), 0, len(base)) !=# base
+  if !empty(git) && !icwd && igit
     let trunc = strpart(abs, len(root)) | let s:path_roots[trunc] = root
   elseif exists('*RelativePath')
     let trunc = RelativePath(abs)
