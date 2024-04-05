@@ -339,12 +339,11 @@ endfunction
 let s:path_roots = {}
 function! s:trunc_path(path) abort
   let abs = fnamemodify(a:path, ':p')
-  let bnr = bufnr(a:path)
-  let git = exists('*FugitiveGitDir') ? FugitiveGitDir(bnr) : ''
+  let git = exists('*FugitiveExtractGitDir') ? FugitiveExtractGitDir(abs) : ''
   let base = empty(git) ? '' : fnamemodify(git, ':h')  " remove '.git' heading
   let root = empty(git) ? '' : fnamemodify(fnamemodify(base, ':h'), ':p')  " root with trailing slash
   let igit = strpart(abs, 0, len(root)) ==# root
-  let icwd = strpart(getcwd(), 0, len(base)) !=# base
+  let icwd = strpart(getcwd(), 0, len(base)) ==# base
   if !empty(git) && !icwd && igit
     let trunc = strpart(abs, len(root)) | let s:path_roots[trunc] = root
   elseif exists('*RelativePath')
@@ -378,11 +377,10 @@ function! s:tag_source(level, ...) abort
       call map(opts, show ? 'insert(v:val, path, 0)' : 'v:val')
     endif
     if a:0 && !empty(a:1)  " line:name (other) or file:line:name (other)
-      let fmt = (show ? '%s:' : '') . '%4d: %s (%s)'
-      let [idx, jdx] = show ? [2, 3] : [1, 2]
-      call map(opts, '[s:trunc_path(v:val[0])] + v:val[1:]')
-      call map(opts, 'add(v:val[:' . idx . '], join(v:val[' . jdx . ':], ", "))')
-      call map(opts, 'call("printf", [' . string(fmt) . '] + v:val)')
+      let [idx, fmt] = show ? [2, '%s:'] : [1, '']
+      call map(opts, show ? '[s:trunc_path(v:val[0])] + v:val[1:]' : 'v:val')
+      call map(opts, 'add(v:val[:' . idx . '], join(v:val[' . (idx + 1) . ':], ", "))')
+      call map(opts, 'call("printf", [' . string(fmt . '%4d: %s (%s)') . '] + v:val)')
     endif
     call extend(source, uniq(opts))  " ignore duplicates
   endfor
