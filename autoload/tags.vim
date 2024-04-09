@@ -336,25 +336,30 @@ endfunction
 " Return tags in the format '[<file>: ]<line>: name (type[, scope])'
 " for selection by fzf. File name included only if 'global' was passed.
 " See: https://github.com/junegunn/fzf/wiki/Examples-(vim)
+let s:path_names = {}
 let s:path_roots = {}
-function! s:trunc_path(path) abort
-  let abs = fnamemodify(a:path, ':p')
-  let git = exists('*FugitiveExtractGitDir') ? FugitiveExtractGitDir(abs) : ''
-  let base = empty(git) ? '' : fnamemodify(git, ':h')  " remove '.git' heading
-  let root = empty(git) ? '' : fnamemodify(fnamemodify(base, ':h'), ':p')  " root with trailing slash
-  let igit = strpart(abs, 0, len(root)) ==# root
-  let icwd = strpart(getcwd(), 0, len(base)) ==# base
-  if !empty(git) && !icwd && igit
-    let trunc = strpart(abs, len(root)) | let s:path_roots[trunc] = root
+function! s:path_name(path) abort
+  let path = fnamemodify(a:path, ':p')
+  let name = get(s:path_names, path, '')
+  if !empty(name) | return name | endif
+  let git = exists('*FugitiveExtractGitDir') ? FugitiveExtractGitDir(path) : ''
+  let base = fnamemodify(git, ':h')  " remove '.git' heading
+  let root = fnamemodify(fnamemodify(base, ':h'), ':p')  " root with trailing slash
+  let igit = !empty(git) && strpart(path, 0, len(base)) ==# base
+  let icwd = !empty(git) && strpart(getcwd(), 0, len(base)) ==# base
+  if igit && !icwd
+    let name = strpart(path, len(root)) | let s:path_roots[name] = root
   elseif exists('*RelativePath')
-    let trunc = RelativePath(abs)
+    let name = RelativePath(path)
   else  " default display
-    let trunc = fnamemodify(abs, ':~:.')
+    let name = fnamemodify(path, ':~:.')
   endif
-  return trunc
+  let s:path_names[path] = name
+  return name
 endfunction
 function! s:tag_source(level, ...) abort
   let s:path_roots = {}
+  let s:path_names = {}
   let source = []
   let show = type(a:level) > 1 ? 1 : a:level  " whether to show path
   if a:0 && type(a:1) > 1  " user input tags
@@ -378,7 +383,7 @@ function! s:tag_source(level, ...) abort
     endif
     if a:0 && !empty(a:1)  " line:name (other) or file:line:name (other)
       let [idx, fmt] = show ? [2, '%s:'] : [1, '']
-      call map(opts, show ? '[s:trunc_path(v:val[0])] + v:val[1:]' : 'v:val')
+      call map(opts, show ? '[s:path_name(v:val[0])] + v:val[1:]' : 'v:val')
       call map(opts, 'add(v:val[:' . idx . '], join(v:val[' . (idx + 1) . ':], ", "))')
       call map(opts, 'call("printf", [' . string(fmt . '%4d: %s (%s)') . '] + v:val)')
     endif
