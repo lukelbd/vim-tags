@@ -23,7 +23,8 @@ if v:shell_error " exit code
 endif
 
 " Initial stuff
-augroup tags
+silent! au! tags
+augroup vim_tags
   au!
   au InsertLeave * silent call tags#change_setup()  " finish change operation and set repeat
   au BufReadPost,BufWritePost * silent call tags#update_tags(expand('<afile>'))
