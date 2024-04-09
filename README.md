@@ -66,12 +66,12 @@ Commands
 
 | Command | Description |
 | ---- | ---- |
+| `:Goto` | Go to the tag under the cursor or passed to the command. Use `:Goto!` to search tags across buffers of any filetype instead of just the current filetype. |
 | `:Search` | Set the current search pattern to the input and print a count. Accepts an optional manually-passed or visually-selected line range. |
 | `:ShowTags` | Update file tags and print them in a table. This ignores `g:tags_skip_kinds`. Use `:ShowTags!` to display tags for all open buffers or `:ShowTags path1 [path2...]` for specific files. |
 | `:ShowKinds` | Print file tag kinds in a table. This ignores `g:tags_skip_kinds`. Use `:ShowKinds!` to display kinds for all open buffers or `:ShowKinds path1 [path2...]` for specific files. |
-| `:UpdateTags` | Manually refresh the buffer-scope variables used by this plugin. This is called whenever a file is read or written. Use `:UpdateTags!` to update tags for all open buffers. |
 | `:SelectTag` | Show a fuzzy-completion menu of tags and jump to the selected location. Use `:SelectTag!` to choose from tags across all open buffers instead of just the current buffer. |
-| `:CursorTag` | Jump to the tag under the cursor or passed to the command. Use `:CursorTag!` to search tags across buffers of any filetype instead of just the current filetype. |
+| `:UpdateTags` | Manually refresh the buffer-scope variables used by this plugin. This is called whenever a file is read or written. Use `:UpdateTags!` to update tags for all open buffers. |
 
 Jumping maps
 ------------
