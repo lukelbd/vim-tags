@@ -130,11 +130,11 @@ endif
 "-----------------------------------------------------------------------------
 " Public commands
 " Note: The tags#current_tag() function can also be used for statuslines
-command! -bang -nargs=* -complete=filetype ShowKinds
+command! -bang -nargs=* -complete=buffer ShowKinds
   \ echo call('tags#table_kinds', <bang>0 ? ['all'] : [<f-args>])
-command! -bang -nargs=* -complete=file ShowTags
+command! -bang -nargs=* -complete=buffer ShowTags
   \ echo call('tags#table_tags', <bang>0 ? ['all'] : [<f-args>])
-command! -bang -nargs=* -complete=file UpdateTags
+command! -bang -nargs=* -complete=buffer UpdateTags
   \ call call('tags#update_tags', <bang>0 ? ['all'] : [<f-args>])
 command! -bang -count=0 -nargs=* -complete=buffer SelectTag
   \ call tags#select_tag(!empty(<q-args>) ? [<f-args>] : <bang>0 ? 2 : <count>)
