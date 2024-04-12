@@ -480,7 +480,7 @@ function! s:goto_tag(iter, ...) abort
   let regex = '^\%(\(.\{-}\):\)\?'  " tag file
   let regex .= '\s*\(\d\+\):\s\+'  " tag line
   let regex .= '\(.\{-}\)\s\+'  " tag name
-  let regex .= '(\(\a\(,\s\+.\{-}\)\?\))$'  " tag kind and scope
+  let regex .= '(\(\w\+\%(,\s\+.\{-}\)\?\))$'  " tag kind and scope
   let from = getpos('.')  " from position
   let from[0] = bufnr()  " ensure correct buffer
   let path = expand('%:p')  " current path
