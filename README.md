@@ -67,11 +67,12 @@ Commands
 | Command | Description |
 | ---- | ---- |
 | `:Goto` | Go to the tag under the cursor or passed to the command. Use `:Goto!` to search tags across buffers of any filetype instead of just the current filetype. |
-| `:Search` | Set the current search pattern to the input and print a count. Accepts an optional manually-passed or visually-selected line range. |
+| `:Select` | Show a fuzzy-completion menu of tags and jump to the selected location. Use `:SelectTag!` to choose from tags across all open buffers instead of just the current buffer. |
+| `:Search` | Search the input regular expression and print the number of matches. If passed with a line range then matches or filtered to the requested range using `\%>Nl\%<Nl` atoms. |
 | `:ShowTags` | Update file tags and print them in a table. This ignores `g:tags_skip_kinds`. Use `:ShowTags!` to display tags for all open buffers or `:ShowTags path1 [path2...]` for specific files. |
 | `:ShowKinds` | Print file tag kinds in a table. This ignores `g:tags_skip_kinds`. Use `:ShowKinds!` to display kinds for all open buffers or `:ShowKinds path1 [path2...]` for specific files. |
-| `:SelectTag` | Show a fuzzy-completion menu of tags and jump to the selected location. Use `:SelectTag!` to choose from tags across all open buffers instead of just the current buffer. |
-| `:UpdateTags` | Manually refresh the buffer-scope variables used by this plugin. This is called whenever a file is read or written. Use `:UpdateTags!` to update tags for all open buffers. |
+| `:UpdateTags` | Manually refresh the buffer-scope `b:tags_by_name` and `b:tags_by_line` variables. This is called whenever a file is read or written. Use `:UpdateTags!` to update all open buffers. |
+| `:UpdateKinds` | Manually refresh the global-scope `g:tags_kind_names` and `g:tags_kind_chars` variables. This is used to translate between tag kind names and abbreviations for each filetype. |
 
 Jumping maps
 ------------

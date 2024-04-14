@@ -23,7 +23,7 @@ if v:shell_error " exit code
 endif
 
 " Initial stuff
-silent! au! tags
+silent! autocmd! tags
 augroup vim_tags
   au!
   au InsertLeave * silent call tags#change_setup()  " finish change operation and set repeat
@@ -130,16 +130,18 @@ endif
 "-----------------------------------------------------------------------------
 " Public commands
 " Note: The tags#current_tag() function can also be used for statuslines
-command! -bang -nargs=* -complete=buffer ShowKinds
-  \ echo call('tags#table_kinds', <bang>0 ? ['all'] : [<f-args>])
-command! -bang -nargs=* -complete=buffer ShowTags
-  \ echo call('tags#table_tags', <bang>0 ? ['all'] : [<f-args>])
-command! -bang -nargs=* -complete=buffer UpdateTags
-  \ call call('tags#update_tags', <bang>0 ? ['all'] : [<f-args>])
-command! -bang -count=0 -nargs=* -complete=buffer SelectTag
-  \ call tags#select_tag(!empty(<q-args>) ? [<f-args>] : <bang>0 ? 2 : <count>)
 command! -bang -nargs=? -complete=tag Goto
   \ call tags#goto_name(<bang>0 + 1, <f-args>)
+command! -bang -count=0 -nargs=* -complete=buffer Select
+  \ call tags#select_tag(!empty(<q-args>) ? [<f-args>] : <bang>0 ? 2 : <count>)
+command! -bang -nargs=* -complete=buffer ShowTags
+  \ echo call('tags#table_tags', <bang>0 ? ['all'] : [<f-args>])
+command! -bang -nargs=* -complete=buffer ShowKinds
+  \ echo call('tags#table_kinds', <bang>0 ? ['all'] : [<f-args>])
+command! -bang -nargs=* -complete=buffer UpdateTags
+  \ call call('tags#update_tags', <bang>0 ? ['all'] : [<f-args>])
+command! -nargs=? -complete=buffer UpdateKinds
+  \ call call('tags#update_kinds', [])
 
 " Tag select maps
 " Note: Must use :n instead of <expr> ngg so we can use <C-u> to discard count!
