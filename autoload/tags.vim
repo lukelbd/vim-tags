@@ -22,41 +22,44 @@ function! s:sort_by_name(tag1, tag2) abort
 endfunction
 
 " Return whether tag is the given kind
-function! s:tag_is_major(tag, ...) abort
+function! tags#is_major(tag, ...) abort
   return call('s:tag_is_kind', [a:tag, 'major', 'f'] + a:000)
 endfunction
-function! s:tag_is_minor(tag, ...) abort
+function! tags#is_minor(tag, ...) abort
   return call('s:tag_is_kind', [a:tag, 'minor', 'v'] + a:000)
 endfunction
-function! s:tag_is_skipped(tag, ...) abort
+function! tags#is_skipped(tag, ...) abort
   return call('s:tag_is_kind', [a:tag, 'skip', '@'] + a:000)
 endfunction
-function! s:tag_is_kind(tag, name, value, ...) abort
-  let types = get(g:, 'tags_' . a:name . '_kinds', {})
-  let opts = get(types, a:0 ? a:1 : tags#lang_name(), a:value)
+function! s:tag_is_kind(tag, name, default, ...) abort
+  let key = call('tags#kind_lang', a:000)
+  let name = 'tags_' . a:name . '_kinds'  " setting name
+  let opts = get(get(g:, name, {}), key, a:default)
   if type(opts) <= 1 | let opts = split(opts, '\zs') | endif
   let kind1 = get(a:tag, 2, '')  " translate to or from character
-  let kind2 = get(len(kind1) > 1 ? s:kind_chars : s:kind_names, kind1, kind1)
+  let cache = len(kind1) > 1 ? g:tags_kind_chars : g:tags_kind_names
+  let kind2 = get(get(cache, key, {}), kind1, kind1)
   return index(opts, kind1) >= 0 || index(opts, kind2) >= 0
 endfunction
 
 " Return ctags filetype or
-let s:kind_names = {}
-let s:kind_chars = {}
-function! tags#lang_name(...) abort
-  let arg = a:0 ? a:1 : ''  " default current path
-  let name = getbufvar(bufnr(arg), '&filetype')
-  return substitute(tolower(name), '\..*$', '', 'g')
+let g:tags_kind_chars = {}
+let g:tags_kind_names = {}
+let g:tags_kind_langs = {}
+function! tags#kind_char(kind, ...) abort
+  let key = call('tags#kind_lang', a:000)
+  let opts = len(a:kind) <= 1 ? {} : get(g:tags_kind_chars, key, {})
+  return get(opts, a:kind, a:kind)
 endfunction
 function! tags#kind_name(kind, ...) abort
-  let key = call('tags#lang_name', a:000)
-  let opts = len(a:kind) > 1 ? {} : get(s:kind_names, key, {})
+  let key = call('tags#kind_lang', a:000)
+  let opts = len(a:kind) > 1 ? {} : get(g:tags_kind_names, key, {})
   return get(opts, a:kind, a:kind)
 endfunction
-function! tags#kind_char(kind, ...) abort
-  let key = call('tags#lang_name', a:000)
-  let opts = len(a:kind) <= 1 ? {} : get(s:kind_chars, key, {})
-  return get(opts, a:kind, a:kind)
+function! tags#kind_lang(...) abort
+  let name = getbufvar(call('bufnr', a:000), '&filetype')
+  let name = substitute(tolower(name), '\..*$', '', 'g')
+  return get(g:tags_kind_langs, name, name)
 endfunction
 
 "-----------------------------------------------------------------------------"
@@ -69,7 +72,7 @@ function! s:bufs_close(...) abort
   let tnr = tabpagenr()  " active tab
   let tleft = tnr
   let tright = tnr - 1  " initial value
-  let ftype = a:0 ? tags#lang_name(a:1) : ''  " restricted type
+  let ftype = a:0 ? tags#kind_lang(a:1) : ''  " restricted type
   let pairs = []  " [tnr, bnr] pairs
   while 1
     if tnr == tleft
@@ -87,7 +90,7 @@ function! s:bufs_close(...) abort
     for bnr in tabpagebuflist(tnr)
       let path = expand('#' . bnr . ':p')
       let btype = getbufvar(bnr, '&filetype')
-      if !empty(ftype) && ftype !=# tags#lang_name(bnr)
+      if !empty(ftype) && ftype !=# tags#kind_lang(bnr)
         continue
       elseif filereadable(path) && index(g:tags_skip_filetypes, btype) == -1
         call add(pairs, [tnr, bnr]) | break  " one entry per tab
@@ -159,7 +162,7 @@ endfunction
 " Todo: Remove this and use ctags --machinable --list-maps instead or possibly
 " use -F with a given file then print the name.
 function! tags#type_paths(...) abort
-  let cache = {}  " cached matches
+  let cache = a:0 > 2 ? a:3 : {}  " cached matches
   let ftype = a:0 > 1 ? a:2 : &l:filetype
   let regex = tags#type_regex(ftype)  " auto-construct filetype regex
   let paths = a:0 && type(a:1) > 1 ? copy(a:1) : map(tags#buffer_paths(), 'v:val[1]')
@@ -189,7 +192,7 @@ function! tags#type_match(path, ...) abort
   endif
   let regex = a:0 > 1 ? a:2 : tags#type_regex(ftype)
   let name = fnamemodify(path, ':t')
-  let btype = tags#lang_name(path)
+  let btype = tags#kind_lang(path)
   if !empty(btype) && btype ==# ftype
     let imatch = 1
   elseif empty(regex)
@@ -223,53 +226,44 @@ endfunction
 " Note: This is used for buffer variables and unopened :ShowTags path(s)
 " Note: Output should be in number mode (i.e. shows line number instead of full line)
 function! s:execute_tags(path, ...) abort
+  let name = empty(a:path) ? '' : tags#kind_lang(expand(a:path))
   let path = empty(a:path) ? '' : fnamemodify(expand(a:path), ':p')
-  let name = empty(path) ? '' : fnamemodify(path, ':t')
-  let type = empty(path) ? '' : tags#lang_name(path)
-  let flag = empty(type) || name =~# '\.' ? '' : '--language-force=' . shellescape(type)
+  let flag = empty(name) || fnamemodify(path, ':t') =~# '\.' ? '' : '--language-force=' . name
   let cmd = 'ctags -f - --excmd=number ' . join(a:000, ' ') . ' ' . flag
   let cmd .= ' ' . shellescape(path) . ' 2>/dev/null'
   let cmd .= empty(path) ? '' : " | cut -d'\t' -f1,3-5 | sed 's/;\"\t/\t/g'"
   return system(cmd)
 endfunction
 function! s:generate_tags(path) abort
-  let ftype = tags#lang_name(a:path)  " possibly empty string
+  let ftype = tags#kind_lang(a:path)  " possibly empty string
   if index(g:tags_skip_filetypes, ftype) >= 0
     let items = []
   else  " generate tags
     let items = split(s:execute_tags(a:path), '\n')
   endif
-  let items = map(items, "split(v:val, '\t')")
-  let items = filter(items, '!s:tag_is_skipped(v:val)')
+  call map(items, "split(v:val, '\t')")
+  call filter(items, '!tags#is_skipped(v:val)')
   let lines = sort(items, 's:sort_by_line')
   let names = sort(deepcopy(items), 's:sort_by_name')
   return [lines, names]
 endfunction
+function! tags#execute(...) abort
+  return call('s:execute_tags', a:0 ? a:000 : [expand('%')])
+endfunction
+function! tags#generate(...) abort
+  return call('s:generate_tags', a:000)
+endfunction
 
-" Update tag buffer variables and kind cache
+" Update tag buffer variables and kind global variables
 " Note: This will only update when tag generation time more recent than last file
 " save time. Also note files open in multiple windows have the same buffer number
-function! s:update_kinds() abort
-  let s:kind_names = {}  " mapping from e.g. 'f' to 'function'
-  let s:kind_chars = {}  " mapping from e.g. 'function' to 'f'
-  let items = split(s:execute_tags('', '--machinable --list-kinds-full'), '\n')
-  for line in items[1:]
-    let parts = split(line, '\t')
-    if len(parts) < 5 | continue | endif
-    let [type, char, name; rest] = parts
-    let key = tolower(type)
-    let opts = get(s:kind_names, key, {})
-    let opts[char] = name
-    let s:kind_names[key] = opts
-    let opts = get(s:kind_chars, key, {})
-    let opts[name] = char
-    let s:kind_chars[key] = opts
-  endfor
-endfunction
+" Note: Ctags has both language 'aliases' for translating internal options like
+" --language-force and 'mappings' that convert file names to languages. Seems alias
+" defitions were developed with vim in mind so no need to use their extensions.
 function! tags#update_tags(...) abort
   let global = a:0 ? a:1 : 0
-  if empty(s:kind_names) || empty(s:kind_chars)
-    call s:update_kinds()
+  if empty(g:tags_kind_names) || empty(g:tags_kind_chars)
+    call tags#update_kinds()
   endif
   if global  " global paths
     let paths = map(tags#buffer_paths(), 'v:val[1]')
@@ -286,47 +280,32 @@ function! tags#update_tags(...) abort
     call setbufvar(bnr, 'tags_update_time', localtime())
   endfor
 endfunction
-
-" Show the current file kinds
-" Note: Ctags cannot show specific filetype kinds so instead filter '--list-kinds=all'
-" Note: See https://stackoverflow.com/a/71334/4970632 for difference between \r and \n
-function! tags#table_kinds(...) abort
-  let [umajor, uminor] = [copy(g:tags_major_kinds), copy(g:tags_minor_kinds)]
-  if index(a:000, 'all') >= 0  " all open filetypes
-    let flag = 'all'
-    let types = uniq(sort(keys(umajor) + keys(uminor)))
-    let major = map(copy(types), {idx, val -> val . ' ' . string(get(umajor, val, 'f'))})
-    let minor = map(copy(types), {idx, val -> val . ' ' . string(get(uminor, val, 'v'))})
-    let major = ['default ' . string('f')] + major
-    let minor = ['default ' . string('v')] + minor
-    let types = uniq(map(tags#buffer_paths(), 'tags#lang_name(v:val[1])'))
-    let label = 'all buffer filetypes'
-  elseif a:0  " input filetype(s)
-    let types = uniq(sort(map(copy(a:000), 'tags#lang_name(v:val)')))
-    let flag = len(types) == 1 ? types[0] : 'all'
-    let major = map(copy(types), {idx, val -> val . ' ' . string(get(umajor, val, 'f'))})
-    let minor = map(copy(types), {idx, val -> val . ' ' . string(get(uminor, val, 'v'))})
-    let label = 'input filetype(s) ' . join(map(copy(types), 'string(v:val)'), ', ')
-  else  " current filetype
-    let flag = &l:filetype
-    let types = [&l:filetype]
-    let major = [string(get(umajor, flag, 'f'))]
-    let minor = [string(get(uminor, flag, 'v'))]
-    let label = 'current filetype ' . string(&filetype)
-  endif
-  let table = s:execute_tags('', '--list-kinds=' . shellescape(flag))
-  if flag ==# 'all'  " filter particular filetypes
-    let l:subs = []
-    let regex = '\c\(\%(\n\|^\)\@<=\%(' . join(types, '\|') . '\)\n'
-    let regex = regex . '\%(\s\+[^\n]*\%(\n\|$\)\)*\)\S\@!'
-    let append = '\=add(l:subs, submatch(0))'  " see: https://vi.stackexchange.com/a/16491/8084
-    call substitute(table, regex, append, 'gn')
-    let table = join(l:subs, '')
-  endif
-  let title = 'Tag kinds for ' . label
-  let major = 'Major tag kinds: ' . join(major, ' ')
-  let minor = 'Minor tag kinds: ' . join(minor, ' ')
-  return title . ":\n" . major . "\n" . minor . "\n" . trim(table)
+function! tags#update_kinds() abort
+  let g:tags_kind_names = {}  " mapping from e.g. 'f' to 'function'
+  let g:tags_kind_chars = {}  " mapping from e.g. 'function' to 'f'
+  let g:tags_kind_langs = {'python2': 'python', 'python3': 'python'}
+  let head = '--machinable --with-list-header=no '
+  let items = split(s:execute_tags('', head . '--list-aliases'), '\n')
+  for line in items
+    let parts = split(line, '\t')
+    if len(parts) != 2 | continue | endif
+    let [name, alias] = map(parts, 'tolower(v:val)')
+    if alias =~# '\*' | continue | endif  " currently only python[23]*
+    let g:tags_kind_langs[alias] = name
+  endfor
+  let items = split(s:execute_tags('', head . '--list-kinds-full'), '\n')
+  for line in items
+    let parts = split(line, '\t')
+    if len(parts) < 5 | continue | endif
+    let [type, char, name; rest] = parts
+    let key = tolower(type)
+    let opts = get(g:tags_kind_names, key, {})
+    let opts[char] = name
+    let g:tags_kind_names[key] = opts
+    let opts = get(g:tags_kind_chars, key, {})
+    let opts[name] = char
+    let g:tags_kind_chars[key] = opts
+  endfor
 endfunction
 
 " Show the current file tags
@@ -371,6 +350,48 @@ function! tags#table_tags(...) abort
     echohl None | return ''
   endif
   return 'Tags for ' . label . ":\n" . join(tables, "\n")
+endfunction
+
+" Show the current file kinds
+" Note: Ctags cannot show specific filetype kinds so instead filter '--list-kinds=all'
+" Note: See https://stackoverflow.com/a/71334/4970632 for difference between \r and \n
+function! tags#table_kinds(...) abort
+  let [umajor, uminor] = [copy(g:tags_major_kinds), copy(g:tags_minor_kinds)]
+  if index(a:000, 'all') >= 0  " all open filetypes
+    let flag = 'all'
+    let types = uniq(sort(keys(umajor) + keys(uminor)))
+    let major = map(copy(types), {idx, val -> val . ' ' . string(get(umajor, val, 'f'))})
+    let minor = map(copy(types), {idx, val -> val . ' ' . string(get(uminor, val, 'v'))})
+    let major = ['default ' . string('f')] + major
+    let minor = ['default ' . string('v')] + minor
+    let types = uniq(map(tags#buffer_paths(), 'tags#kind_lang(v:val[1])'))
+    let label = 'all buffer filetypes'
+  elseif a:0  " input filetype(s)
+    let types = uniq(sort(map(copy(a:000), 'tags#kind_lang(v:val)')))
+    let flag = len(types) == 1 ? types[0] : 'all'
+    let major = map(copy(types), {idx, val -> val . ' ' . string(get(umajor, val, 'f'))})
+    let minor = map(copy(types), {idx, val -> val . ' ' . string(get(uminor, val, 'v'))})
+    let label = 'input filetype(s) ' . join(map(copy(types), 'string(v:val)'), ', ')
+  else  " current filetype
+    let flag = &l:filetype
+    let types = [&l:filetype]
+    let major = [string(get(umajor, flag, 'f'))]
+    let minor = [string(get(uminor, flag, 'v'))]
+    let label = 'current filetype ' . string(&filetype)
+  endif
+  let table = s:execute_tags('', '--list-kinds=' . shellescape(flag))
+  if flag ==# 'all'  " filter particular filetypes
+    let l:subs = []
+    let regex = '\c\(\%(\n\|^\)\@<=\%(' . join(types, '\|') . '\)\n'
+    let regex = regex . '\%(\s\+[^\n]*\%(\n\|$\)\)*\)\S\@!'
+    let append = '\=add(l:subs, submatch(0))'  " see: https://vi.stackexchange.com/a/16491/8084
+    call substitute(table, regex, append, 'gn')
+    let table = join(l:subs, '')
+  endif
+  let title = 'Tag kinds for ' . label
+  let major = 'Major tag kinds: ' . join(major, ' ')
+  let minor = 'Minor tag kinds: ' . join(minor, ' ')
+  return title . ":\n" . major . "\n" . minor . "\n" . trim(table)
 endfunction
 
 "-----------------------------------------------------------------------------
@@ -580,9 +601,9 @@ function! tags#find_tag(...) abort
   let forward = a:0 > 2 ? a:3 : 0
   let circular = a:0 > 3 ? a:4 : 0
   if major  " major tags only
-    let filt = 'len(v:val) == 3 && s:tag_is_major(v:val)'
+    let filt = 'len(v:val) == 3 && tags#is_major(v:val)'
   else  " all except minor
-    let filt = 'len(v:val) > 2 && !s:tag_is_minor(v:val)'
+    let filt = 'len(v:val) > 2 && !tags#is_minor(v:val)'
   endif
   let items = getbufvar(bnum, 'tags_by_line', [])
   let items = filter(copy(items), filt)
@@ -599,7 +620,7 @@ function! tags#find_tag(...) abort
       if forward && lnum >= items[-jdx - 1][1]
         let idx = -jdx | break
       endif
-      if !forward && lnum < items[jdx][1]
+      if !forward && lnum <= items[jdx][1]
         let idx = jdx - 1 | break
       endif
     endfor
@@ -717,6 +738,7 @@ endfunction
 " Note: Vim does not natively support jumping separate windows so implement here
 let s:keyword_mods = {'vim': ':', 'tex': ':-'}
 function! tags#goto_name(...) abort
+  let cache = {}
   let level = a:0 ? a:1 : 0
   let path = expand('%:p')
   let keys = &l:iskeyword
@@ -731,21 +753,23 @@ function! tags#goto_name(...) abort
       let &l:iskeyword = keys
     endtry
   endif
-  for name in names  " several attempts
+  for name in names
     let name = substitute(name, '\(^\s*\|\s*$\)', '', 'g')
     if empty(name) | return | endif
     let itags = tags#get_tags(name, path)
     for itag in itags  " search 'tags' files
       let ipath = fnamemodify(itag.filename, ':p')
       if level < 1 && ipath !=# path | continue | endif
-      let itype = tags#type_paths([ipath], &l:filetype)
+      let itype = tags#type_paths([ipath], &l:filetype, cache)
       if level < 2 && empty(itype) | continue | endif
-      return tags#push_tag(0, [ipath, itag.cmd, itag.name, itag.kind])
+      let item = [ipath, itag.cmd, itag.name, itag.kind]
+      return tags#push_tag(0, item)
     endfor
-    let itags = s:tag_source(level, 0)  " search all files
+    let itags = s:tag_source(level, 0)  " search buffer tag variables
     for [ipath, iline, iname; irest] in itags
       if name !=# iname | continue | endif
-      return tags#push_tag(0, [ipath, iline, iname] + irest)
+      let item = [ipath, iline, iname] + irest
+      return tags#push_tag(0, item)
     endfor
   endfor
   redraw | echohl ErrorMsg
@@ -766,7 +790,7 @@ function! tags#get_inside(arg, ...) abort
     let [offset; names] = [a:arg] + a:000
   endif
   let [lnum, cnum] = [line('.'), col('.') + offset]
-  let cnum = min([max([cnum, 1]), col('$') - 1])  " col('$') is newline/end-of-file
+  let cnum = min([max([cnum, 1]), col('$') - 1])  " col('$') is newline or end-of-file
   let sids = map(synstack(lnum, cnum), 'synIDtrans(v:val)')
   for name in names  " iterate over options
     let sid = synIDtrans(hlID(name))
@@ -781,7 +805,7 @@ function! tags#get_scope(...) abort
   " Initial stuff
   let trunc = 20  " truncate long labels
   let items = get(b:, 'tags_by_line', [])
-  let items = filter(copy(items), 's:tag_is_major(v:val)')
+  let items = filter(copy(items), 'tags#is_major(v:val)')
   let lines = map(deepcopy(items), 'str2nr(v:val[1])')
   if empty(items)
     redraw | echohl WarningMsg
