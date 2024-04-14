@@ -540,19 +540,23 @@ endfunction
 " even when input path is outside of tag file path (can be slow). Also note input
 " argument interprets regex i.e. behaves like :tags /<name> (see :help taglist())
 function! tags#get_tags(name, ...) abort
-  let original = &l:tags
   let path = expand(a:0 ? a:1 : '%')
-  let paths = tags#get_files(path)
+  let paths = call('tags#get_files', a:000)
   let regex = '^' . escape(a:name, s:regex_magic) . '$'
+  let sorted = join(map(paths, {idx, val -> escape(val, ',')}), ',')
+  let unsorted = &l:tags
   try
-    let &l:tags = join(map(paths, {idx, val -> escape(val, ',')}), ',')
+    let &l:tags = sorted
     return taglist(regex, path)
   finally
-    let &l:tags = original
+    let &l:tags = unsorted
   endtry
 endfunction
 function! tags#get_files(...) abort  " 
-  let head = fnamemodify(expand(a:0 ? a:1 : '%'), ':p')  " initial value
+  let strict = a:0 > 1 ? a:2 : 0
+  let source = a:0 > 0 ? a:1 : ''
+  let source = expand(empty(source) ? '%' : source)
+  let head = fnamemodify(source, ':p')  " initial value
   let paths = map(tagfiles(), {idx, val -> fnamemodify(val, ':p')})
   let heads = map(copy(paths), {idx, val -> fnamemodify(val, ':h')})
   let result = []  " filtered tag files
@@ -563,6 +567,9 @@ function! tags#get_files(...) abort  "
     let idx = index(heads, head)
     if idx >= 0 | call add(result, paths[idx]) | endif
   endwhile
+  if !strict  " other paths lower priority
+    call extend(result, filter(paths, 'index(result, v:val) < 0'))
+  endif
   return result
 endfunction
 function! tags#find_tag(...) abort
