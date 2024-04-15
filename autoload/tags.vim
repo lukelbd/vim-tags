@@ -421,16 +421,25 @@ endfunction
 " See: https://github.com/junegunn/fzf/wiki/Examples-(vim)
 let s:path_names = {}
 let s:path_roots = {}
+function! s:path_base(path) abort
+  let base = ''  " see also statusline.vim
+  let func = get(g:, 'gutentags_project_root_finder', '')
+  if !empty(func) && exists('*' . func)
+    let base = call(func, [a:path])
+  elseif exists('*FugitiveExtractGitDir')
+    let base = FugitiveExtractGitDir(a:path)
+    let base = empty(base) ? base : fnamemodify(base, ':h')
+  endif | return base
+endfunction
 function! s:path_name(path) abort
   let path = fnamemodify(a:path, ':p')
   let name = get(s:path_names, path, '')
   if !empty(name) | return name | endif
-  let git = exists('*FugitiveExtractGitDir') ? FugitiveExtractGitDir(path) : ''
-  let base = fnamemodify(git, ':h')  " remove '.git' heading
+  let base = s:path_base(path)  " remove '.git' heading
   let root = fnamemodify(fnamemodify(base, ':h'), ':p')  " root with trailing slash
-  let igit = !empty(git) && strpart(path, 0, len(base)) ==# base
-  let icwd = !empty(git) && strpart(getcwd(), 0, len(base)) ==# base
-  if igit && !icwd
+  let icwd = !empty(base) && strpart(getcwd(), 0, len(base)) ==# base
+  let ipath = !empty(base) && strpart(path, 0, len(base)) ==# base
+  if ipath && !icwd
     let name = strpart(path, len(root)) | let s:path_roots[name] = root
   elseif exists('*RelativePath')
     let name = RelativePath(path)
