@@ -483,8 +483,8 @@ endfunction
 function! tags#goto_tag(...) abort  " :tag <name> analogue
   return call('s:goto_tag', [0] + a:000)
 endfunction
-function! tags#jump_tag(iter, ...) abort  " 1:naked tag/pop, 2:bracket jump
-  return call('s:goto_tag', [a:iter] + a:000)
+function! tags#jump_tag(mode, ...) abort  " 1:naked tag/pop, 2:bracket jump
+  return call('s:goto_tag', [a:mode] + a:000)
 endfunction
 function! s:goto_tag(mode, ...) abort
   " Parse tag input
@@ -551,9 +551,9 @@ function! s:goto_tag(mode, ...) abort
   let type = a:mode ? '\<block\>' : '\<tag\>'
   exe &l:foldopen !~# type ? 'normal! zz' : 'normal! zvzz'
   exe a:mode && g:tags_keep_jumps || getpos("''") == getpos('.') ? '' : "normal! m'"
-  let kind = tags#kind_name(type(ikind) > 1 ? get(ikind, 0, '') : ikind)
-  let head = len(kind) <= 1 ? 'Tag' : toupper(kind[0]) . tolower(kind[1:])
-  redraw | echom head . ': ' . iname
+  let ikind = tags#kind_name(type(ikind) > 1 ? get(ikind, 0, '') : ikind)
+  let ikind = empty(ikind) ? '' : ' (' . ikind . ')'
+  redraw | echom 'Tag: ' . iname . ikind
 endfunction
 
 " Find the tag closest to the input position
@@ -637,19 +637,19 @@ endfunction
 " (tags#jump_tag) and first argument indicates the paths to search and whether to
 " display the path in the fzf prompt. The second argument can also be a list of tags
 " in the format [line, name, other] (or [path, line, name, other] if level > 0)
-function! tags#push_tag(iter, item) abort
-  let name = a:iter ? 'tags#jump_tag' : 'tags#goto_tag'
+function! tags#push_tag(mode, item) abort
+  let name = a:mode ? 'tags#jump_tag' : 'tags#goto_tag'
   if exists('*stack#push_stack')
-    let arg = a:iter ? type(a:item) > 1 ? [a:iter] + a:item : [a:iter, a:item] : a:item
+    let arg = a:mode ? type(a:item) > 1 ? [a:mode] + a:item : [a:mode, a:item] : a:item
     return stack#push_stack('tag', name, arg, 0)
   else
-    let arg = a:iter ? [a:iter, a:item] : [a:item]
+    let arg = a:mode ? [a:mode, a:item] : [a:item]
     return call(name, arg)
   endif
 endfunction
 function! tags#select_tag(level, ...) abort
   let input = a:0 && !empty(a:1)
-  let iter = a:0 > 1 ? a:2 : 0
+  let mode = a:0 > 1 ? a:2 : 0
   let char = input || type(a:level) > 1 ? 'S' : a:level < 1 ? 'B' : a:level < 2 ? 'F' : ''
   let source = s:tag_source(a:level, input ? a:1 : 1)
   if empty(source)
@@ -664,7 +664,7 @@ function! tags#select_tag(level, ...) abort
   endif
   let options = {
     \ 'source': source,
-    \ 'sink': function('tags#push_tag', [iter]),
+    \ 'sink': function('tags#push_tag', [mode]),
     \ 'options': '--no-sort --prompt=' . string(char . 'Tag> ')
   \ }
   call fzf#run(fzf#wrap(options))
