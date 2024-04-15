@@ -499,11 +499,11 @@ function! s:goto_tag(mode, ...) abort
   let path = expand('%:p')  " current path
   let isrc = ''  " reference file
   if a:0 > 1  " non-fzf input
-    let [ibuf, ipos, iname; irest] = a:0 < 3 ? [path] + a:000 : a:000
+    let [ibuf, ipos, iname; ikind] = a:0 < 3 ? [path] + a:000 : a:000
   elseif a:1 =~# regex  " format '[<file>: ]<line>: name (type[, scope])'
-    let [ibuf, ipos, iname, irest] = matchlist(a:1, regex)[1:4]
+    let [ibuf, ipos, iname, ikind] = matchlist(a:1, regex)[1:4]
   elseif a:1 =~# raw  " native format 'name<Tab>file<Tab>line;...'
-    let [iname, ibuf, ipos, irest, isrc] = matchlist(a:1, raw)[1:5]
+    let [iname, ibuf, ipos, ikind, isrc] = matchlist(a:1, raw)[1:5]
   else  " e.g. cancelled selection
     return
   endif
@@ -551,9 +551,9 @@ function! s:goto_tag(mode, ...) abort
   let type = a:mode ? '\<block\>' : '\<tag\>'
   exe &l:foldopen !~# type ? 'normal! zz' : 'normal! zvzz'
   exe a:mode && g:tags_keep_jumps || getpos("''") == getpos('.') ? '' : "normal! m'"
-  let suffix = type(irest) <= 1 ? irest : get(irest, 0, '')
-  let suffix = empty(irest) ? '' : ' (' . suffix . ')'
-  redraw | echom 'Tag: ' . iname . suffix
+  let kind = tags#kind_name(type(ikind) > 1 ? get(ikind, 0, '') : ikind)
+  let head = len(kind) <= 1 ? 'Tag' : toupper(kind[0]) . tolower(kind[1:])
+  redraw | echom head . ': ' . iname
 endfunction
 
 " Find the tag closest to the input position
