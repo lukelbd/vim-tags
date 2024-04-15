@@ -818,7 +818,7 @@ function! tags#get_scope(...) abort
   let [iline, line1, level1] = [-1, lnum, foldlevel('.')]
   while iline != line1 && index(lines, line1) == -1
     let [iline, ifold] = [line('.'), foldclosed('.')]
-    exe ifold > 0 ? ifold : 'keepjumps normal! [z'
+    exe ifold > 0 && iline != ifold ? ifold : 'keepjumps normal! [z'
     let [line1, level1] = [line('.'), foldlevel('.')]
   endwhile
   let ifold = foldclosedend('.')
