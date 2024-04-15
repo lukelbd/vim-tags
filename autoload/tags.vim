@@ -718,7 +718,7 @@ function! tags#next_word(count, ...) abort
   let regex = @/ | let flags = a:count >= 0 ? 'w' : 'bw'
   for _ in range(abs(a:count))
     let pos = getpos('.')
-    call search(regex, flags, 0, 0, "tags#get_inside('Constant', 'Comment')")
+    call search(regex, flags, 0, 0, "tags#get_inside(0, 'Constant', 'Comment')")
     if getpos('.') == pos
       redraw | echohl WarningMsg
       echom 'Error: Next keyword not found'
@@ -784,18 +784,20 @@ endfunction
 " Note: This uses the searcy() 'skip' parameter to skip matches inside comments and
 " constants (i.e. strings). Similar method is used in succinct.vim for python docstrings
 function! tags#get_inside(arg, ...) abort
-  if type(a:arg)  " i.e. not numeric
-    let [offset; names] = [0, a:arg] + a:000
-  else
-    let [offset; names] = [a:arg] + a:000
-  endif
-  let [lnum, cnum] = [line('.'), col('.') + offset]
-  let cnum = min([max([cnum, 1]), col('$') - 1])  " col('$') is newline or end-of-file
-  let sids = map(synstack(lnum, cnum), 'synIDtrans(v:val)')
-  for name in names  " iterate over options
+  let lnum = line('.')  " check against input column offset or given position
+  let cnum = type(a:arg) ? col(a:arg) : col('.') + a:arg
+  let cnum = max([cnum, 1])  " one-based indexing
+  let cnum = min([cnum, col('$') - 1])  " end-of-line or end-of-file plus 1
+  let stack = synstack(lnum, cnum)
+  let sids = map(stack, 'synIDtrans(v:val)')
+  let status = 0  " default false
+  for name in a:000  " group names
     let sid = synIDtrans(hlID(name))
-    if sid && index(sids, sid) != -1 | return 1 | endif
-  endfor | return 0
+    if sid && index(sids, sid) != -1
+      let status = 1 | break
+    endif
+  endfor
+  return status
 endfunction
 
 " Return major tag folding scope
