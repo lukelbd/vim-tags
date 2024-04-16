@@ -395,7 +395,7 @@ function! tags#table_kinds(...) abort
 endfunction
 
 "-----------------------------------------------------------------------------
-" Tag searching utiltiies
+" Tag selection utiltiies
 "-----------------------------------------------------------------------------
 " Return index of input tag in the stack
 " Note: This is used to manually update the tag stack index, allowing us to emulate
@@ -565,80 +565,6 @@ function! s:goto_tag(mode, ...) abort
   redraw | echom 'Tag: ' . iname . ikind
 endfunction
 
-" Find the tag closest to the input position
-" Note: Here modify &tags temporarily since taglist() seems to search all tagfiles()
-" even when input path is outside of tag file path (can be slow). Also note input
-" argument interprets regex i.e. behaves like :tags /<name> (see :help taglist())
-function! tags#get_tags(name, ...) abort
-  let path = expand(a:0 ? a:1 : '%')
-  let paths = call('tags#get_files', a:000)
-  let regex = '^' . escape(a:name, s:regex_magic) . '$'
-  let sorted = join(map(paths, {idx, val -> escape(val, ',')}), ',')
-  let unsorted = &l:tags
-  try
-    let &l:tags = sorted
-    return taglist(regex, path)
-  finally
-    let &l:tags = unsorted
-  endtry
-endfunction
-function! tags#get_files(...) abort  " 
-  let strict = a:0 > 1 ? a:2 : 0
-  let source = a:0 > 0 ? a:1 : ''
-  let source = expand(empty(source) ? '%' : source)
-  let head = fnamemodify(source, ':p')  " initial value
-  let paths = map(tagfiles(), {idx, val -> fnamemodify(val, ':p')})
-  let heads = map(copy(paths), {idx, val -> fnamemodify(val, ':h')})
-  let result = []  " filtered tag files
-  while v:true
-    let ihead = fnamemodify(head, ':h')
-    if empty(ihead) || ihead ==# head | break | endif
-    let head = ihead  " tag file candidate
-    let idx = index(heads, head)
-    if idx >= 0 | call add(result, paths[idx]) | endif
-  endwhile
-  if !strict  " other paths lower priority
-    call extend(result, filter(paths, 'index(result, v:val) < 0'))
-  endif
-  return result
-endfunction
-function! tags#find_tag(...) abort
-  let pos = a:0 > 0 ? a:1 : line('.')
-  let bnum = type(pos) > 1 && !empty(pos[0]) ? bufnr(pos[0]) : bufnr()
-  let lnum = type(pos) > 1 ? pos[1] : type(pos) ? str2nr(pos) : pos
-  let major = a:0 > 1 ? a:2 : 0
-  let forward = a:0 > 2 ? a:3 : 0
-  let circular = a:0 > 3 ? a:4 : 0
-  if major  " major tags only
-    let filt = 'len(v:val) == 3 && tags#is_major(v:val)'
-  else  " all except minor
-    let filt = 'len(v:val) > 2 && !tags#is_minor(v:val)'
-  endif
-  let items = getbufvar(bnum, 'tags_by_line', [])
-  let items = filter(copy(items), filt)
-  if empty(items)
-    return []  " silent failure
-  endif
-  if circular && forward && lnum >= items[-1][1]
-    let idx = 0
-  elseif circular && !forward && lnum <= items[0][1]
-    let idx = -1
-  else  " search in between (endpoint inclusive)
-    let idx = forward ? 0 : -1
-    for jdx in range(1, len(items) - 1)
-      if forward && lnum >= items[-jdx - 1][1]
-        let idx = -jdx | break
-      endif
-      if !forward && lnum <= items[jdx][1]
-        let idx = jdx - 1 | break
-      endif
-    endfor
-  endif
-  let [name, lnum, kind; rest] = items[idx]
-  let kind = tags#kind_char(kind)
-  return [name, lnum, kind] + rest
-endfunction
-
 " Select a specific tag using fzf
 " See: https://github.com/ludovicchabant/vim-gutentags/issues/349
 " Note: Usage is tags#select_tag(paths_or_level, options_or_iter) where second
@@ -682,6 +608,130 @@ endfunction
 "-----------------------------------------------------------------------------"
 " Tag navigation utilities
 "-----------------------------------------------------------------------------"
+" Get tags and tag files using &g:tags setting
+" Note: Here tagfiles() function returns buffer-local variables so use &g:tags instead,
+" and note that literal commas/spaces preced by backslash (see :help option-backslash).
+" Note: Here modify &l:tags temporarily to optionally exclude unrelated projects, since
+" taglist() uses tagfiles() which may include unrelated projects if &l:tags unset. Also
+" note function expects regex i.e. behaves like :tags /<name> (see :help taglist()).
+function! tags#get_tags(name, ...) abort
+  let regex = '^' . escape(a:name, s:regex_magic) . '$'
+  let path = expand(a:0 ? a:1 : '%')
+  let tags = call('tags#get_files', a:000)
+  call map(tags, {_, val -> substitute(val, '\(,\| \)', '\\\1', 'g')})
+  let [itags, jtags] = [&l:tags, join(tags, ',')]
+  try
+    let &l:tags = jtags
+    return taglist(regex, path)
+  finally
+    let &l:tags = itags
+  endtry
+endfunction
+function! tags#get_files(...) abort
+  let strict = a:0 > 1 ? a:2 : 0
+  let source = a:0 > 0 ? a:1 : ''
+  let source = expand(empty(source) ? '%' : source)
+  let head = fnamemodify(source, ':p')  " initial value
+  let tags = split(&g:tags, '\\\@<!,')  " see above
+  call map(tags, {_, val -> substitute(val, '\\\(,\| \)', '\1', 'g')})
+  call map(tags, {_, val -> fnamemodify(val, ':p')})
+  let heads = map(copy(tags), {_, val -> fnamemodify(val, ':h')})
+  let result = []  " filtered tag files
+  while v:true
+    let ihead = fnamemodify(head, ':h')
+    if empty(ihead) || ihead ==# head | break | endif
+    let idx = index(heads, ihead)
+    if idx >= 0 | call add(result, tags[idx]) | endif
+    let head = ihead  " tag file candidate
+  endwhile
+  if !strict  " other paths lower priority
+    call extend(result, filter(tags, 'index(result, v:val) < 0'))
+  endif
+  return result
+endfunction
+
+" Go to the tag keyword under the cursor
+" Note: Vim does not natively support jumping separate windows so implement here
+let s:keyword_mods = {'vim': ':', 'tex': ':-'}
+function! tags#goto_name(...) abort
+  let cache = {}
+  let level = a:0 ? a:1 : 0
+  let path = expand('%:p')
+  let keys = &l:iskeyword
+  let names = a:000[1:]
+  if empty(names)  " tag names
+    let mods = get(s:keyword_mods, &l:filetype, '')
+    let mods = split(mods, '\zs')
+    try
+      let &l:iskeyword = join([keys] + mods, ',')
+      let names = [expand('<cword>'), expand('<cWORD>')]
+    finally
+      let &l:iskeyword = keys
+    endtry
+  endif
+  for name in names
+    let name = substitute(name, '\(^\s*\|\s*$\)', '', 'g')
+    if empty(name) | return | endif
+    let itags = tags#get_tags(name, path)
+    for itag in itags  " search 'tags' files
+      let ipath = fnamemodify(itag.filename, ':p')
+      if level < 1 && ipath !=# path | continue | endif
+      let itype = tags#type_paths([ipath], &l:filetype, cache)
+      if level < 2 && empty(itype) | continue | endif
+      let item = [ipath, itag.cmd, itag.name, itag.kind]
+      return tags#push_tag(0, item)
+    endfor
+    let itags = s:tag_source(level, 0)  " search buffer tag variables
+    for [ipath, iline, iname; irest] in itags
+      if name !=# iname | continue | endif
+      let item = [ipath, iline, iname] + irest
+      return tags#push_tag(0, item)
+    endfor
+  endfor
+  redraw | echohl ErrorMsg
+  echom 'Error: Tag ' . string(names[0]) . ' not found'
+  echohl None | return 1
+endfunction
+
+" Find the tag closest to the input position
+" Note: This translates tag to single-character for use e.g. in statusline
+function! tags#find_tag(...) abort
+  let pos = a:0 > 0 ? a:1 : line('.')
+  let bnum = type(pos) > 1 && !empty(pos[0]) ? bufnr(pos[0]) : bufnr()
+  let lnum = type(pos) > 1 ? pos[1] : type(pos) ? str2nr(pos) : pos
+  let major = a:0 > 1 ? a:2 : 0
+  let forward = a:0 > 2 ? a:3 : 0
+  let circular = a:0 > 3 ? a:4 : 0
+  if major  " major tags only
+    let filt = 'len(v:val) == 3 && tags#is_major(v:val)'
+  else  " all except minor
+    let filt = 'len(v:val) > 2 && !tags#is_minor(v:val)'
+  endif
+  let items = getbufvar(bnum, 'tags_by_line', [])
+  let items = filter(copy(items), filt)
+  if empty(items)
+    return []  " silent failure
+  endif
+  if circular && forward && lnum >= items[-1][1]
+    let idx = 0
+  elseif circular && !forward && lnum <= items[0][1]
+    let idx = -1
+  else  " search in between (endpoint inclusive)
+    let idx = forward ? 0 : -1
+    for jdx in range(1, len(items) - 1)
+      if forward && lnum >= items[-jdx - 1][1]
+        let idx = -jdx | break
+      endif
+      if !forward && lnum <= items[jdx][1]
+        let idx = jdx - 1 | break
+      endif
+    endfor
+  endif
+  let [name, lnum, kind; rest] = items[idx]
+  let kind = tags#kind_char(kind)
+  return [name, lnum, kind] + rest
+endfunction
+
 " Get the 'current' tag definition under or preceding the cursor
 " Note: This is used with statusline and :CurrentTag
 function! tags#current_tag(...) abort
@@ -741,49 +791,6 @@ function! tags#next_word(count, ...) abort
   let suffix = line1 && line2 ? ' (lines ' . line1 . ' to ' . line2 . ')' : ''
   redraw | echom 'Keyword: ' . prefix . suffix
   if &l:foldopen =~# '\<block\>' | exe 'normal! zv' | endif
-endfunction
-
-" Go to the tag keyword under the cursor
-" Note: Vim does not natively support jumping separate windows so implement here
-let s:keyword_mods = {'vim': ':', 'tex': ':-'}
-function! tags#goto_name(...) abort
-  let cache = {}
-  let level = a:0 ? a:1 : 0
-  let path = expand('%:p')
-  let keys = &l:iskeyword
-  let names = a:000[1:]
-  if empty(names)  " tag names
-    let mods = get(s:keyword_mods, &l:filetype, '')
-    let mods = split(mods, '\zs')
-    try
-      let &l:iskeyword = join([keys] + mods, ',')
-      let names = [expand('<cword>'), expand('<cWORD>')]
-    finally
-      let &l:iskeyword = keys
-    endtry
-  endif
-  for name in names
-    let name = substitute(name, '\(^\s*\|\s*$\)', '', 'g')
-    if empty(name) | return | endif
-    let itags = tags#get_tags(name, path)
-    for itag in itags  " search 'tags' files
-      let ipath = fnamemodify(itag.filename, ':p')
-      if level < 1 && ipath !=# path | continue | endif
-      let itype = tags#type_paths([ipath], &l:filetype, cache)
-      if level < 2 && empty(itype) | continue | endif
-      let item = [ipath, itag.cmd, itag.name, itag.kind]
-      return tags#push_tag(0, item)
-    endfor
-    let itags = s:tag_source(level, 0)  " search buffer tag variables
-    for [ipath, iline, iname; irest] in itags
-      if name !=# iname | continue | endif
-      let item = [ipath, iline, iname] + irest
-      return tags#push_tag(0, item)
-    endfor
-  endfor
-  redraw | echohl ErrorMsg
-  echom 'Error: Tag ' . string(names[0]) . ' not found'
-  echohl None | return 1
 endfunction
 
 "-----------------------------------------------------------------------------"
