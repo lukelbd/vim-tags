@@ -868,10 +868,10 @@ endfunction
 " to silently abort for some weird reason... so instead call this manually.
 function! tags#get_match(level, ...) abort
   let search = a:0 ? a:1 : 0
-  if a:level >= 2
+  if a:level > 1
     let item = escape(expand('<cWORD>'), s:regex_magic)
     let item = search ? '\(^\|\s\)\zs' . item . '\ze\($\|\s\)\C' : item
-  elseif a:level >= 1
+  elseif a:level > 0
     let item = escape(expand('<cword>'), s:regex_magic)
     let item = item =~# '^\k\+$' ? search ? '\<' . item . '\>\C' : item : ''
   else  " ··· note col('.') and string[:idx] uses byte index
@@ -887,7 +887,7 @@ function! tags#set_match(level, option, ...) abort
     let prefix = 'Match'
     let suffix = a:option ? 'Prev' : 'Next'
   else  " cursor search
-    let prefix = a:level >= 2 ? 'WORD' : a:level >= 1 ? 'Word' : 'Char'
+    let prefix = a:level > 1 ? 'WORD' : a:level > 0 ? 'Word' : 'Char'
     let suffix = a:option ? 'Local' : 'Global'
     let item = tags#get_match(a:level, 0)
     if adjust && empty(item) && foldclosed('.') == -1
