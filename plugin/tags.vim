@@ -142,6 +142,8 @@ command! -bang -nargs=* -complete=buffer UpdateTags
   \ call call('tags#update_tags', <bang>0 ? ['all'] : [<f-args>])
 command! -nargs=? -complete=buffer UpdateKinds
   \ call call('tags#update_kinds', [])
+command! -bang -nargs=* -range Search
+  \ <line1>,<line2>call tags#set_search(<q-args>, <bang>0)
 
 " Tag select maps
 " Note: Must use :n instead of <expr> ngg so we can use <C-u> to discard count!
@@ -173,24 +175,19 @@ noremap <Plug>TagsNextGlobal <Cmd>call tags#next_word(v:count1, 1)<CR>
 "------------------------------------------------------------------------------
 " Search-and-replace commands and maps
 "------------------------------------------------------------------------------
-" Public command
-command! -bang -nargs=1 -range Search let @/ = 
-  \ join(slice([printf('\%%>%dl', <line1> - 1), printf('\%%<%dl', <line2> + 1)], 0, <range>), '')
-  \ . <q-args> | call tags#search_match(-1, <bang>0)
-
 " Global and local <cword>, global and local <cWORD>, and current character searches.
 " Note: current character copied from https://stackoverflow.com/a/23323958/4970632
 " Todo: Add scope-local matches? No because use those for other mappings.
 if !g:tags_nomap_searches
-  if !hasmapto('tags#get_scope')  " avoid overwriting
-    noremap g/ /<C-r>=tags#get_scope()<CR>
-    noremap g? ?<C-r>=tags#get_scope()<CR>
+  if !hasmapto('tags#set_search('''', 1)')  " avoid overwriting
+    noremap g/ <Cmd>call tags#set_search('', 1)<CR><Cmd>call feedkeys(empty(@/) ? '' : '/' . @/, 'n')<CR>
+    noremap g? <Cmd>call tags#set_search('', 1)<CR><Cmd>call feedkeys(empty(@/) ? '' : '?' . @/, 'n')<CR>
   endif
-  exe 'noremap ' . g:tags_char_global_map . ' <Cmd>call tags#set_match(0, 0, 1)<CR><Cmd>setlocal hlsearch<CR>'
-  exe 'noremap ' . g:tags_word_global_map . ' <Cmd>call tags#set_match(1, 0, 1)<CR><Cmd>setlocal hlsearch<CR>'
-  exe 'noremap ' . g:tags_WORD_global_map . ' <Cmd>call tags#set_match(2, 0, 1)<CR><Cmd>setlocal hlsearch<CR>'
-  exe 'noremap ' . g:tags_word_local_map . ' <Cmd>call tags#set_match(1, 1, 1)<CR><Cmd>setlocal hlsearch<CR>'
-  exe 'noremap ' . g:tags_WORD_local_map . ' <Cmd>call tags#set_match(2, 1, 1)<CR><Cmd>setlocal hlsearch<CR>'
+  exe 'noremap ' . g:tags_char_global_map . ' <Cmd>call tags#set_search(0, 0, 1)<CR>'
+  exe 'noremap ' . g:tags_word_global_map . ' <Cmd>call tags#set_search(1, 0, 1)<CR>'
+  exe 'noremap ' . g:tags_WORD_global_map . ' <Cmd>call tags#set_search(2, 0, 1)<CR>'
+  exe 'noremap ' . g:tags_word_local_map . ' <Cmd>call tags#set_search(1, 1, 1)<CR>'
+  exe 'noremap ' . g:tags_WORD_local_map . ' <Cmd>call tags#set_search(2, 1, 1)<CR>'
 endif
 
 " Normal mode mappings that replicate :s/regex/sub/ behavior and can be repeated
@@ -215,18 +212,18 @@ if !g:tags_nomap_searches
   exe 'nmap ca' . g:tags_WORD_local_map . ' <Plug>TagsChangeWORDSLocal'
 endif
 nnoremap <Plug>TagsChangeRepeat <Cmd>call tags#change_repeat()<CR>
-nnoremap <Plug>TagsChangeMatchNext <Cmd>call tags#change_next(-1, 0)<CR>
-nnoremap <Plug>TagsChangeMatchPrev <Cmd>call tags#change_next(-1, 1)<CR>
-nnoremap <Plug>TagsChangeMatchesNext <Cmd>call tags#change_next(-1, 0, 1)<CR>
-nnoremap <Plug>TagsChangeMatchesPrev <Cmd>call tags#change_next(-1, 1, 1)<CR>
-nnoremap <Plug>TagsChangeCharGlobal <Cmd>call tags#change_next(0, 0)<CR>
-nnoremap <Plug>TagsChangeWordGlobal <Cmd>call tags#change_next(1, 0)<CR>
-nnoremap <Plug>TagsChangeWORDGlobal <Cmd>call tags#change_next(2, 0)<CR>
-nnoremap <Plug>TagsChangeWordLocal <Cmd>call tags#change_next(1, 1)<CR>
-nnoremap <Plug>TagsChangeWORDLocal <Cmd>call tags#change_next(2, 1)<CR>
-nnoremap <Plug>TagsChangeCharsGlobal <Cmd>call tags#change_next(0, 0, 1)<CR>
-nnoremap <Plug>TagsChangeWordsGlobal <Cmd>call tags#change_next(1, 0, 1)<CR>
-nnoremap <Plug>TagsChangeWORDSGlobal <Cmd>call tags#change_next(2, 0, 1)<CR>
+nnoremap <Plug>TagsChangeMatchNext <Cmd>call tags#change_next(@/, 0, 0)<CR>
+nnoremap <Plug>TagsChangeMatchPrev <Cmd>call tags#change_next(@/, 0, 1)<CR>
+nnoremap <Plug>TagsChangeMatchesNext <Cmd>call tags#change_next(@/, 1, 0)<CR>
+nnoremap <Plug>TagsChangeMatchesPrev <Cmd>call tags#change_next(@/, 1, 1)<CR>
+nnoremap <Plug>TagsChangeCharGlobal <Cmd>call tags#change_next(0, 0, 0)<CR>
+nnoremap <Plug>TagsChangeWordGlobal <Cmd>call tags#change_next(1, 0, 0)<CR>
+nnoremap <Plug>TagsChangeWORDGlobal <Cmd>call tags#change_next(2, 0, 0)<CR>
+nnoremap <Plug>TagsChangeWordLocal <Cmd>call tags#change_next(1, 0, 1)<CR>
+nnoremap <Plug>TagsChangeWORDLocal <Cmd>call tags#change_next(2, 0, 1)<CR>
+nnoremap <Plug>TagsChangeCharsGlobal <Cmd>call tags#change_next(0, 1, 0)<CR>
+nnoremap <Plug>TagsChangeWordsGlobal <Cmd>call tags#change_next(1, 1, 0)<CR>
+nnoremap <Plug>TagsChangeWORDSGlobal <Cmd>call tags#change_next(2, 1, 0)<CR>
 nnoremap <Plug>TagsChangeWordsLocal <Cmd>call tags#change_next(1, 1, 1)<CR>
 nnoremap <Plug>TagsChangeWORDSLocal <Cmd>call tags#change_next(2, 1, 1)<CR>
 
@@ -250,17 +247,17 @@ if !g:tags_nomap_searches
   exe 'nmap da' . g:tags_word_local_map . ' <Plug>TagsDeleteWordsLocal'
   exe 'nmap da' . g:tags_WORD_local_map . ' <Plug>TagsDeleteWORDSLocal'
 endif
-nnoremap <Plug>TagsDeleteMatchNext <Cmd>call tags#delete_next(-1, 0)<CR>
-nnoremap <Plug>TagsDeleteMatchPrev <Cmd>call tags#delete_next(-1, 1)<CR>
-nnoremap <Plug>TagsDeleteMatchesNext <Cmd>call tags#delete_next(-1, 0, 1)<CR>
-nnoremap <Plug>TagsDeleteMatchesPrev <Cmd>call tags#delete_next(-1, 1, 1)<CR>
-nnoremap <Plug>TagsDeleteCharGlobal <Cmd>call tags#delete_next(0, 0)<CR>
-nnoremap <Plug>TagsDeleteWordGlobal <Cmd>call tags#delete_next(1, 0)<CR>
-nnoremap <Plug>TagsDeleteWORDGlobal <Cmd>call tags#delete_next(1, 0)<CR>
-nnoremap <Plug>TagsDeleteWordLocal <Cmd>call tags#delete_next(1, 1)<CR>
-nnoremap <Plug>TagsDeleteWORDLocal <Cmd>call tags#delete_next(2, 1)<CR>
-nnoremap <Plug>TagsDeleteCharsGlobal <Cmd>call tags#delete_next(0, 0, 1)<CR>
-nnoremap <Plug>TagsDeleteWordsGlobal <Cmd>call tags#delete_next(1, 0, 1)<CR>
-nnoremap <Plug>TagsDeleteWORDSGlobal <Cmd>call tags#delete_next(2, 0, 1)<CR>
+nnoremap <Plug>TagsDeleteMatchNext <Cmd>call tags#delete_next(@/, 0, 0)<CR>
+nnoremap <Plug>TagsDeleteMatchPrev <Cmd>call tags#delete_next(@/, 0, 1)<CR>
+nnoremap <Plug>TagsDeleteMatchesNext <Cmd>call tags#delete_next(@/, 1, 0)<CR>
+nnoremap <Plug>TagsDeleteMatchesPrev <Cmd>call tags#delete_next(@/, 1, 1)<CR>
+nnoremap <Plug>TagsDeleteCharGlobal <Cmd>call tags#delete_next(0, 0, 0)<CR>
+nnoremap <Plug>TagsDeleteWordGlobal <Cmd>call tags#delete_next(1, 0, 0)<CR>
+nnoremap <Plug>TagsDeleteWORDGlobal <Cmd>call tags#delete_next(1, 0, 0)<CR>
+nnoremap <Plug>TagsDeleteWordLocal <Cmd>call tags#delete_next(1, 0, 1)<CR>
+nnoremap <Plug>TagsDeleteWORDLocal <Cmd>call tags#delete_next(2, 0, 1)<CR>
+nnoremap <Plug>TagsDeleteCharsGlobal <Cmd>call tags#delete_next(0, 1, 0)<CR>
+nnoremap <Plug>TagsDeleteWordsGlobal <Cmd>call tags#delete_next(1, 1, 0)<CR>
+nnoremap <Plug>TagsDeleteWORDSGlobal <Cmd>call tags#delete_next(2, 1, 0)<CR>
 nnoremap <Plug>TagsDeleteWordsLocal <Cmd>call tags#delete_next(1, 1, 1)<CR>
 nnoremap <Plug>TagsDeleteWORDSLocal <Cmd>call tags#delete_next(2, 1, 1)<CR>

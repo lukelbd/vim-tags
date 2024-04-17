@@ -765,19 +765,19 @@ function! tags#next_tag(count, ...) abort
     let args[0] = str2nr(tag[1])  " adjust line number
   endfor
   call tags#jump_tag(2, tag[1], tag[0])  " jump to line then name
-  if &l:foldopen =~# '\<block\>' | exe 'normal! zv' | endif
+  exe &l:foldopen =~# '\<block\>' ? 'normal! zv' : ''
 endfunction
 
 " Jump to the next or previous word under the cursor
 " Note: This is used with bracket w/W mappings
 function! tags#next_word(count, ...) abort
-  let global = a:0 && a:1
-  let winview = winsaveview()  " tags#set_match() moves to start of match
-  silent call tags#set_match(1, !global, 1)  " suppress scope emssage for now
-  let regex = @/ | let flags = a:count >= 0 ? 'w' : 'bw'
+  let winview = winsaveview()  " tags#set_search() moves to start of match
+  let local = a:0 ? 1 - a:1 : 1
+  silent call tags#set_search(1, 0, local, 1)  " suppress scope message for now
+  let [regex, flags] = [@/, a:count < 0 ? 'bw' : 'w']
   for _ in range(abs(a:count))
     let pos = getpos('.')
-    call search(regex, flags, 0, 0, "tags#get_inside(0, 'Constant', 'Comment')")
+    call search(regex, flags, 0, 0, "!tags#get_skip(0, 'Constant', 'Comment')")
     if getpos('.') == pos
       redraw | echohl WarningMsg
       echom 'Error: Next keyword not found'
@@ -790,47 +790,59 @@ function! tags#next_word(count, ...) abort
   let prefix = substitute(word, '\\[<>cC]', '', 'g')
   let suffix = line1 && line2 ? ' (lines ' . line1 . ' to ' . line2 . ')' : ''
   redraw | echom 'Keyword: ' . prefix . suffix
-  if &l:foldopen =~# '\<block\>' | exe 'normal! zv' | endif
+  exe &l:foldopen =~# '\<block\>' ? 'normal! zv' : ''
 endfunction
 
 "-----------------------------------------------------------------------------"
 " Keyword searching utilities
 "-----------------------------------------------------------------------------"
-" Return whether cursor is inside the requested syntax element(s)
-" Note: This uses the searcy() 'skip' parameter to skip matches inside comments and
+" Return match under cursor and whether inside requested syntax group
+" Note: Here level -1 is previous search, level 0 is current character, level 1 is
+" current word, and level 2 is current WORD. Second arg denotes scope boundary.
+" Note: This uses the search() 'skip' parameter to skip matches inside comments and
 " constants (i.e. strings). Similar method is used in succinct.vim for python docstrings
-function! tags#get_inside(arg, ...) abort
+function! tags#get_skip(arg, ...) abort
   let lnum = line('.')  " check against input column offset or given position
   let cnum = type(a:arg) ? col(a:arg) : col('.') + a:arg
   let cnum = max([cnum, 1])  " one-based indexing
   let cnum = min([cnum, col('$') - 1])  " end-of-line or end-of-file plus 1
   let stack = synstack(lnum, cnum)
   let sids = map(stack, 'synIDtrans(v:val)')
-  let status = 0  " default false
   for name in a:000  " group names
     let sid = synIDtrans(hlID(name))
-    if sid && index(sids, sid) != -1
-      let status = 1 | break
-    endif
-  endfor
-  return status
+    if sid && index(sids, sid) != -1 | return 1 | endif
+  endfor | return 0
+endfunction
+function! tags#get_search(level, ...) abort
+  let search = a:0 ? a:1 : 0
+  if type(a:level) | return a:level | endif
+  if a:level > 1
+    let regex = escape(expand('<cWORD>'), s:regex_magic)
+    let regex = search ? '\(^\|\s\)\zs' . regex . '\ze\($\|\s\)\C' : regex
+  elseif a:level > 0
+    let regex = escape(expand('<cword>'), s:regex_magic)
+    let regex = regex =~# '^\k\+$' ? search ? '\<' . regex . '\>\C' : regex : ''
+  else  " ··· note col('.') and string[:idx] uses byte index
+    let regex = strcharpart(strpart(getline('.'), col('.') - 1), 0, 1)
+    let regex = escape(empty(regex) ? "\n" : regex, s:regex_magic)
+  endif
+  return regex
 endfunction
 
 " Return major tag folding scope
 " See: https://stackoverflow.com/a/597932/4970632
 " See: http://vim.wikia.com/wiki/Search_in_current_function
 function! tags#get_scope(...) abort
-  " Initial stuff
-  let trunc = 20  " truncate long labels
+  " Find closing line and tag
+  let s:scope_bounds = []  " reset message cache
   let items = get(b:, 'tags_by_line', [])
   let items = filter(copy(items), 'tags#is_major(v:val)')
   let lines = map(deepcopy(items), 'str2nr(v:val[1])')
   if empty(items)
     redraw | echohl WarningMsg
-    echom 'Warning: Failed to restrict the search scope (tags unavailable).'
+    echom 'Error: Failed to restrict the search scope (tags unavailable).'
     echohl None | return ''
   endif
-  " Find closing line and tag
   let winview = winsaveview()
   exe a:0 ? a:1 : '' | let lnum = line('.')
   let [iline, line1, level1] = [-1, lnum, foldlevel('.')]
@@ -848,66 +860,81 @@ function! tags#get_scope(...) abort
   let isfold = level1 > 0 && line1 != line2
   let iscursor = lnum >= line1 && lnum <= line2
   if idx >= 0 && isfold && iscursor  " scope local search
-    let [label1, label2] = [items[idx][0], trim(getline(line2))]
-  else  " fallback to global search
-    let [line1, line2, label1, label2] = [1, line('$'), 'START', 'END']
+    let label1 = items[idx][0]
+    let label2 = trim(getline(line2))
+  elseif !a:force  " fallback to global search
+    let [line1, line2] = [1, line('$')]
+    let [label1, label2] = ['START', 'END']
+  else
+    let msg = isfold ? 'current scope is global' : 'major tag fold not found'
+    redraw | echohl WarningMsg
+    echom 'Error: Failed to restrict the search scope (' . msg . ').'
+    echohl None | return ''
   endif
-  let label1 = len(label1) <= trunc ? label1 : label1[:trunc - 3] . '···'
-  let label2 = len(label2) <= trunc ? label2 : label2[:trunc - 3] . '···'
-  let regex = printf('\%%>%dl\%%<%dl', line1 - 1, line2 + 1)
-  let msg = 'Selected lines ' . line1 . ' (' . label1 . ') to ' . line2 . ' (' . label2 . ').'
-  redraw | echom msg | return regex
+  let nmax = 20  " maximum label length
+  let label1 = len(label1) > nmax ? label1[:nmax - 3] . '···' : label1
+  let label2 = len(label2) > nmax ? label2[:nmax - 3] . '···' : label2
+  let s:scope_bounds = [line1, line2, label1, label2]  " see tags#show_search
+  return printf('\%%>%dl\%%<%dl', line1 - 1, line2 + 1)
 endfunction
 
 " Set the last search register to some 'current pattern' under cursor
-" Note: Here level -1 is previous search, level 0 is current character, level 1 is
-" current word, and level 2 is current WORD. Second arg denotes scope boundary.
-" Note: Here '!' handles multi-byte characters using example in :help byteidx. Also
-" the native vim-indexed-search maps invoke <Plug>(indexed-search-after), which just
+" Note: Native vim-indexed-search maps invoke <Plug>(indexed-search-after), which just
 " calls <Plug>(indexed-search-index) --> :ShowSearchIndex... but causes change maps
 " to silently abort for some weird reason... so instead call this manually.
-function! tags#get_match(level, ...) abort
-  let search = a:0 ? a:1 : 0
-  if a:level > 1
-    let item = escape(expand('<cWORD>'), s:regex_magic)
-    let item = search ? '\(^\|\s\)\zs' . item . '\ze\($\|\s\)\C' : item
-  elseif a:level > 0
-    let item = escape(expand('<cword>'), s:regex_magic)
-    let item = item =~# '^\k\+$' ? search ? '\<' . item . '\>\C' : item : ''
-  else  " ··· note col('.') and string[:idx] uses byte index
-    let item = strcharpart(strpart(getline('.'), col('.') - 1), 0, 1)
-    let item = escape(empty(item) ? "\n" : item, s:regex_magic)
+function! tags#show_search(...) abort
+  let regex = a:0 ? a:1 : @/
+  if !empty(get(s:, 'scope_bounds', []))
+    let [line1, line2; rest] = s:scope_bounds
+    let part1 = empty(rest) ? line1 : line1 . ' (' . rest[0] . ')'
+    let part2 = empty(rest) ? line2 : line2 . ' (' . rest[1] . ')'
+    echom 'Selected lines ' . part1 . ' to ' . part2 . '.'
+  else  " n flag prints results without substitution
+    let winview = winsaveview()  " store window as buffer variable
+    let search = escape(regex, '@')
+    call execute('%s@' . search . '@@gne')
+    call winrestview(winview)
   endif
-  return item
+  let keys = "\<Cmd>setlocal hlsearch\<CR>"
+  call feedkeys(keys, 'n') | let s:scope_bounds = []  " reset message cache
 endfunction
-function! tags#set_match(level, option, ...) abort
-  let adjust = a:0 && a:1
-  let scope = ''
-  if a:level < 0  " previous search
-    let prefix = 'Match'
-    let suffix = a:option ? 'Prev' : 'Next'
-  else  " cursor search
-    let prefix = a:level > 1 ? 'WORD' : a:level > 0 ? 'Word' : 'Char'
-    let suffix = a:option ? 'Local' : 'Global'
-    let item = tags#get_match(a:level, 0)
-    if adjust && empty(item) && foldclosed('.') == -1
-      exe getline('.') =~# '^\s*$' ? '' : 'normal! B'
-    endif
-    let item = tags#get_match(a:level, 1)
-    let char = strcharpart(strpart(getline('.'), col('.') - 1), 0, 1)
-    let flags = char =~# '\s' || a:level == 1 && char !~# '\k' ? 'cW' : 'cbW'
-    if a:0 && a:1 && strwidth(item) > 1
-      call search(item, flags, line('.'))
-    endif
-    let scope = a:option ? tags#get_scope() : ''
-    let @/ = scope . item
+function! tags#set_search(level, ...) range abort
+  let adjust = a:0 > 1 ? a:2 : 0
+  let local = a:0 > 0 ? a:1 : 0
+  let bnds = [a:firstline, a:lastline]
+  let match = tags#get_search(a:level, 0)
+  if adjust && empty(match) && foldclosed('.') == -1
+    exe getline('.') =~# '^\s*$' ? '' : 'normal! B'
   endif
-  if a:0 && a:1 && foldclosed('.') != -1
-    foldopen
+  let regex = tags#get_search(a:level, 1)
+  let char = strcharpart(strpart(getline('.'), col('.') - 1), 0, 1)
+  let flag = char =~# '\s' || a:level == 1 && char !~# '\k' ? 'cW' : 'cbW'
+  if adjust && strwidth(match) > 1
+    call search(regex, flag, line('.'))
   endif
+  if bnds[0] != bnds[1]  " user-input range
+    let scope = printf('\%%>%dl\%%<%dl', bnds[0] - 1, bnds[1] + 1) | let s:scope_bounds = bnds
+  elseif local  " local scope
+    let scope = tags#get_scope()
+  else  " global scope
+    let scope = ''
+  endif
+  if local && empty(scope)  " reset pattern
+    let @/ = '' | return []
+  else  " update pattern
+    let @/ = scope . regex
+  endif
+  let prefix = a:level > 1 ? 'WORD' : a:level > 0 ? 'Word' : 'Char'
+  let suffix = local ? 'Local' : 'Global'
   if empty(scope) && exists(':ShowSearchIndex')
-    call feedkeys("\<Cmd>ShowSearchIndex\<CR>", 'n')
+    let cmds = ['ShowSearchIndex', 'setlocal hlsearch']
+    let s:scope_bounds = []
+  else
+    let cmds = ['call tags#show_search(' . string(scope) . ')']
   endif
+  exe &l:foldopen =~# '\<block\>' && adjust ? 'normal! zv' : ''
+  call map(cmds, {_, val -> "\<Cmd>" . val . "\<CR>"})
+  call feedkeys(join(cmds, ''), 'n')
   return [prefix, suffix]
 endfunction
 
@@ -923,14 +950,6 @@ function! s:feed_repeat(name, ...) abort
   let cnt = a:0 ? a:1 : v:count
   let cmd = 'call repeat#set("' . plug . '", ' . cnt . ')'
   call feedkeys("\<Cmd>" . cmd . "\<CR>", 'n')
-endfunction
-function! tags#search_match(level, option) abort
-  call tags#set_match(a:level, a:option)
-  let winview = winsaveview()  " store window as buffer variable
-  let result = execute('%s@' . escape(@/, '@') . '@@gne')
-  call winrestview(winview)
-  call feedkeys("\<Cmd>setlocal hlsearch\<CR>", 'n')
-  return result
 endfunction
 
 " Set up repeat after finishing previous change on InsertLeave
@@ -967,28 +986,38 @@ endfunction
 " register may have keystrokes e.g. <80>kb (backspace) so must feed as 'typed'
 " Note: Unlike 'change all', 'delete all' can simply use :substitute. Also note
 " :hlsearch inside functions fails: https://stackoverflow.com/q/1803539/4970632
-function! tags#change_next(level, option, ...) abort
-  let [prefix, suffix] = tags#set_match(a:level, a:option)
-  let iterate = a:0 && a:1
-  let motion = a:level < 0 && a:option ? 'N' : 'n'
+function! tags#change_next(level, force, ...) abort
+  if a:level < 0  " e.g. c/
+    let motion = a:0 && a:1 ? 'N' : 'n'
+    let names = ['Match', motion ==# 'N' ? 'Prev' : 'Next']
+  else  " e.g. c*
+    let motion = 'n'
+    let names = call('tags#set_search', [a:level] + a:000)
+  endif
+  if empty(names) | return | endif  " scope not found
   let s:change_motion = motion
   call feedkeys('cg' . motion, 'n')
-  if !iterate  " change single match
+  if !a:force  " change single match
     let s:change_setup = ''
     call s:feed_repeat('TagsChangeRepeat')
   else  " change all matches
     let plural = a:level < 0 ? 'es' : 's'
-    let plug = 'TagsChange' . prefix . plural . suffix
+    let plug = 'TagsChange' . names[0] . plural . names[1]
     let s:change_setup = plug
     call s:feed_repeat(plug)
   endif
 endfunction
-function! tags#delete_next(level, option, ...) abort
-  let [prefix, suffix] = tags#set_match(a:level, a:option)
-  let iterate = a:0 && a:1
-  let motion = a:level < 0 && a:option ? 'N' : 'n'
-  if !iterate  " delete single item
-    let plug = 'TagsDelete' . prefix . suffix
+function! tags#delete_next(level, force, ...) abort
+  if a:level < 0
+    let motion = a:0 && a:1 ? 'N' : 'n'
+    let names = ['Match', motion ==# 'N' ? 'Prev' : 'Next']
+  else
+    let motion = 'n'
+    let names = call('tags#set_search', [a:level] + a:000)
+  endif
+  if empty(names) | return | endif  " scope not found
+  if !a:force  " delete single item
+    let plug = 'TagsDelete' . names[0] . names[1]
     call feedkeys('dg' . repeat(motion, 2), 'n')
     call s:feed_repeat(plug)
   else  " delete all matches
