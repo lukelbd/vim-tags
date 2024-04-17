@@ -550,7 +550,7 @@ function! s:goto_tag(mode, ...) abort
   let [lnum, cnum] = type(ipos) == type([]) ? ipos : [ipos, 0]
   call cursor(lnum, 1)
   if cnum <= 0
-    let regex = escape(name, s:regex_magic)
+    let regex = substitute(escape(name, s:regex_magic), '·*$', '', '')
     silent call search(regex, 'cW', lnum)
   elseif cnum > 1
     let motion = (cnum - 1) . 'l'
