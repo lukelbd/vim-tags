@@ -489,8 +489,9 @@ function! s:tag_source(level, ...) abort
 endfunction
 
 " Navigate to input tag list or fzf selection
-" Note: Here optionally preserve jumps triggered by line change, and try
-" to position cursor on exact match instead of start-of-line.
+" Note: This supports reading base path from trailing tab-delimited character. For
+" now not implemented in dotfiles since slow for huge libraries (even though needed
+" for large tags libraries). Also note this positions cursor on exact tag column.
 function! tags#goto_tag(...) abort  " :tag <name> analogue
   return call('s:goto_tag', [0] + a:000)
 endfunction
@@ -502,6 +503,7 @@ function! s:goto_tag(mode, ...) abort
   let from = getpos('.')  " from position
   let from[0] = bufnr()  " ensure correct buffer
   let path = expand('%:p')  " current path
+  let iloc = ''  " source vimtags file
   let native = '^\s*\(.\{-}\) *\t\(.\{-}\) *\t\(\d\+\)\%(;"\s*\(.*\)\)\?$'
   let custom = '^\%(\(.\{-}\):\)\?\s*\(\d\+\):\s\+\(.\{-}\)\s\+(\(.*\))$'
   if a:0 > 1  " non-fzf input
@@ -513,6 +515,12 @@ function! s:goto_tag(mode, ...) abort
   else  " e.g. cancelled selection
     return
   endif
+  let base = ''  " default base
+  let extra = split(get(extra, 0, ''), ' *\t', 1)
+  if a:1 =~# native && extra[-1] =~# 'tags$'
+    let base = fnamemodify(extra[-1], ':h')
+    let extra = slice(extra, 0, len(extra) - 1)
+  endif
   " Jump to tag buffer
   let heads = get(s:, 'path_heads', {})  " optional cache
   if empty(ibuf)
@@ -521,6 +529,8 @@ function! s:goto_tag(mode, ...) abort
     let ipath = expand('#' . ibuf . ':p')
   elseif filereadable(ibuf)
     let ipath = fnamemodify(ibuf, ':p')
+  elseif !empty(base)
+    let ipath = fnamemodify(base, ':p') . ibuf
   elseif has_key(heads, ibuf)  " relative to repo
     let ipath = s:path_heads[ibuf] . ibuf
   else  " absolute path
@@ -561,9 +571,8 @@ function! s:goto_tag(mode, ...) abort
   let keys = a:0 == 1 ? 'zz' : ''
   let keys .= &l:foldopen =~# word ? 'zv' : ''
   let keys .= a:mode && g:tags_keep_jumps || getpos("''") == getpos('.') ? '' : "m'"
-  exe 'normal! ' . keys
-  let extra = get(extra, 0, '')  " optional kind and scope
-  let [kind; rest] = split(extra, ' *\t', 1)
+  exe empty(keys) ? '' : 'normal! ' . keys
+  let [kind; rest] = extra  " see above
   let name = tags#kind_name(kind)
   let kind = empty(name) ? kind : name
   let info = join(empty(kind) ? rest : [kind] + rest, ', ')
