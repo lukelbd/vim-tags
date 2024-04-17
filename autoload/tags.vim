@@ -810,8 +810,8 @@ function! tags#get_skip(arg, ...) abort
   let sids = map(stack, 'synIDtrans(v:val)')
   for name in a:000  " group names
     let sid = synIDtrans(hlID(name))
-    if sid && index(sids, sid) != -1 | return 1 | endif
-  endfor | return 0
+    if sid && index(sids, sid) != -1 | return 0 | endif
+  endfor | return 1
 endfunction
 function! tags#get_search(level, ...) abort
   let search = a:0 ? a:1 : 0
