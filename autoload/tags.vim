@@ -562,8 +562,8 @@ function! s:goto_tag(mode, ...) abort
   let keys .= a:mode && g:tags_keep_jumps || getpos("''") == getpos('.') ? '' : "m'"
   exe empty(keys) ? '' : 'normal! ' . keys
   let [kind; rest] = extra  " see above
-  let name = tags#kind_name(kind)
-  let kind = empty(name) ? kind : name
+  let long = tags#kind_name(kind)
+  let kind = empty(long) ? kind : long
   let info = join(empty(kind) ? rest : [kind] + rest, ', ')
   let info = empty(info) ? '' : ' (' . info . ')'
   redraw | echom 'Tag: ' . name . info
