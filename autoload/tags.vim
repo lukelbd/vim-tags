@@ -345,8 +345,8 @@ function! tags#table_tags(...) abort
     if !empty(trim(table)) | call add(tables, trim(table)) | endif
   endfor
   if empty(tables)
-    redraw | echohl WarningMsg
-    echom 'Warning: Tags not found or not available.'
+    redraw | echohl ErrorMsg
+    echom 'Error: Tags not found or not available.'
     echohl None | return ''
   endif
   return 'Tags for ' . label . ":\n" . join(tables, "\n")
@@ -594,13 +594,13 @@ function! tags#select_tag(level, ...) abort
   let char = input || type(a:level) > 1 ? 'S' : a:level < 1 ? 'B' : a:level < 2 ? 'F' : ''
   let [result, names, heads] = s:tag_source(a:level, input ? a:1 : 1)
   if empty(result)
-    redraw | echohl WarningMsg
-    echom 'Warning: Tags not found or not available.'
+    redraw | echohl ErrorMsg
+    echom 'Error: Tags not found or not available.'
     echohl None | return
   endif
   if !exists('*fzf#run')
-    redraw | echohl WarningMsg
-    echom 'Warning: FZF plugin not found.'
+    redraw | echohl ErrorMsg
+    echom 'Error: fzf.vim plugin not available.'
     echohl None | return
   endif
   let options = {
