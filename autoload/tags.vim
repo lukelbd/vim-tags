@@ -10,6 +10,7 @@
 " Helper functions and variables
 scriptencoding utf-8
 let s:regex_magic = '[]\/.*$~'
+let s:keyword_mods = {'vim': ':', 'tex': ':-'}
 function! s:sort_by_line(tag1, tag2) abort
   let num1 = a:tag1[1]
   let num2 = a:tag2[1]
@@ -42,7 +43,7 @@ function! s:tag_is_kind(tag, name, default, ...) abort
   return index(opts, kind1) >= 0 || index(opts, kind2) >= 0
 endfunction
 
-" Return ctags filetype or
+" Return ctags kind or language
 let g:tags_kind_chars = {}
 let g:tags_kind_names = {}
 let g:tags_kind_langs = {}
@@ -65,16 +66,58 @@ endfunction
 "-----------------------------------------------------------------------------"
 " Buffer listing utilities
 "-----------------------------------------------------------------------------"
-" Return [tab, buffer] number pairs in order of proximity to current tab
+" Return buffers sorted by access time
+" Note: This optionally filters out tabs accessed after 'startup time' determined
+" from files with smallest access times and within 10 seconds of each other.
+function! s:bufs_filter(buf, ...)
+  let ftype = a:0 ? a:1 : ''
+  let btype = getbufvar(a:buf, '&filetype')
+  if !empty(ftype) && ftype !=# btype
+    return 0
+  endif
+  if !filereadable(expand('#' . a:buf . ':p'))
+    return 0
+  endif
+  if empty(btype) || index(g:tags_skip_filetypes, btype) != -1
+    return 0
+  endif
+  return 1
+endfunction
+function! tags#bufs_recent(...) abort
+  let nostartup = a:0 > 0 ? a:1 : 0
+  let filter = a:0 > 1 ? a:2 : 0
+  let ftype = a:0 > 2 ? a:3 : ''
+  let mintime = 0  " default minimum time
+  let bufs = map(getbufinfo(), {idx, val -> [val.bufnr, get(val, 'lastused', 0)]})
+  if nostartup  " auto-detect threshold for sorting
+    for btime in sort(map(copy(bufs), 'v:val[1]'))  " approximate loading time
+      if mintime && btime - mintime > 10 | break | endif | let mintime = btime
+    endfor
+  endif
+  let recent = []  " buffers used after mintime
+  for [bnr, btime] in bufs
+    if filter && !s:bufs_filter(bnr, ftype)
+      continue
+    endif
+    if btime > mintime
+      call add(recent, [bnr, btime])
+    endif
+  endfor
+  let recent = sort(recent, {val1, val2 -> val2[1] - val1[1]})
+  return map(recent, 'v:val[0]')
+endfunction
+
+" Return buffers sorted by proximity to current tab
 " Note: This optionally filters out buffers not belonging to the active
 " filetype used for :tag-style definition jumping across multiple windows.
-function! s:bufs_close(...) abort
+function! tags#bufs_nearby(...) abort
   let tnr = tabpagenr()  " active tab
   let tleft = tnr
   let tright = tnr - 1  " initial value
-  let ftype = a:0 ? tags#kind_lang(a:1) : ''  " restricted type
-  let pairs = []  " [tnr, bnr] pairs
-  while 1
+  let filter = a:0 > 0 ? a:1 : 0
+  let ftype = a:0 > 1 ? a:2 : ''
+  let bufs = []  " buffer numbers
+  while v:true
     if tnr == tleft
       let tright += 1 | let tnr = tright
     else
@@ -88,69 +131,52 @@ function! s:bufs_close(...) abort
       continue  " possibly more tabs to the right
     endif
     for bnr in tabpagebuflist(tnr)
-      let path = expand('#' . bnr . ':p')
-      let btype = getbufvar(bnr, '&filetype')
-      if !empty(ftype) && ftype !=# tags#kind_lang(bnr)
+      if filter && !s:bufs_filter(bnr, ftype)
         continue
-      elseif filereadable(path) && index(g:tags_skip_filetypes, btype) == -1
-        call add(pairs, [tnr, bnr]) | break  " one entry per tab
+      endif
+      if index(bufs, bnr) == -1
+        call add(bufs, bnr)  " one entry per buffer
       endif
     endfor
   endwhile
-  return pairs
-endfunction
-
-" Return buffers accessed after given time
-" Note: This defaults to returning tabs accessed after 'startup time' determined from
-" files with smallast access times and within 10 seconds of each other.
-function! tags#bufs_recent(...) abort
-  let bufs = map(getbufinfo(), {idx, val -> [val.bufnr, get(val, 'lastused', 0)]})
-  let mintime = a:0 ? a:1 : 0
-  if !a:0  " auto-detect threshold for sorting
-    for btime in sort(map(copy(bufs), 'v:val[1]'))  " approximate loading time
-      if mintime && btime - mintime > 10 | break | endif | let mintime = btime
-    endfor
-  endif
-  let recent = []  " buffers used after mintime
-  for [bnr, btime] in bufs
-    if btime > mintime
-      call add(recent, [bnr, btime])
-    endif
-  endfor
-  let recent = sort(recent, {val1, val2 -> val2[1] - val1[1]})
-  let recent = map(recent, 'v:val[0]')
-  return recent
+  return bufs
 endfunction
 
 " Return [tab, buffer] pairs sorted by recent use
 " Note: This sorts buffers using three methods: first by recent use among the
 " author's vimrc 'tab stack' utility, second by recent use among all other tabs,
 " and third by physical proximity to the current tab. Useful for fzf selection.
-function! tags#buffer_paths(...) abort
-  let pairs = call('s:bufs_close', a:000)
-  let bnrs = map(copy(pairs), 'v:val[1]')
-  let idxs = []
+function! tags#get_types(...) abort
+  let cache = a:0 > 2 ? a:3 : {}  " cached matches
+  let ftype = a:0 > 1 ? a:2 : &l:filetype
+  let regex = tags#type_regex(ftype)  " auto-construct filetype regex
+  let paths = a:0 && type(a:1) > 1 ? copy(a:1) : map(tags#get_paths(), 'v:val[1]')
+  return filter(paths, {idx, val -> tags#type_match(val, ftype, regex, cache)})
+endfunction
+function! tags#get_paths(...) abort
+  let ftype = a:0 ? a:1 : ''  " ensure filtering
+  let stack = get(g:, 'tab_stack', [])  " stack of absolute paths
+  let stack = map(copy(stack), 'bufnr(v:val)')
+  let brecent = tags#bufs_recent(1, 1, ftype)  " sorted after startup, filtered
+  let bnearby = tags#bufs_nearby(1, ftype)  " sorted by proximity, filtered
+  let idxs = []  " recorded nearby buffers
   let stacked = []  " sorted by access time
   let temporal = []  " sorted by access time
   let physical = []  " ordered by adjacency
-  let stack = get(g:, 'tab_stack', [])  " stack of absolute paths
-  let stack = map(copy(stack), 'bufnr(v:val)')
-  for bnr in tags#bufs_recent()
-    let idx = index(bnrs, bnr)
-    if idx != -1  " move to the front
-      let tnr = pairs[idx][0]
-      let path = expand('#' . bnr . ':p')
-      let items = index(stack, bnr) == -1 ? temporal : stacked
-      call add(idxs, idx)
-      call add(items, [tnr, path])
-    endif
+  for bnr in brecent  " after startup
+    let idx = index(bnearby, bnr)
+    if idx == -1 | return | endif  " should not happen
+    let path = expand('#' . bnr . ':p')
+    let items = index(stack, bnr) == -1 ? temporal : stacked
+    call add(idxs, idx)
+    call add(items, path)
   endfor
-  for idx in range(len(pairs))
-    if index(idxs, idx) == -1
-      let [tnr, bnr] = pairs[idx]
-      let path = expand('#' . bnr . ':p')
-      call add(physical, [tnr, path])
-    endif
+  for idx in range(len(bnearby))
+    let jdx = index(idxs, idx)
+    if jdx != -1 | continue | endif
+    let bnr = bnearby[idx]
+    let path = expand('#' . bnr . ':p')
+    call add(physical, path)
   endfor
   let pairs = stacked + temporal + physical
   return pairs  " prefer most recently visited then closest
@@ -161,14 +187,6 @@ endfunction
 " for matches. Helps reduce false positives when tag jumping in large sessions.
 " Todo: Remove this and use ctags --machinable --list-maps instead or possibly
 " use -F with a given file then print the name.
-function! tags#type_paths(...) abort
-  let cache = a:0 > 2 ? a:3 : {}  " cached matches
-  let ftype = a:0 > 1 ? a:2 : &l:filetype
-  let regex = tags#type_regex(ftype)  " auto-construct filetype regex
-  let paths = a:0 && type(a:1) > 1 ? copy(a:1) : map(tags#buffer_paths(), 'v:val[1]')
-  let paths = filter(paths, {idx, val -> tags#type_match(val, ftype, regex, cache)})
-  return paths
-endfunction
 function! tags#type_regex(...) abort
   let ftype = a:0 ? a:1 : &l:filetype
   let suffix = '\<' . ftype. '\>\s*$'  " commands should end with filetype
@@ -192,7 +210,7 @@ function! tags#type_match(path, ...) abort
     endif
   endif
   let name = fnamemodify(path, ':t')
-  let btype = tags#kind_lang(path)
+  let btype = getbufvar(bufnr(path), '&filetype', '')
   if !empty(btype) && btype ==# ftype
     let imatch = 1
   elseif empty(regex)
@@ -226,17 +244,17 @@ endfunction
 " Note: This is used for buffer variables and unopened :ShowTags path(s)
 " Note: Output should be in number mode (i.e. shows line number instead of full line)
 function! s:execute_tags(path, ...) abort
-  let name = empty(a:path) ? '' : tags#kind_lang(expand(a:path))
+  let ftype = empty(a:path) ? '' : tags#kind_lang(expand(a:path))
   let path = empty(a:path) ? '' : fnamemodify(expand(a:path), ':p')
-  let flag = empty(name) || fnamemodify(path, ':t') =~# '\.' ? '' : '--language-force=' . name
+  let flag = empty(ftype) || fnamemodify(path, ':t') =~# '\.' ? '' : '--language-force=' . ftype
   let cmd = 'ctags -f - --excmd=number ' . join(a:000, ' ') . ' ' . flag
   let cmd .= ' ' . shellescape(path) . ' 2>/dev/null'
   let cmd .= empty(path) ? '' : " | cut -d'\t' -f1,3-5 | sed 's/;\"\t/\t/g'"
   return system(cmd)
 endfunction
 function! s:generate_tags(path) abort
-  let ftype = tags#kind_lang(a:path)  " possibly empty string
-  if index(g:tags_skip_filetypes, ftype) >= 0
+  let ftype = getbufvar(bufnr(a:path), '&filetype')  " possibly empty string
+  if empty(ftype) || index(g:tags_skip_filetypes, ftype) >= 0
     let items = []
   else  " generate tags
     let items = split(s:execute_tags(a:path), '\n')
@@ -259,14 +277,14 @@ endfunction
 " save time. Also note files open in multiple windows have the same buffer number
 " Note: Ctags has both language 'aliases' for translating internal options like
 " --language-force and 'mappings' that convert file names to languages. Seems alias
-" defitions were developed with vim in mind so no need to use their extensions.
+" definitions were developed with vim in mind so no need to use their extensions.
 function! tags#update_tags(...) abort
   let global = a:0 ? a:1 : 0
   if empty(g:tags_kind_names) || empty(g:tags_kind_chars)
     call tags#update_kinds()
   endif
   if global  " global paths
-    let paths = map(tags#buffer_paths(), 'v:val[1]')
+    let paths = map(tags#get_paths(), 'v:val[1]')
   else  " local path
     let paths = [expand('%:p')]
   endif
@@ -314,7 +332,7 @@ endfunction
 " let table = substitute(table, escape(path, s:regex_magic), '', 'g')
 function! tags#table_tags(...) abort
   if index(a:000, 'all') >= 0  " all open paths
-    let paths = map(tags#buffer_paths(), 'v:val[1]')
+    let paths = map(tags#get_paths(), 'v:val[1]')
     let label = 'all open paths'
   elseif a:0  " input path(s)
     let paths = copy(a:000)
@@ -364,7 +382,7 @@ function! tags#table_kinds(...) abort
     let minor = map(copy(types), {idx, val -> val . ' ' . string(get(uminor, val, 'v'))})
     let major = ['default ' . string('f')] + major
     let minor = ['default ' . string('v')] + minor
-    let types = uniq(map(tags#buffer_paths(), 'tags#kind_lang(v:val[1])'))
+    let types = uniq(map(tags#get_paths(), 'tags#kind_lang(v:val[1])'))
     let label = 'all buffer filetypes'
   elseif a:0  " input filetype(s)
     let types = uniq(sort(map(copy(a:000), 'tags#kind_lang(v:val)')))
@@ -419,7 +437,7 @@ endfunction
 " Return truncated paths
 " Note: This truncates tag paths as if they were generated by gutentags and written
 " to tags files. If root finder unavailable also try relative to git repository.
-function! s:path_name(path, ...) abort
+function! s:get_name(path, ...) abort
   let names = a:0 > 0 ? a:1 : {}  " cached names
   let heads = a:0 > 1 ? a:2 : {}  " cached heads
   let path = fnamemodify(a:path, ':p')
@@ -449,9 +467,9 @@ function! s:tag_source(level, ...) abort
   elseif type(a:level) > 1  " user input paths
     let paths = deepcopy(a:level)
   elseif a:level > 1  " global paths
-    let paths = map(tags#buffer_paths(), 'v:val[1]')
+    let paths = map(tags#get_paths(), 'v:val[1]')
   elseif a:level > 0  " filetype paths
-    let paths = map(tags#buffer_paths(bufname()), 'v:val[1]')
+    let paths = map(tags#get_paths(&l:filetype), 'v:val[1]')
   else  " local path
     let paths = [expand('%:p')]
   endif
@@ -468,7 +486,7 @@ function! s:tag_source(level, ...) abort
       " vint: -ProhibitUsingUndeclaredVariable
       let [idx, jdx, kdx, fmt] = show ? [2, 3, 4, '%s:'] : [1, 2, 3, '']
       call map(opts, 'v:val[:idx] + [tags#kind_char(v:val[jdx])] + v:val[kdx:]')
-      call map(opts, show ? '[s:path_name(v:val[0], names, heads)] + v:val[1:]' : 'v:val')
+      call map(opts, show ? '[s:get_name(v:val[0], names, heads)] + v:val[1:]' : 'v:val')
       call map(opts, 'add(v:val[:idx], join(v:val[jdx:], ", "))')
       call map(opts, 'call("printf", [' . string(fmt . '%4d: %s (%s)') . '] + v:val)')
     endif
@@ -614,89 +632,22 @@ endfunction
 "-----------------------------------------------------------------------------"
 " Tag navigation utilities
 "-----------------------------------------------------------------------------"
-" Get tags and tag files using &g:tags setting
-" Note: Here tagfiles() function returns buffer-local variables so use &g:tags instead,
-" and note that literal commas/spaces preced by backslash (see :help option-backslash).
-" Note: Here modify &l:tags temporarily to optionally exclude unrelated projects, since
-" taglist() uses tagfiles() which may include unrelated projects if &l:tags unset. Also
-" note function expects regex i.e. behaves like :tags /<name> (see :help taglist()).
-function! tags#get_tags(name, ...) abort
-  let regex = '^' . escape(a:name, s:regex_magic) . '$'
-  let path = expand(a:0 ? a:1 : '%')
-  let tags = call('tags#get_files', a:000)
-  call map(tags, {_, val -> substitute(val, '\(,\| \)', '\\\1', 'g')})
-  let [itags, jtags] = [&l:tags, join(tags, ',')]
-  try
-    let &l:tags = jtags
-    return taglist(regex, path)
-  finally
-    let &l:tags = itags
-  endtry
-endfunction
-function! tags#get_files(...) abort
-  let strict = a:0 > 1 ? a:2 : 0
-  let source = a:0 > 0 ? a:1 : ''
-  let source = expand(empty(source) ? '%' : source)
-  let head = fnamemodify(source, ':p')  " initial value
-  let tags = split(&g:tags, '\\\@<!,')  " see above
-  call map(tags, {_, val -> substitute(val, '\\\(,\| \)', '\1', 'g')})
-  call map(tags, {_, val -> fnamemodify(val, ':p')})
-  let heads = map(copy(tags), {_, val -> fnamemodify(val, ':h')})
-  let result = []  " filtered tag files
-  while v:true
-    let ihead = fnamemodify(head, ':h')
-    if empty(ihead) || ihead ==# head | break | endif
-    let idx = index(heads, ihead)
-    if idx >= 0 | call add(result, tags[idx]) | endif
-    let head = ihead  " tag file candidate
-  endwhile
-  if !strict  " other paths lower priority
-    call extend(result, filter(tags, 'index(result, v:val) < 0'))
+" Get the 'current' tag definition under or preceding the cursor
+" Note: This is used with statusline and :CurrentTag
+function! tags#current_tag(...) abort
+  let lnum = line('.')
+  let info = tags#find_tag(lnum, 0, 0, 0)
+  let full = a:0 ? a:1 : 1  " print full tag
+  if empty(info)
+    let parts = []
+  elseif !full || len(info) == 3
+    let parts = [info[2], info[0]]
+  else  " include extra information
+    let extra = substitute(info[3], '^.*:', '', '')
+    let parts = [info[2], extra, info[0]]
   endif
-  return result
-endfunction
-
-" Go to the tag keyword under the cursor
-" Note: Vim does not natively support jumping separate windows so implement here
-let s:keyword_mods = {'vim': ':', 'tex': ':-'}
-function! tags#goto_name(...) abort
-  let cache = {}
-  let level = a:0 ? a:1 : 0
-  let path = expand('%:p')
-  let keys = &l:iskeyword
-  let names = a:000[1:]
-  if empty(names)  " tag names
-    let mods = get(s:keyword_mods, &l:filetype, '')
-    let mods = split(mods, '\zs')
-    try
-      let &l:iskeyword = join([keys] + mods, ',')
-      let names = [expand('<cword>'), expand('<cWORD>')]
-    finally
-      let &l:iskeyword = keys
-    endtry
-  endif
-  for name in names
-    let name = substitute(name, '\(^\s*\|\s*$\)', '', 'g')
-    if empty(name) | return | endif
-    let itags = tags#get_tags(name, path)
-    for itag in itags  " search 'tags' files
-      let ipath = fnamemodify(itag.filename, ':p')
-      if level < 1 && ipath !=# path | continue | endif
-      let itype = tags#type_paths([ipath], &l:filetype, cache)
-      if level < 2 && empty(itype) | continue | endif
-      let item = [ipath, itag.cmd, itag.name, itag.kind]
-      return tags#_select_tag({}, 0, item)
-    endfor
-    let [itags; rest] = s:tag_source(level, 0)  " search buffer tag variables
-    for [ipath, iline, iname; irest] in itags
-      if name !=# iname | continue | endif
-      let item = [ipath, iline, iname] + irest
-      return tags#_select_tag({}, 0, item)
-    endfor
-  endfor
-  redraw | echohl ErrorMsg
-  echom 'Error: Tag ' . string(names[0]) . ' not found'
-  echohl None | return 1
+  let string = join(parts, ':')
+  return string
 endfunction
 
 " Find the tag closest to the input position
@@ -738,22 +689,46 @@ function! tags#find_tag(...) abort
   return [name, lnum, kind] + rest
 endfunction
 
-" Get the 'current' tag definition under or preceding the cursor
-" Note: This is used with statusline and :CurrentTag
-function! tags#current_tag(...) abort
-  let lnum = line('.')
-  let info = tags#find_tag(lnum, 0, 0, 0)
-  let full = a:0 ? a:1 : 1  " print full tag
-  if empty(info)
-    let parts = []
-  elseif !full || len(info) == 3
-    let parts = [info[2], info[0]]
-  else  " include extra information
-    let extra = substitute(info[3], '^.*:', '', '')
-    let parts = [info[2], extra, info[0]]
+" Go to the tag keyword under the cursor
+" Note: Vim does not natively support jumping separate windows so implement here
+function! tags#goto_name(...) abort
+  let cache = {}
+  let level = a:0 ? a:1 : 0
+  let path = expand('%:p')
+  let keys = &l:iskeyword
+  let names = a:000[1:]
+  if empty(names)  " tag names
+    let mods = get(s:keyword_mods, &l:filetype, '')
+    let mods = split(mods, '\zs')
+    try
+      let &l:iskeyword = join([keys] + mods, ',')
+      let names = [expand('<cword>'), expand('<cWORD>')]
+    finally
+      let &l:iskeyword = keys
+    endtry
   endif
-  let string = join(parts, ':')
-  return string
+  for name in names
+    let name = substitute(name, '\(^\s*\|\s*$\)', '', 'g')
+    if empty(name) | return | endif
+    let itags = tags#tag_list(name, path)
+    for itag in itags  " search 'tags' files
+      let ipath = fnamemodify(itag.filename, ':p')
+      if level < 1 && ipath !=# path | continue | endif
+      let itype = tags#get_types([ipath], &l:filetype, cache)
+      if level < 2 && empty(itype) | continue | endif
+      let item = [ipath, itag.cmd, itag.name, itag.kind]
+      return tags#_select_tag({}, 0, item)
+    endfor
+    let [itags; rest] = s:tag_source(level, 0)  " search buffer tag variables
+    for [ipath, iline, iname; irest] in itags
+      if name !=# iname | continue | endif
+      let item = [ipath, iline, iname] + irest
+      return tags#_select_tag({}, 0, item)
+    endfor
+  endfor
+  redraw | echohl ErrorMsg
+  echom 'Error: Tag ' . string(names[0]) . ' not found'
+  echohl None | return 1
 endfunction
 
 " Jump to the next or previous tag under the cursor
@@ -797,6 +772,50 @@ function! tags#next_word(count, ...) abort
   let suffix = line1 && line2 ? ' (lines ' . line1 . ' to ' . line2 . ')' : ''
   redraw | echom 'Keyword: ' . prefix . suffix
   exe &l:foldopen =~# '\<block\>' ? 'normal! zv' : ''
+endfunction
+
+" Return tag files prioritized for current project
+" Note: Here tagfiles() function returns buffer-local variables so use &g:tags instead,
+" and note that literal commas/spaces preced by backslash (see :help option-backslash).
+function! tags#tag_files(...) abort
+  let strict = a:0 > 1 ? a:2 : 0
+  let source = a:0 > 0 ? a:1 : ''
+  let source = expand(empty(source) ? '%' : source)
+  let head = fnamemodify(source, ':p')  " initial value
+  let tags = split(&g:tags, '\\\@<!,')  " see above
+  call map(tags, {_, val -> substitute(val, '\\\(,\| \)', '\1', 'g')})
+  call map(tags, {_, val -> fnamemodify(val, ':p')})
+  let heads = map(copy(tags), {_, val -> fnamemodify(val, ':h')})
+  let result = []  " filtered tag files
+  while v:true
+    let ihead = fnamemodify(head, ':h')
+    if empty(ihead) || ihead ==# head | break | endif
+    let idx = index(heads, ihead)
+    if idx >= 0 | call add(result, tags[idx]) | endif
+    let head = ihead  " tag file candidate
+  endwhile
+  if !strict  " other paths lower priority
+    call extend(result, filter(tags, 'index(result, v:val) < 0'))
+  endif
+  return result
+endfunction
+
+" Return tags from tag files
+" Note: Here modify &l:tags temporarily to optionally exclude unrelated projects, since
+" taglist() uses tagfiles() which may include unrelated projects if &l:tags unset. Also
+" note function expects regex i.e. behaves like :tags /<name> (see :help taglist()).
+function! tags#tag_list(name, ...) abort
+  let regex = '^' . escape(a:name, s:regex_magic) . '$'
+  let path = expand(a:0 ? a:1 : '%')
+  let tags = call('tags#tag_files', a:000)
+  call map(tags, {_, val -> substitute(val, '\(,\| \)', '\\\1', 'g')})
+  let [itags, jtags] = [&l:tags, join(tags, ',')]
+  try
+    let &l:tags = jtags
+    return taglist(regex, path)
+  finally
+    let &l:tags = itags
+  endtry
 endfunction
 
 "-----------------------------------------------------------------------------"
