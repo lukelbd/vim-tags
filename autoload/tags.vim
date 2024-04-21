@@ -150,7 +150,7 @@ function! tags#get_types(...) abort
   let cache = a:0 > 2 ? a:3 : {}  " cached matches
   let ftype = a:0 > 1 ? a:2 : &l:filetype
   let regex = tags#type_regex(ftype)  " auto-construct filetype regex
-  let paths = a:0 && type(a:1) > 1 ? copy(a:1) : map(tags#get_paths(), 'v:val[1]')
+  let paths = a:0 && type(a:1) > 1 ? copy(a:1) : tags#get_paths()
   return filter(paths, {idx, val -> tags#type_match(val, ftype, regex, cache)})
 endfunction
 function! tags#get_paths(...) abort
@@ -284,7 +284,7 @@ function! tags#update_tags(...) abort
     call tags#update_kinds()
   endif
   if global  " global paths
-    let paths = map(tags#get_paths(), 'v:val[1]')
+    let paths = tags#get_paths()
   else  " local path
     let paths = [expand('%:p')]
   endif
@@ -332,7 +332,7 @@ endfunction
 " let table = substitute(table, escape(path, s:regex_magic), '', 'g')
 function! tags#table_tags(...) abort
   if index(a:000, 'all') >= 0  " all open paths
-    let paths = map(tags#get_paths(), 'v:val[1]')
+    let paths = tags#get_paths()
     let label = 'all open paths'
   elseif a:0  " input path(s)
     let paths = copy(a:000)
@@ -382,7 +382,7 @@ function! tags#table_kinds(...) abort
     let minor = map(copy(types), {idx, val -> val . ' ' . string(get(uminor, val, 'v'))})
     let major = ['default ' . string('f')] + major
     let minor = ['default ' . string('v')] + minor
-    let types = uniq(map(tags#get_paths(), 'tags#kind_lang(v:val[1])'))
+    let types = uniq(map(tags#get_paths(), 'tags#kind_lang(v:val)'))
     let label = 'all buffer filetypes'
   elseif a:0  " input filetype(s)
     let types = uniq(sort(map(copy(a:000), 'tags#kind_lang(v:val)')))
@@ -467,9 +467,9 @@ function! s:tag_source(level, ...) abort
   elseif type(a:level) > 1  " user input paths
     let paths = deepcopy(a:level)
   elseif a:level > 1  " global paths
-    let paths = map(tags#get_paths(), 'v:val[1]')
+    let paths = tags#get_paths()
   elseif a:level > 0  " filetype paths
-    let paths = map(tags#get_paths(&l:filetype), 'v:val[1]')
+    let paths = tags#get_paths(&l:filetype)
   else  " local path
     let paths = [expand('%:p')]
   endif
