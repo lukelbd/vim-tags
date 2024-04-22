@@ -195,13 +195,13 @@ endfunction
 function! tags#type_match(path, ...) abort
   let ftype = a:0 > 0 ? a:1 : &l:filetype  " filetype to match
   let regex = a:0 > 1 ? a:2 : tags#type_regex(ftype)
-  let cache = a:0 > 2 ? a:3 : {}  " entries {'path': 'type', 'path': ''}
+  let types = a:0 > 2 ? a:3 : {}  " entries {'path': 'type', 'path': ''}
   let fast = a:0 > 3 ? a:4 : 0  " already checked this filetype
   let path = fnamemodify(a:path, ':p')
-  if has_key(cache, path)
-    let ctype = cache[path]
-    if !empty(ctype) || fast
-      return ctype ==# ftype
+  if has_key(types, path)
+    let itype = types[path]
+    if !empty(itype) || fast
+      return itype ==# ftype
     endif
   endif
   let name = fnamemodify(path, ':t')
@@ -227,8 +227,8 @@ function! tags#type_match(path, ...) abort
       let imatch = imatch || 'name.' . cmd =~# regex
     endif
   endif
-  let ctype = imatch ? ftype : !empty(btype) ? btype : ''
-  let cache[path] = ctype
+  let itype = imatch ? ftype : !empty(btype) ? btype : ''
+  let types[path] = itype
   return imatch
 endfunction
 
@@ -408,23 +408,35 @@ endfunction
 "-----------------------------------------------------------------------------
 " Tag selection utiltiies
 "-----------------------------------------------------------------------------
-" Return index of input tag in the stack
+" Return or set the tag stack index
 " Note: This is used to manually update the tag stack index, allowing us to emulate
 " native vim :tag with tags#iter_tags(1, ...) and :pop with tags#iter_tags(-1, ...).
 function! s:get_index(name, ...) abort  " stack index
-  let direc = a:0 ? a:1 : 0
   let stack = gettagstack(winnr())
   let items = get(stack, 'items', [])
   let idxs = []  " exact tag matches
-  for idx in range(len(items))  " search tag stack
-    let item = items[idx]
-    let name = get(item, 'tagname', '')
-    let bnr = get(item, 'bufnr', 0)
-    if name ==# a:name && bnr == bufnr()
+  for idx in range(len(items))
+    let item = items[idx]  " search tag stack
+    if item.tagname ==# a:name && item.bufnr == bufnr()
       call add(idxs, idx)
     endif
   endfor
-  return empty(idxs) ? -1 : direc < 0 ? idxs[0] : idxs[-1]
+  return empty(idxs) ? -1 : a:0 && a:1 < 0 ? idxs[0] : idxs[-1]
+endfunction
+function! s:set_index(name, lnum, from, ...) abort
+  let scroll = a:0 ? a:1 : 0
+  if a:name ==# '<top>' | return | endif
+  if !scroll && !g:tags_keep_stack  " perform :tag <name>
+    let item = {'bufnr': bufnr(), 'from': a:from, 'matchnr': 1, 'tagname': a:name}
+    if item.bufnr != a:from[0] || a:lnum != a:from[1]  " push from curidx to top
+      call settagstack(winnr(), {'items': [item]}, 't')
+    endif
+  else  " perform :tag or :pop
+    let idx = s:get_index(a:name, scroll)
+    if idx > 0  " assign new stack index
+      call settagstack(winnr(), {'curidx': idx})
+    endif
+  endif
 endfunction
 
 " Return truncated paths
@@ -495,15 +507,14 @@ endfunction
 function! tags#goto_tag(...) abort  " :tag <name> analogue
   return call('s:goto_tag', [0] + a:000)
 endfunction
-function! tags#jump_tag(mode, ...) abort  " 1:naked tag/pop, 2:bracket jump
-  return call('s:goto_tag', [a:mode] + a:000)
+function! tags#_goto_tag(count, ...) abort  " 1:naked tag/pop, 2:bracket jump
+  return call('s:goto_tag', [a:count] + a:000)
 endfunction
-function! s:goto_tag(mode, ...) abort
+function! s:goto_tag(count, ...) abort
   " Parse tag input
-  let from = getpos('.')  " from position
-  let from[0] = bufnr()  " ensure correct buffer
   let path = expand('%:p')  " current path
-  let iloc = ''  " source vimtags file
+  let from = getpos('.')  " current position
+  let from[0] = bufnr()  " ensure correct buffer
   let native = '^\s*\(.\{-}\) *\t\(.\{-}\) *\t\(\d\+\)\%(;"\s*\(.*\)\)\?$'
   let custom = '^\%(\(.\{-}\):\)\?\s*\(\d\+\):\s\+\(.\{-}\)\s\+(\(.*\))$'
   if a:0 > 1  " non-fzf input
@@ -538,16 +549,19 @@ function! s:goto_tag(mode, ...) abort
     echom 'Error: Path ' . string(ibuf) . ' does not exist.'
     echohl None | return
   endif
-  let g:tag_name = [ipath, ipos, name]  " dotfiles stacks
-  if ipath ==# path  " record mark
-    exe a:mode && g:tags_keep_jumps || getpos("''") == getpos('.') ? '' : "normal! m'"
-  elseif exists('*file#open_drop')  " dotfiles utility
-    silent call file#open_drop(ipath)
-  else  " built-in utility
-    silent exe 'tab drop ' . fnameescape(ipath)
+  if ipath !=# path  " record mark
+    if exists('*file#goto_file')  " dotfiles utility
+      silent call file#goto_file(ipath)
+    else  " built-in utility
+      silent exe 'tab drop ' . fnameescape(ipath)
+    endif
   endif
   " Jump to tag position
-  let [lnum, cnum] = type(ipos) == type([]) ? ipos : [ipos, 0]
+  if !a:count || !g:tags_keep_jumps  " add jump
+    exe getpos('.') == getpos("''") ? '' : "normal! m'"
+  endif
+  let g:tag_name = [ipath, ipos, name]  " dotfiles stacks
+  let [lnum, cnum] = type(ipos) > 1 ? ipos : [ipos, 0]
   call cursor(lnum, 1)
   if cnum <= 0
     let regex = substitute(escape(name, s:regex_magic), '·*$', '', '')
@@ -556,21 +570,16 @@ function! s:goto_tag(mode, ...) abort
     let motion = (cnum - 1) . 'l'
     exe 'normal! ' . motion
   endif
-  if !a:mode && !g:tags_keep_stack && name !=# '<top>'  " perform :tag <name>
-    let item = {'bufnr': bufnr(), 'from': from, 'matchnr': 1, 'tagname': name}
-    if item.bufnr != from[0] || lnum != from[1]  " push from curidx to top
-      call settagstack(winnr(), {'items': [item]}, 't')
-    endif
-  elseif abs(a:mode) == 1  " perform :tag or :pop
-    let idx = s:get_index(name, a:mode)
-    if idx > 0  " assign new stack index
-      call settagstack(winnr(), {'curidx': idx})
-    endif
+  if abs(a:count) < 2 && name !=# '<top>'  " i.e. not block jump
+    call s:set_index(name, lnum, from, a:count)
   endif
-  let word = a:mode ? '\<block\>' : '\<tag\>'
   let keys = a:0 == 1 ? 'zz' : ''
-  let keys .= &l:foldopen =~# word ? 'zv' : ''
-  let keys .= a:mode && g:tags_keep_jumps || getpos("''") == getpos('.') ? '' : "m'"
+  if &l:foldopen =~# (a:count ? '\<block\>' : '\<tag\>')
+    let keys .= 'zv'  " open fold
+  endif
+  if !a:count || !g:tags_keep_jumps  " add jump
+    let keys .= getpos('.') == getpos("''") ? '' : "m'"
+  endif
   exe empty(keys) ? '' : 'normal! ' . keys
   let [kind; rest] = extra  " see above
   let long = tags#kind_name(kind)
@@ -584,18 +593,21 @@ endfunction
 " See: https://github.com/ludovicchabant/vim-gutentags/issues/349
 " Note: Usage is tags#select_tag(paths_or_level, options_or_iter) where second
 " argument indicates whether stacks should be updated (tags#goto_tag) or not
-" (tags#jump_tag) and first argument indicates the paths to search and whether to
+" (tags#_goto_tag) and first argument indicates the paths to search and whether to
 " display the path in the fzf prompt. The second argument can also be a list of tags
 " in the format [line, name, other] (or [path, line, name, other] if level > 0)
-function! tags#_select_tag(heads, mode, item) abort
-  let s:path_heads = a:heads
-  let name = a:mode ? 'tags#jump_tag' : 'tags#goto_tag'
-  if exists('*stack#push_stack')
-    let arg = a:mode ? type(a:item) > 1 ? [a:mode] + a:item : [a:mode, a:item] : a:item
-    call stack#push_stack('tag', name, arg, 0)
+function! tags#_select_tag(...) abort
+  if a:0 == 3
+    let [cnt, item, heads] = [a:1, a:3, a:2]
   else
-    let arg = a:mode ? [a:mode, a:item] : [a:item]
-    call call(name, arg)
+    let [cnt, item, heads] = [a:1, a:2, {}]
+  endif
+  let s:path_heads = heads
+  let args = type(item) > 1 ? [cnt] + item : [cnt, item]
+  if exists('*stack#push_stack')
+    call stack#push_stack('tag', 'tags#_goto_tag', args, 0)
+  else
+    call call('tags#_goto_tag', args)
   endif
   let s:path_heads = {} | return
 endfunction
@@ -603,7 +615,7 @@ function! tags#select_tag(level, ...) abort
   let input = a:0 && !empty(a:1)
   let mode = a:0 > 1 ? a:2 : 0
   let char = input || type(a:level) > 1 ? 'S' : a:level < 1 ? 'B' : a:level < 2 ? 'F' : ''
-  let [result, names, heads] = s:tag_source(a:level, input ? a:1 : 1)
+  let [result, _, heads] = s:tag_source(a:level, input ? a:1 : 1)
   if empty(result)
     redraw | echohl ErrorMsg
     echom 'Error: Tags not found or not available.'
@@ -616,7 +628,7 @@ function! tags#select_tag(level, ...) abort
   endif
   let options = {
     \ 'source': result,
-    \ 'sink': function('tags#_select_tag', [heads, mode]),
+    \ 'sink': function('tags#_select_tag', [mode, heads]),
     \ 'options': '--no-sort --prompt=' . string(char . 'Tag> ')
   \ }
   call fzf#run(fzf#wrap(options))
@@ -690,7 +702,7 @@ function! tags#goto_name(...) abort
   let iskey = &l:iskeyword
   let ftype = &l:filetype
   let regex = tags#type_regex()
-  let cache = {}  " file type cache
+  let types = {}  " file type cache
   let path = expand('%:p')
   if empty(names)  " tag names
     let mods = get(s:keyword_mods, &l:filetype, '')
@@ -709,16 +721,16 @@ function! tags#goto_name(...) abort
     for itag in itags  " search 'tags' files
       let ipath = fnamemodify(itag.filename, ':p')
       if level < 1 && ipath !=# path | continue | endif
-      let itype = tags#type_match(ipath, &l:filetype, regex, cache)
+      let itype = tags#type_match(ipath, &l:filetype, regex, types)
       if level < 2 && empty(itype) | continue | endif
       let item = [ipath, itag.cmd, itag.name, itag.kind]
-      return tags#_select_tag({}, 0, item)
+      return tags#_select_tag(0, item)
     endfor
-    let [itags; rest] = s:tag_source(level, 0)  " search buffer tag variables
+    let [itags, _, _] = s:tag_source(level, 0)  " search buffer tag variables
     for [ipath, iline, iname; irest] in itags
       if name !=# iname | continue | endif
       let item = [ipath, iline, iname] + irest
-      return tags#_select_tag({}, 0, item)
+      return tags#_select_tag(0, item)
     endfor
   endfor
   redraw | echohl ErrorMsg
@@ -740,7 +752,7 @@ function! tags#next_tag(count, ...) abort
     endif
     let args[0] = str2nr(tag[1])  " adjust line number
   endfor
-  call tags#jump_tag(2, tag[1], tag[0])  " jump to line then name
+  call tags#_goto_tag(2, tag[1], tag[0])  " jump to line then name
   exe &l:foldopen =~# '\<block\>' ? 'normal! zv' : ''
 endfunction
 
