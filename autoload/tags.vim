@@ -85,7 +85,7 @@ endfunction
 " Return buffers sorted by access time
 " Note: This optionally filters out tabs accessed after 'startup time' determined
 " from files with smallest access times and within 10 seconds of each other.
-function! tags#bufs_recent(...) abort
+function! tags#get_recents(...) abort
   let nostartup = a:0 > 0 ? a:1 : 0
   let filter = a:0 > 1 ? a:2 : 0
   let ftype = a:0 > 2 ? a:3 : ''
@@ -112,7 +112,7 @@ endfunction
 " Return buffers sorted by proximity to current tab
 " Note: This optionally filters out buffers not belonging to the active
 " filetype used for :tag-style definition jumping across multiple windows.
-function! tags#bufs_nearby(...) abort
+function! tags#get_neighbors(...) abort
   let tnr = tabpagenr()  " active tab
   let tleft = tnr
   let tright = tnr - 1  " initial value
@@ -152,8 +152,8 @@ function! tags#get_paths(...) abort
   let ftype = a:0 ? a:1 : ''  " ensure filtering
   let stack = get(g:, 'tab_stack', [])  " stack of absolute paths
   let stack = map(copy(stack), 'bufnr(v:val)')
-  let brecent = tags#bufs_recent(1, 1, ftype)  " sorted after startup, filtered
-  let bnearby = tags#bufs_nearby(1, ftype)  " sorted by proximity, filtered
+  let brecent = tags#get_recents(1, 1, ftype)  " sorted after startup, filtered
+  let bnearby = tags#get_neighbors(1, ftype)  " sorted by proximity, filtered
   let idxs = []  " recorded nearby buffers
   let stacked = []  " sorted by access time
   let temporal = []  " sorted by access time
