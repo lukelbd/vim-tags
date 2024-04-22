@@ -7,7 +7,7 @@
 " vim-tags/autoload file or naming the latter to tags.vim at all caused an autocmd
 " BufRead error on startup. Was impossible to diagnose so just use alternate names.
 "------------------------------------------------------------------------------
-" Helper functions and variables
+" Return values for sorting ctag lists
 scriptencoding utf-8
 let s:regex_magic = '[]\/.*$~'
 let s:keyword_mods = {'vim': ':', 'tex': ':-'}
@@ -20,6 +20,22 @@ function! s:sort_by_name(tag1, tag2) abort
   let str1 = a:tag1[0]
   let str2 = a:tag2[0]
   return str1 <# str2 ? -1 : str1 ==# str2 ? 0 : 1  " equality, lesser, and greater
+endfunction
+
+" Return whether ctags are allowed for current buffer
+function! s:filter_buffer(...) abort
+  let bnr = a:0 > 0 ? a:1 : bufnr()
+  let ftype = a:0 > 1 ? a:2 : ''
+  let btype = getbufvar(bnr, '&filetype')
+  if empty(btype) || !empty(ftype) && ftype !=# btype  " type required
+    return 0
+  endif
+  if !filereadable(expand('#' . bnr . ':p'))  " file required
+    return 0
+  endif
+  if index(g:tags_skip_filetypes, btype) != -1  " additional skips
+    return 0
+  endif | return 1
 endfunction
 
 " Return whether tag is the given kind
@@ -69,20 +85,6 @@ endfunction
 " Return buffers sorted by access time
 " Note: This optionally filters out tabs accessed after 'startup time' determined
 " from files with smallest access times and within 10 seconds of each other.
-function! s:bufs_filter(buf, ...)
-  let ftype = a:0 ? a:1 : ''
-  let btype = getbufvar(a:buf, '&filetype')
-  if !empty(ftype) && ftype !=# btype
-    return 0
-  endif
-  if !filereadable(expand('#' . a:buf . ':p'))
-    return 0
-  endif
-  if empty(btype) || index(g:tags_skip_filetypes, btype) != -1
-    return 0
-  endif
-  return 1
-endfunction
 function! tags#bufs_recent(...) abort
   let nostartup = a:0 > 0 ? a:1 : 0
   let filter = a:0 > 1 ? a:2 : 0
@@ -96,7 +98,7 @@ function! tags#bufs_recent(...) abort
   endif
   let recent = []  " buffers used after mintime
   for [bnr, btime] in bufs
-    if filter && !s:bufs_filter(bnr, ftype)
+    if filter && !s:filter_buffer(bnr, ftype)
       continue
     endif
     if btime > mintime
@@ -131,7 +133,7 @@ function! tags#bufs_nearby(...) abort
       continue  " possibly more tabs to the right
     endif
     for bnr in tabpagebuflist(tnr)
-      if filter && !s:bufs_filter(bnr, ftype)
+      if filter && !s:filter_buffer(bnr, ftype)
         continue
       endif
       if index(bufs, bnr) == -1
@@ -146,13 +148,6 @@ endfunction
 " Note: This sorts buffers using three methods: first by recent use among the
 " author's vimrc 'tab stack' utility, second by recent use among all other tabs,
 " and third by physical proximity to the current tab. Useful for fzf selection.
-function! tags#get_types(...) abort
-  let cache = a:0 > 2 ? a:3 : {}  " cached matches
-  let ftype = a:0 > 1 ? a:2 : &l:filetype
-  let regex = tags#type_regex(ftype)  " auto-construct filetype regex
-  let paths = a:0 && type(a:1) > 1 ? copy(a:1) : tags#get_paths()
-  return filter(paths, {idx, val -> tags#type_match(val, ftype, regex, cache)})
-endfunction
 function! tags#get_paths(...) abort
   let ftype = a:0 ? a:1 : ''  " ensure filtering
   let stack = get(g:, 'tab_stack', [])  " stack of absolute paths
@@ -327,9 +322,7 @@ function! tags#update_kinds() abort
 endfunction
 
 " Show the current file tags
-" Note: This tries to read existing buffer variable to increase speed in huge sessions
-" let table = system(s:execute_tags(path) . ' | tr -s $''\t'' | column -t -s $''\t''')
-" let table = substitute(table, escape(path, s:regex_magic), '', 'g')
+" Note: This tries to read existing buffer variables to improve speed
 function! tags#table_tags(...) abort
   if index(a:000, 'all') >= 0  " all open paths
     let paths = tags#get_paths()
@@ -692,19 +685,21 @@ endfunction
 " Go to the tag keyword under the cursor
 " Note: Vim does not natively support jumping separate windows so implement here
 function! tags#goto_name(...) abort
-  let cache = {}
   let level = a:0 ? a:1 : 0
-  let path = expand('%:p')
-  let keys = &l:iskeyword
   let names = a:000[1:]
+  let iskey = &l:iskeyword
+  let ftype = &l:filetype
+  let regex = tags#type_regex()
+  let cache = {}  " file type cache
+  let path = expand('%:p')
   if empty(names)  " tag names
     let mods = get(s:keyword_mods, &l:filetype, '')
     let mods = split(mods, '\zs')
     try
-      let &l:iskeyword = join([keys] + mods, ',')
+      let &l:iskeyword = join([iskey] + mods, ',')
       let names = [expand('<cword>'), expand('<cWORD>')]
     finally
-      let &l:iskeyword = keys
+      let &l:iskeyword = iskey
     endtry
   endif
   for name in names
@@ -714,7 +709,7 @@ function! tags#goto_name(...) abort
     for itag in itags  " search 'tags' files
       let ipath = fnamemodify(itag.filename, ':p')
       if level < 1 && ipath !=# path | continue | endif
-      let itype = tags#get_types([ipath], &l:filetype, cache)
+      let itype = tags#type_match(ipath, &l:filetype, regex, cache)
       if level < 2 && empty(itype) | continue | endif
       let item = [ipath, itag.cmd, itag.name, itag.kind]
       return tags#_select_tag({}, 0, item)
