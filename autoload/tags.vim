@@ -876,21 +876,17 @@ function! tags#get_scope(...) abort
   let [line2, level2] = [line('.'), foldlevel('.')]
   call winrestview(winview)
   " Return scope if within fold
-  let idx = index(lines, line1)
-  let isfold = level1 > 0 && line1 != line2
   let iscursor = lnum >= line1 && lnum <= line2
-  if idx >= 0 && isfold && iscursor  " scope local search
-    let label1 = items[idx][0]
-    let label2 = trim(getline(line2))
-  elseif !a:force  " fallback to global search
-    let [line1, line2] = [1, line('$')]
-    let [label1, label2] = ['START', 'END']
-  else
+  let isfold = level1 > 0 && line1 != line2
+  let idx = index(lines, line1)  " fold aligns with tags
+  if idx < 0 || !isfold || !iscursor
     let msg = isfold ? 'current scope is global' : 'major tag fold not found'
     redraw | echohl WarningMsg
     echom 'Error: Failed to restrict the search scope (' . msg . ').'
     echohl None | return ''
   endif
+  let label1 = items[idx][0]
+  let label2 = trim(getline(line2))
   let nmax = 20  " maximum label length
   let label1 = len(label1) > nmax ? label1[:nmax - 3] . '···' : label1
   let label2 = len(label2) > nmax ? label2[:nmax - 3] . '···' : label2
