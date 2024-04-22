@@ -855,12 +855,13 @@ endfunction
 function! tags#get_scope(...) abort
   " Find closing line and tag
   let s:scope_bounds = []  " reset message cache
-  let items = get(b:, 'tags_by_line', [])
-  let items = filter(copy(items), 'tags#is_major(v:val)')
-  let lines = map(deepcopy(items), 'str2nr(v:val[1])')
-  if empty(items)
+  let tags = get(b:, 'tags_by_line', [])
+  let itags = filter(copy(tags), 'tags#is_major(v:val)')
+  let lines = map(deepcopy(itags), 'str2nr(v:val[1])')
+  if empty(itags)
+    let msg = empty(tags) ? 'tags unavailable' : 'no major tags found'
     redraw | echohl WarningMsg
-    echom 'Error: Failed to restrict the search scope (tags unavailable).'
+    echom 'Error: Failed to restrict the search scope (' . msg . ').'
     echohl None | return ''
   endif
   let winview = winsaveview()
@@ -885,7 +886,7 @@ function! tags#get_scope(...) abort
     echom 'Error: Failed to restrict the search scope (' . msg . ').'
     echohl None | return ''
   endif
-  let label1 = items[idx][0]
+  let label1 = itags[idx][0]
   let label2 = trim(getline(line2))
   let nmax = 20  " maximum label length
   let label1 = len(label1) > nmax ? label1[:nmax - 3] . '···' : label1
