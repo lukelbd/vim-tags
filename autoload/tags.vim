@@ -160,7 +160,7 @@ function! tags#get_paths(...) abort
   let physical = []  " ordered by adjacency
   for bnr in brecent  " after startup
     let idx = index(bnearby, bnr)
-    if idx == -1 | return | endif  " should not happen
+    if idx == -1 | continue | endif  " i.e. not displayed
     let path = expand('#' . bnr . ':p')
     let items = index(stack, bnr) == -1 ? temporal : stacked
     call add(idxs, idx)
