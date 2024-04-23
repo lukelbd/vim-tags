@@ -194,19 +194,11 @@ function! tags#type_regex(...) abort
 endfunction
 function! tags#type_match(path, ...) abort
   let ftype = a:0 > 0 ? a:1 : &l:filetype  " filetype to match
-  let regex = a:0 > 1 ? a:2 : tags#type_regex(ftype)
-  let types = a:0 > 2 ? a:3 : {}  " entries {'path': 'type', 'path': ''}
-  let fast = a:0 > 3 ? a:4 : 0  " already checked this filetype
   let path = fnamemodify(a:path, ':p')
-  if has_key(types, path)
-    let itype = types[path]
-    if !empty(itype) || fast
-      return itype ==# ftype
-    endif
-  endif
   let name = fnamemodify(path, ':t')
+  let regex = tags#type_regex(ftype)
   let btype = getbufvar(bufnr(path), '&filetype', '')
-  if !empty(btype) && btype ==# ftype
+  if empty(ftype) || btype ==# ftype
     let imatch = 1
   elseif empty(regex)
     let imatch = 0
@@ -215,7 +207,7 @@ function! tags#type_match(path, ...) abort
   else
     let imatch = name =~# regex
   endif
-  if !imatch && name !~# '\.' && a:0 && !empty(a:1) && filereadable(path)
+  if !imatch && name !~# '\.' && filereadable(path)
     let head = readfile(path, '', 1)
     let head = empty(head) ? '' : get(head, 0, '')
     if head !~# '^#!'
@@ -224,11 +216,10 @@ function! tags#type_match(path, ...) abort
       let cmd = substitute(head, '^#!.*/', '', 'g')
       let cmd = split(cmd, '', 1)[-1]
       let imatch = cmd =~# '^' . ftype . '\d*$'
-      let imatch = imatch || 'name.' . cmd =~# regex
+      let imatch = imatch || 'file.' . cmd =~# regex
     endif
   endif
   let itype = imatch ? ftype : !empty(btype) ? btype : ''
-  let types[path] = itype
   return imatch
 endfunction
 
@@ -701,8 +692,6 @@ function! tags#goto_name(...) abort
   let names = a:000[1:]
   let iskey = &l:iskeyword
   let ftype = &l:filetype
-  let regex = tags#type_regex()
-  let types = {}  " file type cache
   let path = expand('%:p')
   if empty(names)  " tag names
     let mods = get(s:keyword_mods, &l:filetype, '')
@@ -721,7 +710,7 @@ function! tags#goto_name(...) abort
     for itag in itags  " search 'tags' files
       let ipath = fnamemodify(itag.filename, ':p')
       if level < 1 && ipath !=# path | continue | endif
-      let itype = tags#type_match(ipath, &l:filetype, regex, types)
+      let itype = tags#type_match(ipath)
       if level < 2 && empty(itype) | continue | endif
       let item = [ipath, itag.cmd, itag.name, itag.kind]
       return tags#_select_tag(0, item)
