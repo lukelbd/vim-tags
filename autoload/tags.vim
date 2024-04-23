@@ -458,7 +458,7 @@ endfunction
 function! s:tag_source(level, ...) abort
   if a:0 && type(a:1)  " user input tags
     let paths = ['']
-  elseif type(a:level) > 1  " user input paths
+  elseif type(a:level)  " user input paths
     let paths = deepcopy(a:level)
   elseif a:level > 1  " global paths
     let paths = tags#get_paths()
@@ -469,23 +469,19 @@ function! s:tag_source(level, ...) abort
   endif
   let [result, cache] = [[], {}]  " path name caches
   for path in paths
-    let bnr = bufnr(path)
-    if a:0 && type(a:1)  " [line, name, other] or [path, line, name, other]
-      let [items, print] = [deepcopy(a:1), 1]
-    else  " [name, line, other] -> [[path, ]line, name, other]
-      let items = deepcopy(getbufvar(bnr, 'tags_by_name', []))
-      call map(items, '[v:val[1], v:val[0]] + v:val[2:]')
-      call map(items, !empty(a:level) ? 'insert(v:val, path, 0)' : 'v:val')
+    let items = getbufvar(bufnr(path), 'tags_by_name', [])
+    if a:0 && type(a:1)  " user-input [path, line, name, other]
+      let items = deepcopy(a:1)
+    else  " [name, line, other] -> [path, line, name, other]
+      let items = map(deepcopy(items), '[path, v:val[1], v:val[0]] + v:val[2:]')
     endif
     if a:0 > 0  " line:name (other) or file:line:name (other)
-      " vint: -ProhibitUsingUndeclaredVariable
-      let [iline, iname, ikind, ipost] = !empty(a:level) ? [1, 2, 3, 4] : [0, 1, 2, 3]
-      let size = max(map(copy(items), 'len(string(str2nr(v:val[iline])))'))
-      let args = !empty(a:level) ? '[v:val[0], s:get_name(v:val[0], cache)] + v:val[1:]' : 'v:val'
-      let fmt = !empty(a:level) ? '%s: %s: %' . size . 'd: %s (%s)' : '%' . size . 'd: %s (%s)'
-      call map(items, 'v:val[:iname] + [tags#kind_char(v:val[ikind])] + v:val[ipost:]')
-      call map(items, 'add(v:val[:iname], join(v:val[ikind:], ", "))')  " combine parts
-      call map(items, 'call("printf", [' . string(fmt)  . '] + ' . args . ')')
+      let size = max(map(copy(items), 'len(string(str2nr(v:val[1])))'))
+      let format = string('%s: %s: %' . size . 'd: %s (%s)')
+      call map(items, 'v:val[:2] + [tags#kind_char(v:val[3])] + v:val[4:]')
+      call map(items, 'add(v:val[:2], join(v:val[3:], ", "))')  " combine parts
+      call map(items, '[v:val[0], s:get_name(v:val[0], cache)] + v:val[1:]')
+      call map(items, 'call("printf", [' . format  . '] + v:val)')
     endif
     call extend(result, uniq(items))  " ignore duplicates
   endfor | return result
@@ -607,12 +603,15 @@ function! tags#select_tag(level, ...) abort
     echom 'Error: fzf.vim plugin not available.'
     echohl None | return
   endif
-  let char = input || type(a:level) > 1 ? 'S' : a:level < 1 ? 'B' : a:level < 2 ? 'F' : ''
-  let flags = !empty(a:level) ? '-d": " --with-nth=2.. ' : ''
+  let with = empty(a:level) ? '--with-nth=3..' : '--with-nth=2..'
+  let opts = fzf#vim#with_preview({'placeholder': '{1}:{3..}'})
+  let opts = map(get(opts, 'options', []), 'fzf#shellescape(v:val)')
+  let opts = ["-d': '", with, '--preview-window', '+{3}-/2'] + opts
+  let char = input || type(a:level) ? 'S' : a:level < 1 ? 'B' : a:level < 2 ? 'F' : ''
   let options = {
     \ 'source': result,
     \ 'sink': function('tags#_select_tag', [cnt]),
-    \ 'options': flags . '--no-sort --prompt=' . string(char . 'Tag> ')
+    \ 'options': join(opts, ' ') . ' --no-sort --prompt=' . string(char . 'Tag> ')
   \ }
   call fzf#run(fzf#wrap(options))
 endfunction
@@ -789,9 +788,10 @@ function! tags#tag_files(...) abort
 endfunction
 
 " Return tags from tag files
+" Note: Here taglist() uses path only to prioritize tags (i.e. does not filter) and
+" name is treated as a regex as with :tags /<name> (see :help taglist()).
 " Note: Here modify &l:tags temporarily to optionally exclude unrelated projects, since
-" taglist() uses tagfiles() which may include unrelated projects if &l:tags unset. Also
-" note function expects regex i.e. behaves like :tags /<name> (see :help taglist()).
+" taglist() uses tagfiles() which may include unrelated projects if &l:tags unset.
 function! tags#tag_list(name, ...) abort
   let regex = '^' . escape(a:name, s:regex_magic) . '$'
   let path = expand(a:0 ? a:1 : '%')
@@ -1032,7 +1032,7 @@ function! tags#delete_next(level, force, ...) abort
     call s:feed_repeat(plug)
   else  " delete all matches
     let plural = a:level < 0 ? 'es' : 's'
-    let plug = 'TagsDelete' . prefix . plural . suffix
+    let plug = 'TagsDelete' . names[0] . plural . names[1]
     let winview = winsaveview()
     exe 'keepjumps %s@' . escape(@/, '@') . '@@ge'
     call winrestview(winview)
