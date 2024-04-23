@@ -439,11 +439,10 @@ function! s:get_name(path, ...) abort
   let name = get(cache, path, '')
   if !empty(name) | return name | endif
   let base = getbufvar(bufnr(path), 'gutentags_root', '')  " see also statusline.vim
-  let head = fnamemodify(fnamemodify(base, ':h'), ':p')  " root with trailing slash
   let icwd = !empty(base) && strpart(getcwd(), 0, len(base)) ==# base
   let ipath = !empty(base) && strpart(path, 0, len(base)) ==# base
   if ipath && !icwd
-    let name = strpart(path, len(head))
+    let name = strpart(path, len(fnamemodify(base, ':p')))
   elseif exists('*RelativePath')
     let name = RelativePath(path)
   else  " default display
