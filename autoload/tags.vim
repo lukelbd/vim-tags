@@ -564,9 +564,10 @@ function! s:goto_tag(count, ...) abort
   if abs(a:count) < 2 && name !=# '<top>'  " i.e. not block jump
     call s:set_index(name, lnum, from, a:count)
   endif
-  let keys = a:0 == 1 ? 'zz' : ''
   if &l:foldopen =~# (a:count ? '\<block\>' : '\<tag\>')
-    let keys .= 'zv'  " open fold
+    let keys = 'zvzz'  " open fold
+  else  " center tag
+    let keys = a:count ? '' : 'zz'
   endif
   if !a:count || !g:tags_keep_jumps  " add jump
     let keys .= getpos('.') == getpos("''") ? '' : "m'"
