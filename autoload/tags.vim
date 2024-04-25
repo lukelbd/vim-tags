@@ -863,6 +863,7 @@ function! tags#get_scope(...) abort
     let [iline, ifold] = [line('.'), foldclosed('.')]
     exe ifold > 0 && iline != ifold ? ifold : 'keepjumps normal! [z'
     let [line1, level1] = [line('.'), foldlevel('.')]
+    let line1 = get(get(b:, 'fold_heads', {}), line1, line1)  " python decorators
   endwhile
   let ifold = foldclosedend('.')
   exe ifold > 0 ? ifold : 'keepjumps normal! ]z'
@@ -873,7 +874,7 @@ function! tags#get_scope(...) abort
   let isfold = level1 > 0 && line1 != line2
   let idx = index(lines, line1)  " fold aligns with tags
   if idx < 0 || !isfold || !iscursor
-    let msg = isfold ? 'current scope is global' : 'major tag fold not found'
+    let msg = !iscursor ? 'current scope is global' : 'major tag fold not found'
     redraw | echohl WarningMsg
     echom 'Error: Failed to restrict the search scope (' . msg . ').'
     echohl None | return ''
