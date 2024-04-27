@@ -322,7 +322,7 @@ function! tags#table_tags(...) abort
     let paths = copy(a:000)
     let label = 'input path(s) ' . join(map(copy(paths), 'string(v:val)'), ', ')
   else  " current path
-    let paths = [exists('*RelativePath') ? RelativePath(@%) : expand('%:~:.')]
+    let paths = [expand('%:p')]
     let label = 'current path ' . string(paths[0])
   endif
   let tables = []
@@ -335,11 +335,14 @@ function! tags#table_tags(...) abort
         echohl None
       endif | continue
     endif
-    let path = exists('*RelativePath') ? RelativePath(path) : fnamemodify(path, ':~:.')
-    let items = getbufvar(bufnr(path), 'tags_by_name', [])  " use buffer by default
-    let items = empty(items) ? s:generate_tags(path)[1] : items  " try to generate
-    let table = empty(items) || len(paths) == 1 ? '' : path . "\n"
-    for [name, line, kind; context] in empty(items) ? [] : items
+    let table = ''  " intialize table
+    let items = getbufvar(bufnr(path), 'tags_by_name', [])  " prefer from buffer
+    let items = empty(items) ? s:generate_tags(path)[1] : items  " generate tags
+    if !empty(items) && len(paths) > 1
+      let table .= exists('*RelativePath') ? RelativePath(path) : fnamemodify(path, ':~:.')
+      let table .= "\n"
+    endif
+    for [name, line, kind; context] in items
       let kind = len(paths) == 1 ? kind : '    ' . kind
       let name = empty(context) ? name : name . ' (' . join(context, ' ') . ')'
       let table .= kind . ' ' . repeat(' ', 4 - len(line)) . line . ': ' . name . "\n"
@@ -436,17 +439,20 @@ endfunction
 function! s:get_name(path, ...) abort
   let cache = a:0 > 0 ? a:1 : {}  " cached names
   let path = fnamemodify(a:path, ':p')
-  let name = get(cache, path, '')
-  if !empty(name) | return name | endif
-  let base = getbufvar(bufnr(path), 'gutentags_root', '')  " see also statusline.vim
-  let icwd = !empty(base) && strpart(getcwd(), 0, len(base)) ==# base
-  let ipath = !empty(base) && strpart(path, 0, len(base)) ==# base
-  if ipath && !icwd
-    let name = strpart(path, len(fnamemodify(base, ':p')))
-  elseif exists('*RelativePath')
-    let name = RelativePath(path)
-  else  " default display
-    let name = fnamemodify(path, ':~:.')
+  if has_key(cache, path)
+    return cache[path]
+  endif
+  let root = getbufvar(bufnr(path), 'gutentags_root', '')  " see also statusline.vim
+  if empty(root) && exists('*gutentags#get_project_root')
+    let root = gutentags#get_project_root(a:path)  " standard gutentags algorithm
+  endif
+  let path_in_cwd = strpart(getcwd(), 0, len(root)) ==# root
+  let path_in_root = strpart(path, 0, len(root)) ==# root
+  let root = path_in_root && !path_in_cwd ? fnamemodify(root, ':p') : ''
+  if empty(root)  " truncated path
+    let name = exists('*RelativePath') ? RelativePath(path) : fnamemodify(path, ':~:.')
+  else  " relative to root
+    let name = strpart(path, len(root))
   endif
   let cache[path] = name | return name
 endfunction
