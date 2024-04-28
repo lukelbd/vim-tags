@@ -964,7 +964,7 @@ function! s:feed_repeat(name, ...) abort
   if !exists('*repeat#set') | return | endif
   let plug = '\<Plug>' . a:name
   let cnt = a:0 ? a:1 : v:count
-  let cmd = 'call repeat#set("' . plug . '", ' . cnt . ')'
+  let cmd = 'call repeat#set("zv' . plug . '", ' . cnt . ')'
   call feedkeys("\<Cmd>" . cmd . "\<CR>", 'n')
 endfunction
 
@@ -976,17 +976,15 @@ function! tags#change_repeat() abort
   let motion = get(s:, 'change_motion', 'n')
   let cmd = "mode() =~# 'i' ? '\<C-a>' : ''"
   let cmd = 'feedkeys(' . cmd . ', "ni")'
-  let cmd = 'zvcg' . motion . "\<Cmd>call " . cmd . "\<CR>\<Esc>" . motion
+  let cmd = 'cg' . motion . "\<Cmd>call " . cmd . "\<CR>\<Esc>" . motion
   call feedkeys(cmd, 'n')  " add previous insert if cgn succeeds
   call s:feed_repeat('TagsChangeRepeat')
 endfunction
 function! tags#change_setup() abort
-  if !exists('s:change_setup')
-    return
-  endif
+  if !exists('s:change_setup') | return | endif
   if empty(s:change_setup)  " change single item
     let motion = get(s:, 'change_motion', 'n')
-    call feedkeys(motion, 'nt')
+    call feedkeys(motion . 'zv', 'nt')
     call s:feed_repeat('TagsChangeRepeat')
   else  " change all items
     let b:change_winview = winsaveview()
@@ -1034,7 +1032,7 @@ function! tags#delete_next(level, force, ...) abort
   if empty(names) | return | endif  " scope not found
   if !a:force  " delete single item
     let plug = 'TagsDelete' . names[0] . names[1]
-    call feedkeys('dg' . repeat(motion, 2), 'n')
+    call feedkeys('dg' . repeat(motion, 2) . 'zv', 'n')
     call s:feed_repeat(plug)
   else  " delete all matches
     let plural = a:level < 0 ? 'es' : 's'
