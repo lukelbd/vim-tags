@@ -211,7 +211,8 @@ if !g:tags_nomap_searches
   exe 'nmap ca' . g:tags_word_local_map . ' <Plug>TagsChangeWordsLocal'
   exe 'nmap ca' . g:tags_WORD_local_map . ' <Plug>TagsChangeWORDSLocal'
 endif
-nnoremap <Plug>TagsChangeRepeat <Cmd>call tags#change_repeat()<CR>
+nnoremap <Plug>TagsChangeAll <Cmd>call tags#change_all()<CR>
+nnoremap <Plug>TagsChangeAgain <Cmd>call tags#change_again()<CR>
 nnoremap <Plug>TagsChangeMatchNext <Cmd>call tags#change_next(@/, 0, 0)<CR>
 nnoremap <Plug>TagsChangeMatchPrev <Cmd>call tags#change_next(@/, 0, 1)<CR>
 nnoremap <Plug>TagsChangeMatchesNext <Cmd>call tags#change_next(@/, 1, 0)<CR>

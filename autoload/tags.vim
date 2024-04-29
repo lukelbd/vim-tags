@@ -972,27 +972,37 @@ endfunction
 " Note: The 'cgn' command silently fails to trigger insert mode if no matches found
 " so we check for that. Putting <Esc> in feedkeys() cancels operation so must come
 " afterward (may be no-op) and the 'i' is necessary to insert <C-a> before <Esc>.
-function! tags#change_repeat() abort
+function! tags#change_all() abort
+  let winview = winsaveview()
+  let regex = escape(@/, '@')
+  let string = get(s:, 'change_string', '')
+  let replace = escape(string, '@')
+  exe 'keepjumps %s@' . regex . '@' . replace . '@ge'
+  call winrestview(winview)
+  call s:feed_repeat('TagsChangeAll')
+endfunction
+function! tags#change_again() abort
   let motion = get(s:, 'change_motion', 'n')
-  let cmd = "mode() =~# 'i' ? '\<C-a>' : ''"
-  let cmd = 'feedkeys(' . cmd . ', "ni")'
-  let cmd = 'cg' . motion . "\<Cmd>call " . cmd . "\<CR>\<Esc>" . motion
-  call feedkeys(cmd, 'n')  " add previous insert if cgn succeeds
-  call s:feed_repeat('TagsChangeRepeat')
+  let string = get(s:, 'change_string', '')
+  let replace = "mode() ==# 'i' ? " . string(string) . " : ''"
+  let replace = "\<Cmd>call feedkeys(" . replace . ", 'ni')\<CR>"
+  call feedkeys('cg' . motion . replace . "\<Esc>" . motion, 'n')
+  call s:feed_repeat('TagsChangeAgain')
 endfunction
 function! tags#change_setup() abort
-  if !exists('s:change_setup') | return | endif
-  if empty(s:change_setup)  " change single item
+  let setup = get(s:, 'change_setup', 0)
+  if !setup | return | endif
+  let s:change_setup = 0
+  let s:change_string = @.
+  if setup == 1  " change single item
     let motion = get(s:, 'change_motion', 'n')
     call feedkeys(motion . 'zv', 'nt')
-    call s:feed_repeat('TagsChangeRepeat')
+    call s:feed_repeat('TagsChangeAgain')
   else  " change all items
-    let b:change_winview = winsaveview()
-    let cmd = 'u:keepjumps %s@' . escape(@/, '@') . '@' . escape(@., '@') . '@ge'
-    call feedkeys(cmd . " | call winrestview(b:change_winview)\<CR>", 'nt')
-    call s:feed_repeat(s:change_setup)
+    call feedkeys('u', 'n')
+    call feedkeys("\<Plug>TagsChangeAll", 'm')
+    call s:feed_repeat('TagsChangeAll')
   endif
-  exe 'unlet s:change_setup'
 endfunction
 
 " Change and delete next match
@@ -1011,15 +1021,7 @@ function! tags#change_next(level, force, ...) abort
   if empty(names) | return | endif  " scope not found
   let s:change_motion = motion
   call feedkeys('cg' . motion, 'n')
-  if !a:force  " change single match
-    let s:change_setup = ''
-    call s:feed_repeat('TagsChangeRepeat')
-  else  " change all matches
-    let plural = a:level < 0 ? 'es' : 's'
-    let plug = 'TagsChange' . names[0] . plural . names[1]
-    let s:change_setup = plug
-    call s:feed_repeat(plug)
-  endif
+  let s:change_setup = 1 + a:force
 endfunction
 function! tags#delete_next(level, force, ...) abort
   if a:level < 0
