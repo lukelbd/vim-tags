@@ -277,7 +277,8 @@ function! tags#update_tags(...) abort
   for path in paths
     let bnr = bufnr(path)  " buffer unique to path
     let time = getbufvar(bnr, 'tags_update_time', 0)
-    if getftime(path) < time | continue | endif
+    let items = getbufvar(bnr, 'tags_by_line', [])
+    if !empty(items) && getftime(path) < time | continue | endif
     let items = s:generate_tags(path)  " items by line and name
     call setbufvar(bnr, 'tags_by_line', items[0])
     call setbufvar(bnr, 'tags_by_name', items[1])
