@@ -259,6 +259,7 @@ function! tags#generate(...) abort
 endfunction
 
 " Update tag buffer variables and kind global variables
+" Todo: Make this asyncronous to speed up startup in huge sessions.
 " Note: This will only update when tag generation time more recent than last file
 " save time. Also note files open in multiple windows have the same buffer number
 " Note: Ctags has both language 'aliases' for translating internal options like
@@ -970,33 +971,33 @@ function! s:feed_repeat(name, ...) abort
 endfunction
 
 " Set up repeat after finishing previous change on InsertLeave
+" Note: Critical to use global variables or else have issues with nested feed
 " Note: The 'cgn' command silently fails to trigger insert mode if no matches found
 " so we check for that. Putting <Esc> in feedkeys() cancels operation so must come
 " afterward (may be no-op) and the 'i' is necessary to insert <C-a> before <Esc>.
+function! tags#change_again() abort
+  let motion = get(g:, 'tags_change_motion', 'n')
+  let replace = "mode() ==# 'i' ? get(g:, 'tags_change_string', '') : ''"
+  let replace = "\<Cmd>call feedkeys(" . replace . ", 'ti')\<CR>"
+  call feedkeys('cg' . motion . replace . "\<Esc>" . motion, 'n')
+  call s:feed_repeat('TagsChangeAgain')
+endfunction
 function! tags#change_all() abort
   let winview = winsaveview()
   let regex = escape(@/, '@')
-  let string = get(s:, 'change_string', '')
+  let string = get(g:, 'tags_change_string', '')
   let replace = escape(string, '@')
   exe 'keepjumps %s@' . regex . '@' . replace . '@ge'
   call winrestview(winview)
   call s:feed_repeat('TagsChangeAll')
 endfunction
-function! tags#change_again() abort
-  let motion = get(s:, 'change_motion', 'n')
-  let string = get(s:, 'change_string', '')
-  let replace = "mode() ==# 'i' ? " . string(string) . " : ''"
-  let replace = "\<Cmd>call feedkeys(" . replace . ", 'ni')\<CR>"
-  call feedkeys('cg' . motion . replace . "\<Esc>" . motion, 'n')
-  call s:feed_repeat('TagsChangeAgain')
-endfunction
 function! tags#change_setup() abort
-  let setup = get(s:, 'change_setup', 0)
+  let setup = get(g:, 'tags_change_setup', 0)
   if !setup | return | endif
-  let s:change_setup = 0
-  let s:change_string = @.
+  let g:tags_change_setup = 0
+  let g:tags_change_string = substitute(@., "\n", "\<CR>", 'g')
   if setup == 1  " change single item
-    let motion = get(s:, 'change_motion', 'n')
+    let motion = get(g:, 'tags_change_motion', 'n')
     call feedkeys(motion . 'zv', 'nt')
     call s:feed_repeat('TagsChangeAgain')
   else  " change all items
@@ -1020,9 +1021,9 @@ function! tags#change_next(level, force, ...) abort
     let names = call('tags#set_search', [a:level] + a:000)
   endif
   if empty(names) | return | endif  " scope not found
-  let s:change_motion = motion
+  let g:tags_change_motion = motion
   call feedkeys('cg' . motion, 'n')
-  let s:change_setup = 1 + a:force
+  let g:tags_change_setup = 1 + a:force
 endfunction
 function! tags#delete_next(level, force, ...) abort
   if a:level < 0
