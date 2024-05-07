@@ -245,8 +245,9 @@ function! s:generate_tags(path) abort
   else  " generate tags
     let items = split(s:execute_tags(a:path), '\n')
   endif
-  call map(items, "split(v:val, '\t')")
-  call filter(items, '!tags#is_skipped(v:val)')
+  let expr = 'len(v:val) >= 2 && !tags#is_skipped(v:val)'
+  let expr .= ftype ==# 'json' ? ' && v:val[0] !~# ''^\d\+$''' : ''
+  let items = filter(map(items, "split(v:val, '\t')"), expr)
   let lines = sort(items, 's:sort_by_line')
   let names = sort(deepcopy(items), 's:sort_by_name')
   return [lines, names]
