@@ -2,9 +2,9 @@
 " Tools for working with tags in vim. {{{1
 "------------------------------------------------------------------------------
 " Initial stuff {{{2
+" Author: Luke Davis (lukelbd@gmail.com)
 " This plugin works as a companion to project-wide tag navigation utilities.
 " Supports jumping across open buffers and search and replace within buffers.
-" Author: Luke Davis (lukelbd@gmail.com)
 augroup vim_tags
   au!
   au InsertLeave * silent call tags#change_setup()  " finish change operation and set repeat
