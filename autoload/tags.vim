@@ -1,13 +1,10 @@
 "------------------------------------------------------------------------------
-" General tag processing utiltiies
+" General tag processing utiltiies {{{1
+"------------------------------------------------------------------------------
 " Todo: Add tag file-reading utilities here including file sorting
-" Todo: Parse ctags abbreviated kinds into long names using --machinable
-" Todo: Support either strings or lists for g:tag_major_kind setting
-" Warning: Encountered strange error where naming .vim/autoload file same as
+" Note: Encountered strange error where naming .vim/autoload file same as
 " vim-tags/autoload file or naming the latter to tags.vim at all caused an autocmd
 " BufRead error on startup. Was impossible to diagnose so just use alternate names.
-"------------------------------------------------------------------------------
-" Return values for sorting ctag lists
 scriptencoding utf-8
 let s:regex_magic = '[]\/.*$~'
 let s:keyword_mods = {'vim': ':', 'tex': ':-'}
@@ -21,8 +18,6 @@ function! s:sort_by_name(tag1, tag2) abort
   let str2 = a:tag2[0]
   return str1 <# str2 ? -1 : str1 ==# str2 ? 0 : 1  " equality, lesser, and greater
 endfunction
-
-" Return whether ctags are allowed for current buffer
 function! s:filter_buffer(...) abort
   let bnr = a:0 > 0 ? a:1 : bufnr()
   let ftype = a:0 > 1 ? a:2 : ''
@@ -80,7 +75,7 @@ function! tags#kind_lang(...) abort
 endfunction
 
 "-----------------------------------------------------------------------------"
-" Buffer listing utilities
+" Buffer listing utilities {{{1
 "-----------------------------------------------------------------------------"
 " Return buffers sorted by access time
 " Note: This optionally filters out tabs accessed after 'startup time' determined
@@ -224,7 +219,7 @@ function! tags#type_match(path, ...) abort
 endfunction
 
 "-----------------------------------------------------------------------------"
-" Tag generation utiliities
+" Tag generation utiliities {{{1
 "-----------------------------------------------------------------------------"
 " Generate tag string or lists
 " Note: This is used for buffer variables and unopened :ShowTags path(s)
@@ -403,7 +398,7 @@ function! tags#table_kinds(...) abort
 endfunction
 
 "-----------------------------------------------------------------------------
-" Tag selection utiltiies
+" Tag selection utiltiies {{{1
 "-----------------------------------------------------------------------------
 " Return or set the tag stack index
 " Note: This is used to manually update the tag stack index, allowing us to emulate
@@ -625,7 +620,7 @@ function! tags#select_tag(level, ...) abort
 endfunction
 
 "-----------------------------------------------------------------------------"
-" Tag navigation utilities
+" Tag navigation utilities {{{1
 "-----------------------------------------------------------------------------"
 " Get the 'current' tag definition under or preceding the cursor
 " Note: This is used with statusline and :CurrentTag
@@ -815,7 +810,7 @@ function! tags#tag_list(name, ...) abort
 endfunction
 
 "-----------------------------------------------------------------------------"
-" Keyword searching utilities
+" Keyword searching utilities {{{1
 "-----------------------------------------------------------------------------"
 " Return match under cursor and whether inside requested syntax group
 " Note: Here level -1 is previous search, level 0 is current character, level 1 is
@@ -958,7 +953,7 @@ function! tags#set_search(level, ...) range abort
 endfunction
 
 "-----------------------------------------------------------------------------
-" Keyword manipulation utilities
+" Keyword manipulation utilities {{{1
 "-----------------------------------------------------------------------------
 " Helper functions
 " Note: Critical to feed repeat command and use : instead of <Cmd> or will

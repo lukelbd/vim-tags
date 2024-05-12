@@ -1,36 +1,24 @@
 "------------------------------------------------------------------------------
-" Author:  Luke Davis (lukelbd@gmail.com)
-" Tools for working with tags in vim. This plugin works as a lightweight companion to
-" more comprehensive utilities like gutentags, offering tag jumping across open
-" buffers and tag navigation and search-replace utilities within buffers.
+" Tools for working with tags in vim. {{{1
 "------------------------------------------------------------------------------
-" Each element of the b:tags_* variables is as follows:
-"   Index 0: Tag name.
-"   Index 1: Tag line number.
-"   Index 2: Tag type.
-"   Index 3: Tag parent (optional).
-" Re-define a few of the shift-number row keys to make them a bit more useful:
-"   '*' is the current word, global
-"   '&' is the current WORD, global
-"   '#' is the current word, local
-"   '@' is the current WORD, local
-"------------------------------------------------------------------------------
-call system('type ctags &>/dev/null')
-if v:shell_error " exit code
-  echohl WarningMsg
-  echom 'Error: vim-tags requires the command-line tool ctags, not found.'
-  echohl None | finish
-endif
-
-" Initial stuff
-silent! autocmd! tags
+" Initial stuff {{{2
+" This plugin works as a companion to project-wide tag navigation utilities.
+" Supports jumping across open buffers and search and replace within buffers.
+" Author: Luke Davis (lukelbd@gmail.com)
 augroup vim_tags
   au!
   au InsertLeave * silent call tags#change_setup()  " finish change operation and set repeat
   au BufReadPost,BufWritePost * silent call tags#update_tags(expand('<afile>'))
 augroup END
+silent! autocmd! tags
+call system('type ctags &>/dev/null')
+if v:shell_error " exit code
+  echohl WarningMsg
+  echom "Warning: Command-line executable 'ctags' not found."
+  echohl None | finish
+endif
 
-" Disable mappings
+" Disable mappings {{{2
 if !exists('g:tags_nomap')
   let g:tags_nomap = 0
 endif
@@ -41,27 +29,21 @@ if !exists('g:tags_nomap_searches')
   let g:tags_nomap_searches = g:tags_nomap
 endif
 
-" List of filetypes to fully skip
-if !exists('g:tags_skip_filetypes')
+" Filetype settings {{{2
+if !exists('g:tags_skip_filetypes')  " filetypes to fully skip
   let g:tags_skip_filetypes = ['diff', 'help', 'man', 'qf']
 endif
-
-" Lists of per-file/per-filetype tag kinds to fully skip. Can also use .ctags config
-if !exists('g:tags_skip_kinds')
+if !exists('g:tags_skip_kinds')  " filetype kinds to fully skip
   let g:tags_skip_kinds = {}
 endif
-
-" Lists of per-file/per-filetype tag kinds to use for search scope and [T navigation
-if !exists('g:tags_major_kinds')
+if !exists('g:tags_major_kinds')  " filetype kinds for search scope and [T navigation
   let g:tags_major_kinds = {}
 endif
-
-" Lists of per-file/per-filetype tag kinds skipped during [t navigation
-if !exists('g:tags_minor_kinds')
+if !exists('g:tags_minor_kinds')  " filetype kinds skipped by [T and [t navigation
   let g:tags_minor_kinds = {}
 endif
 
-" Tag jumping and stack options
+" Jump and tag stack options {{{2
 if !exists('g:tags_keep_jumps')
   let g:tags_keep_jumps = 0
 endif
@@ -69,7 +51,7 @@ if !exists('g:tags_keep_stack')
   let g:tags_keep_stack = 0
 endif
 
-" Tag jumping mappings
+" Tag jump map settings {{{2
 if !exists('g:tags_cursor_map')
   let g:tags_cursor_map = '<Leader><CR>'
 endif
@@ -80,7 +62,7 @@ if !exists('g:tags_select_map')
   let g:tags_select_map = '<Leader><Tab>'
 endif
 
-" Tag navigation mappings
+" Tag navigation map settings {{{2
 if !exists('g:tags_backward_map')
   let g:tags_backward_map = '[t'
 endif
@@ -94,7 +76,7 @@ if !exists('g:tags_forward_top_map')
   let g:tags_forward_top_map = ']T'
 endif
 
-" Keyword navigation mappings
+" Keyword navigation map settings {{{2
 if !exists('g:tags_prev_local_map')
   let g:tags_prev_local_map = '[w'
 endif
@@ -108,7 +90,7 @@ if !exists('g:tags_next_global_map')
   let g:tags_next_global_map = ']W'
 endif
 
-" Selectiong mappings
+" Selection map settings {{{2
 if !exists('g:tags_char_global_map')
   let g:tags_char_global_map = '!'
 endif
@@ -126,9 +108,9 @@ if !exists('g:tags_WORD_local_map')
 endif
 
 "-----------------------------------------------------------------------------
-" Tag-related commands and maps
+" Commands and mappings {{{1
 "-----------------------------------------------------------------------------
-" Public commands
+" Public commands {{{2
 " Note: The tags#current_tag() function can also be used for statuslines
 command! -bang -nargs=? -complete=tag Goto
   \ call tags#goto_name(<bang>0 + 1, <f-args>)
@@ -145,7 +127,7 @@ command! -nargs=? -complete=buffer UpdateKinds
 command! -bang -nargs=* -range Search
   \ <line1>,<line2>call tags#set_search(<q-args>, <bang>0)
 
-" Tag select maps
+" Tag select maps {{{2
 " Note: Must use :n instead of <expr> ngg so we can use <C-u> to discard count!
 if !g:tags_nomap_jumps
   exe 'nmap ' . g:tags_bselect_map . ' <Plug>TagsBSelect'
@@ -172,11 +154,9 @@ noremap <Plug>TagsNextGlobal <Cmd>call tags#next_word(v:count1, 1)<CR>
 noremap <Plug>TagsPrevLocal <Cmd>call tags#next_word(-v:count1, 0)<CR>
 noremap <Plug>TagsNextGlobal <Cmd>call tags#next_word(v:count1, 1)<CR>
 
-"------------------------------------------------------------------------------
-" Search-and-replace commands and maps
-"------------------------------------------------------------------------------
-" Global and local <cword>, global and local <cWORD>, and current character searches.
-" Note: current character copied from https://stackoverflow.com/a/23323958/4970632
+" Current word searches {{{2
+" Includes current character, global and local <cword>, global and local <cWORD>
+" Note: Current character copied from https://stackoverflow.com/a/23323958/4970632
 " Todo: Add scope-local matches? No because use those for other mappings.
 if !g:tags_nomap_searches
   if !hasmapto('tags#set_search('''', 1)')  " avoid overwriting
@@ -190,9 +170,10 @@ if !g:tags_nomap_searches
   exe 'noremap ' . g:tags_WORD_local_map . ' <Cmd>call tags#set_search(2, 1, 1)<CR>'
 endif
 
-" Normal mode mappings that replicate :s/regex/sub/ behavior and can be repeated
-" with '.'. The substitution is determined from the text inserted by the user and
-" the cursor automatically jumps to the next match. The 'a' mappings change matches
+" Current word search-and-replace {{{2
+" These replicate :s/regex/sub/ behavior and can be repeated with '.'. The replacement
+" text is determined from the text typed by the user until the next InsertLeave event
+" and the cursor jumps to the next match automatically. The 'a' maps change all matches
 if !g:tags_nomap_searches
   if !hasmapto('TagsChangeMatch')  " avoid overwriting
     nmap c/ <Plug>TagsChangeMatchNext
@@ -228,6 +209,7 @@ nnoremap <Plug>TagsChangeWORDSGlobal <Cmd>call tags#change_next(2, 1, 0)<CR>
 nnoremap <Plug>TagsChangeWordsLocal <Cmd>call tags#change_next(1, 1, 1)<CR>
 nnoremap <Plug>TagsChangeWORDSLocal <Cmd>call tags#change_next(2, 1, 1)<CR>
 
+" Current word deltion {{{2
 " Normal mode mappings that replicate :d/regex/ behavior and can be repeated with '.'.
 " Cursor automatically jumps to the next match. The 'a' mappings delete all matches.
 if !g:tags_nomap_searches
