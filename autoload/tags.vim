@@ -44,14 +44,22 @@ function! tags#is_skipped(tag, ...) abort
   return call('s:tag_is_kind', [a:tag, 'skip', '@'] + a:000)
 endfunction
 function! s:tag_is_kind(tag, name, default, ...) abort
-  let key = call('tags#kind_lang', a:000)
   let name = 'tags_' . a:name . '_kinds'  " setting name
-  let opts = get(get(g:, name, {}), key, a:default)
-  if type(opts) <= 1 | let opts = split(opts, '\zs') | endif
+  let lang = call('tags#buffer_lang', a:000)
+  let opts = get(get(g:, name, {}), lang, a:default)
   let kind1 = get(a:tag, 2, '')  " translate to or from character
+  if type(opts) > 1
+    return index(opts, kind1) >= 0
+  else  " faster than splitting (important for statusline)
+    return kind1 =~# '[' . opts . ']'
+  endif
   let cache = len(kind1) > 1 ? g:tags_kind_chars : g:tags_kind_names
-  let kind2 = get(get(cache, key, {}), kind1, kind1)
-  return index(opts, kind1) >= 0 || index(opts, kind2) >= 0
+  let kind2 = get(get(cache, lang, {}), kind1, kind1)
+  if type(opts) > 1
+    return index(opts, kind1) >= 0 || index(opts, kind2) >= 0
+  else  " faster than splitting (important for statusline)
+    return kind1 =~# '[' . opts . ']' || kind2 =~# '[' . opts . ']'
+  endif
 endfunction
 
 " Return ctags kind or language
@@ -59,19 +67,22 @@ let g:tags_kind_chars = {}
 let g:tags_kind_names = {}
 let g:tags_kind_langs = {}
 function! tags#kind_char(kind, ...) abort
-  let key = call('tags#kind_lang', a:000)
-  let opts = len(a:kind) <= 1 ? {} : get(g:tags_kind_chars, key, {})
+  let lang = call('tags#buffer_lang', a:000)
+  let opts = len(a:kind) <= 1 ? {} : get(g:tags_kind_chars, lang, {})
   return get(opts, a:kind, a:kind)
 endfunction
 function! tags#kind_name(kind, ...) abort
-  let key = call('tags#kind_lang', a:000)
-  let opts = len(a:kind) > 1 ? {} : get(g:tags_kind_names, key, {})
+  let lang = call('tags#buffer_lang', a:000)
+  let opts = len(a:kind) > 1 ? {} : get(g:tags_kind_names, lang, {})
   return get(opts, a:kind, a:kind)
 endfunction
-function! tags#kind_lang(...) abort
-  let name = getbufvar(call('bufnr', a:000), '&filetype')
-  let name = substitute(tolower(name), '\..*$', '', 'g')
-  return get(g:tags_kind_langs, name, name)
+function! tags#buffer_lang(...) abort
+  let bnr = call('bufnr', a:000)
+  let lang = getbufvar(bnr, 'tags_language', '')
+  if !empty(lang) | return lang | endif  " speedup for statusline
+  let type = tolower(getbufvar(bnr, '&filetype', ''))
+  let type = substitute(type, '\..*$', '', 'g')
+  return get(g:tags_kind_langs, type, type)
 endfunction
 
 "-----------------------------------------------------------------------------"
@@ -225,9 +236,9 @@ endfunction
 " Note: This is used for buffer variables and unopened :ShowTags path(s)
 " Note: Output should be in number mode (i.e. shows line number instead of full line)
 function! s:execute_tags(path, ...) abort
-  let ftype = empty(a:path) ? '' : tags#kind_lang(expand(a:path))
   let path = empty(a:path) ? '' : fnamemodify(expand(a:path), ':p')
-  let flag = empty(ftype) || fnamemodify(path, ':t') =~# '\.' ? '' : '--language-force=' . ftype
+  let flag = empty(a:path) ? '' : tags#buffer_lang(path)
+  let flag = empty(flag) || fnamemodify(path, ':t') =~# '\.' ? '' : '--language-force=' . flag
   let cmd = 'ctags -f - --excmd=number ' . join(a:000, ' ') . ' ' . flag
   let cmd .= ' ' . shellescape(path) . ' 2>/dev/null'
   let cmd .= empty(path) ? '' : " | cut -d'\t' -f1,3-5 | sed 's/;\"\t/\t/g'"
@@ -235,10 +246,10 @@ function! s:execute_tags(path, ...) abort
 endfunction
 function! s:generate_tags(path) abort
   let ftype = getbufvar(bufnr(a:path), '&filetype')  " possibly empty string
-  if empty(ftype) || index(g:tags_skip_filetypes, ftype) >= 0
-    let items = []
-  else  " generate tags
+  if !empty(ftype) && index(g:tags_skip_filetypes, ftype) < 0
     let items = split(s:execute_tags(a:path), '\n')
+  else  " skip generating tags
+    let items = []
   endif
   let expr = 'len(v:val) >= 2 && !tags#is_skipped(v:val)'
   let expr .= ftype ==# 'json' ? ' && v:val[0] !~# ''^\d\+$''' : ''
@@ -361,35 +372,32 @@ endfunction
 function! tags#table_kinds(...) abort
   let [umajor, uminor] = [copy(g:tags_major_kinds), copy(g:tags_minor_kinds)]
   if index(a:000, 'all') >= 0  " all open filetypes
-    let flag = 'all'
-    let types = uniq(sort(keys(umajor) + keys(uminor)))
-    let major = map(copy(types), {idx, val -> val . ' ' . string(get(umajor, val, 'f'))})
-    let minor = map(copy(types), {idx, val -> val . ' ' . string(get(uminor, val, 'v'))})
+    let [flag, langs] = ['all', uniq(sort(keys(umajor) + keys(uminor)))]
+    let major = map(copy(langs), {idx, val -> val . ' ' . string(get(umajor, val, 'f'))})
+    let minor = map(copy(langs), {idx, val -> val . ' ' . string(get(uminor, val, 'v'))})
     let major = ['default ' . string('f')] + major
     let minor = ['default ' . string('v')] + minor
-    let types = uniq(map(tags#get_paths(), 'tags#kind_lang(v:val)'))
+    let langs = uniq(map(tags#get_paths(), 'tags#buffer_lang(v:val)'))
     let label = 'all buffer filetypes'
   elseif a:0  " input filetype(s)
-    let types = uniq(sort(map(copy(a:000), 'tags#kind_lang(v:val)')))
-    let flag = len(types) == 1 ? types[0] : 'all'
-    let major = map(copy(types), {idx, val -> val . ' ' . string(get(umajor, val, 'f'))})
-    let minor = map(copy(types), {idx, val -> val . ' ' . string(get(uminor, val, 'v'))})
-    let label = 'input filetype(s) ' . join(map(copy(types), 'string(v:val)'), ', ')
+    let langs = uniq(sort(map(copy(a:000), 'tags#buffer_lang(v:val)')))
+    let flag = len(langs) == 1 ? langs[0] : 'all'
+    let major = map(copy(langs), {idx, val -> val . ' ' . string(get(umajor, val, 'f'))})
+    let minor = map(copy(langs), {idx, val -> val . ' ' . string(get(uminor, val, 'v'))})
+    let label = 'input filetype(s) ' . join(map(copy(langs), 'string(v:val)'), ', ')
   else  " current filetype
     let flag = &l:filetype
-    let types = [&l:filetype]
+    let langs = [&l:filetype]
     let major = [string(get(umajor, flag, 'f'))]
     let minor = [string(get(uminor, flag, 'v'))]
     let label = 'current filetype ' . string(&filetype)
   endif
   let table = s:execute_tags('', '--list-kinds=' . shellescape(flag))
   if flag ==# 'all'  " filter particular filetypes
-    let l:subs = []
-    let regex = '\c\(\%(\n\|^\)\@<=\%(' . join(types, '\|') . '\)\n'
+    let regex = '\c\(\%(\n\|^\)\@<=\%(' . join(langs, '\|') . '\)\n'
     let regex = regex . '\%(\s\+[^\n]*\%(\n\|$\)\)*\)\S\@!'
-    let append = '\=add(l:subs, submatch(0))'  " see: https://vi.stackexchange.com/a/16491/8084
-    call substitute(table, regex, append, 'gn')
-    let table = join(l:subs, '')
+    let [l:subs, append] = [[], '\=add(l:subs, submatch(0))']
+    call substitute(table, regex, append, 'gn') | let table = join(l:subs, '')
   endif
   let title = 'Tag kinds for ' . label
   let major = 'Major tag kinds: ' . join(major, ' ')
@@ -626,7 +634,7 @@ endfunction
 " Note: This is used with statusline and :CurrentTag
 function! tags#current_tag(...) abort
   let lnum = line('.')
-  let info = tags#find_tag(lnum, 0, 0, 0)
+  let info = tags#find_tag(lnum)
   let full = a:0 ? a:1 : 1  " print full tag
   if empty(info)
     let parts = []
@@ -643,40 +651,55 @@ endfunction
 " Find the tag closest to the input position
 " Note: This translates tag to single-character for use e.g. in statusline
 function! tags#find_tag(...) abort
+  " Get search starting point
   let pos = a:0 > 0 ? a:1 : line('.')
   let bnum = type(pos) > 1 && !empty(pos[0]) ? bufnr(pos[0]) : bufnr()
   let lnum = type(pos) > 1 ? pos[1] : type(pos) ? str2nr(pos) : pos
   let major = a:0 > 1 ? a:2 : 0
   let forward = a:0 > 2 ? a:3 : 0
   let circular = a:0 > 3 ? a:4 : 0
-  if major  " major tags only
-    let filt = 'len(v:val) == 3 && tags#is_major(v:val)'
-  else  " all except minor
-    let filt = 'len(v:val) > 2 && !tags#is_minor(v:val)'
-  endif
   let items = getbufvar(bnum, 'tags_by_line', [])
-  let items = filter(copy(items), filt)
-  if empty(items)
-    return []  " silent failure
+  let [idx, max] = [-1, len(items) - 1]
+  if !empty(items)
+    if forward && lnum >= items[-1][1]
+      let idx = circular ? 0 : max
+    elseif !forward && lnum <= items[0][1]
+      let idx = circular ? max : 0
+    endif
   endif
-  if circular && forward && lnum >= items[-1][1]
-    let idx = 0
-  elseif circular && !forward && lnum <= items[0][1]
-    let idx = -1
-  else  " search in between (endpoint inclusive)
-    let idx = forward ? 0 : -1
-    for jdx in range(1, len(items) - 1)
-      if forward && lnum >= items[-jdx - 1][1]
-        let idx = -jdx | break
-      endif
-      if !forward && lnum <= items[jdx][1]
-        let idx = jdx - 1 | break
-      endif
-    endfor
+  for jdx in idx < 0 ? range(1, max) : []  " search in between (endpoint inclusive)
+    if forward && lnum >= items[max - jdx - 1][1]
+      let idx = max - jdx | break
+    endif
+    if !forward && lnum <= items[jdx][1]
+      let idx = jdx - 1 | break
+    endif
+  endfor
+  " Get nearest tag matching criteria
+  let [jdx, kdx] = [idx, -1]
+  while jdx >= 0 && kdx < 0  " filter tags from starting point
+    let item = items[jdx]
+    if major && len(item) == 3 && tags#is_major(item)
+      let kdx = jdx | break
+    elseif !major && len(item) > 2 && tags#is_minor(item)
+      let kdx = jdx | break
+    endif
+    if !circular && forward && jdx == max
+      let kdx = max | break
+    elseif !circular && !forward && jdx == 0
+      let kdx = 0 | break
+    endif
+    let jdx += forward ? 1 : -1
+    let jdx %= len(items)  " circular wrapping
+    if jdx == idx
+      let kdx = -1 | break
+    endif
+  endwhile
+  let item = kdx < 0 ? [] : copy(items[idx])
+  if len(item) > 2
+    let item[2] = tags#kind_char(item[2])
   endif
-  let [name, lnum, kind; rest] = items[idx]
-  let kind = tags#kind_char(kind)
-  return [name, lnum, kind] + rest
+  return item
 endfunction
 
 " Go to the tag keyword under the cursor
