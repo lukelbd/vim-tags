@@ -7,7 +7,6 @@
 " Supports jumping across open buffers and search and replace within buffers.
 augroup vim_tags
   au!
-  au FileType * let b:tags_language = tags#buffer_lang()
   au InsertLeave * silent call tags#change_setup()  " finish change operation and set repeat
   au BufReadPost,BufWritePost * silent call tags#update_tags(expand('<afile>'))
 augroup END

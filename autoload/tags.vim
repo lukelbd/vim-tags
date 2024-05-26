@@ -45,16 +45,11 @@ function! tags#is_skipped(tag, ...) abort
 endfunction
 function! s:tag_is_kind(tag, name, default, ...) abort
   let name = 'tags_' . a:name . '_kinds'  " setting name
-  let lang = call('tags#buffer_lang', a:000)
-  let opts = get(get(g:, name, {}), lang, a:default)
+  let name = call('tags#lang_name', a:000)
+  let opts = get(get(g:, name, {}), name, a:default)
   let kind1 = get(a:tag, 2, '')  " translate to or from character
-  if type(opts) > 1
-    return index(opts, kind1) >= 0
-  else  " faster than splitting (important for statusline)
-    return kind1 =~# '[' . opts . ']'
-  endif
-  let cache = len(kind1) > 1 ? g:tags_kind_chars : g:tags_kind_names
-  let kind2 = get(get(cache, lang, {}), kind1, kind1)
+  let kinds = len(kind1) > 1 ? g:tags_kind_chars : g:tags_kind_names
+  let kind2 = get(get(kinds, name, {}), kind1, kind1)
   if type(opts) > 1
     return index(opts, kind1) >= 0 || index(opts, kind2) >= 0
   else  " faster than splitting (important for statusline)
@@ -67,22 +62,24 @@ let g:tags_kind_chars = {}
 let g:tags_kind_names = {}
 let g:tags_kind_langs = {}
 function! tags#kind_char(kind, ...) abort
-  let lang = call('tags#buffer_lang', a:000)
-  let opts = len(a:kind) <= 1 ? {} : get(g:tags_kind_chars, lang, {})
+  let name = call('tags#lang_name', a:000)
+  let opts = len(a:kind) <= 1 ? {} : get(g:tags_kind_chars, name, {})
   return get(opts, a:kind, a:kind)
 endfunction
 function! tags#kind_name(kind, ...) abort
-  let lang = call('tags#buffer_lang', a:000)
-  let opts = len(a:kind) > 1 ? {} : get(g:tags_kind_names, lang, {})
+  let name = call('tags#lang_name', a:000)
+  let opts = len(a:kind) > 1 ? {} : get(g:tags_kind_names, name, {})
   return get(opts, a:kind, a:kind)
 endfunction
-function! tags#buffer_lang(...) abort
+function! tags#lang_name(...) abort
   let bnr = call('bufnr', a:000)
-  let lang = getbufvar(bnr, 'tags_language', '')
-  if !empty(lang) | return lang | endif  " speedup for statusline
+  let name = getbufvar(bnr, 'tags_lang_name', '')
+  if !empty(name) | return name | endif  " speedup for statusline
   let type = tolower(getbufvar(bnr, '&filetype', ''))
   let type = substitute(type, '\..*$', '', 'g')
-  return get(g:tags_kind_langs, type, type)
+  let name = get(g:tags_kind_langs, type, type)
+  call setbufvar(bnr, 'tags_lang_name', name)
+  return name
 endfunction
 
 "-----------------------------------------------------------------------------"
@@ -237,7 +234,7 @@ endfunction
 " Note: Output should be in number mode (i.e. shows line number instead of full line)
 function! s:execute_tags(path, ...) abort
   let path = empty(a:path) ? '' : fnamemodify(expand(a:path), ':p')
-  let flag = empty(a:path) ? '' : tags#buffer_lang(path)
+  let flag = empty(a:path) ? '' : tags#lang_name(path)
   let flag = empty(flag) || fnamemodify(path, ':t') =~# '\.' ? '' : '--language-force=' . flag
   let cmd = 'ctags -f - --excmd=number ' . join(a:000, ' ') . ' ' . flag
   let cmd .= ' ' . shellescape(path) . ' 2>/dev/null'
@@ -263,6 +260,47 @@ function! tags#execute(...) abort
 endfunction
 function! tags#generate(...) abort
   return call('s:generate_tags', a:000)
+endfunction
+
+" Return tag files and tags from tag files prioritized by project
+" Note: Here tagfiles() function returns buffer-local variables so use &g:tags instead,
+" and note that literal commas/spaces preced by backslash (see :help option-backslash).
+" Note: Here taglist() uses path only to prioritize tags (i.e. does not filter) and
+" name is treated as a regex as with :tags /<name> (see :help taglist()).
+function! tags#tag_list(name, ...) abort
+  let regex = '^' . escape(a:name, s:regex_magic) . '$'
+  let path = expand(a:0 ? a:1 : '%')
+  let tags = call('tags#tag_files', a:000)
+  call map(tags, {_, val -> substitute(val, '\(,\| \)', '\\\1', 'g')})
+  let [itags, jtags] = [&l:tags, join(tags, ',')]
+  try  " restrict to current project
+    let &l:tags = jtags
+    return taglist(regex, path)
+  finally
+    let &l:tags = itags
+  endtry
+endfunction
+function! tags#tag_files(...) abort
+  let strict = a:0 > 1 ? a:2 : 0
+  let source = a:0 > 0 ? a:1 : ''
+  let source = expand(empty(source) ? '%' : source)
+  let head = fnamemodify(source, ':p')  " initial value
+  let tags = split(&g:tags, '\\\@<!,')  " see above
+  call map(tags, {_, val -> substitute(val, '\\\(,\| \)', '\1', 'g')})
+  call map(tags, {_, val -> fnamemodify(val, ':p')})
+  let heads = map(copy(tags), {_, val -> fnamemodify(val, ':h')})
+  let result = []  " filtered tag files
+  while v:true
+    let ihead = fnamemodify(head, ':h')
+    if empty(ihead) || ihead ==# head | break | endif
+    let idx = index(heads, ihead)
+    if idx >= 0 | call add(result, tags[idx]) | endif
+    let head = ihead  " tag file candidate
+  endwhile
+  if !strict  " other paths lower priority
+    call extend(result, filter(tags, 'index(result, v:val) < 0'))
+  endif
+  return result
 endfunction
 
 " Update tag buffer variables and kind global variables
@@ -377,10 +415,10 @@ function! tags#table_kinds(...) abort
     let minor = map(copy(langs), {idx, val -> val . ' ' . string(get(uminor, val, 'v'))})
     let major = ['default ' . string('f')] + major
     let minor = ['default ' . string('v')] + minor
-    let langs = uniq(map(tags#get_paths(), 'tags#buffer_lang(v:val)'))
+    let langs = uniq(map(tags#get_paths(), 'tags#lang_name(v:val)'))
     let label = 'all buffer filetypes'
   elseif a:0  " input filetype(s)
-    let langs = uniq(sort(map(copy(a:000), 'tags#buffer_lang(v:val)')))
+    let langs = uniq(sort(map(copy(a:000), 'tags#lang_name(v:val)')))
     let flag = len(langs) == 1 ? langs[0] : 'all'
     let major = map(copy(langs), {idx, val -> val . ' ' . string(get(umajor, val, 'f'))})
     let minor = map(copy(langs), {idx, val -> val . ' ' . string(get(uminor, val, 'v'))})
@@ -630,76 +668,60 @@ endfunction
 "-----------------------------------------------------------------------------"
 " Tag navigation utilities {{{1
 "-----------------------------------------------------------------------------"
-" Get the 'current' tag definition under or preceding the cursor
-" Note: This is used with statusline and :CurrentTag
-function! tags#current_tag(...) abort
-  let lnum = line('.')
-  let info = tags#find_tag(lnum)
-  let full = a:0 ? a:1 : 1  " print full tag
-  if empty(info)
-    let parts = []
-  elseif !full || len(info) == 3
-    let parts = [info[2], info[0]]
-  else  " include extra information
-    let extra = substitute(info[3], '^.*:', '', '')
-    let parts = [info[2], extra, info[0]]
-  endif
-  let string = join(parts, ':')
-  return string
-endfunction
-
-" Find the tag closest to the input position
-" Note: This translates tag to single-character for use e.g. in statusline
-function! tags#find_tag(...) abort
-  " Get search starting point
+" Return the tags and nearest index for the given buffer and line number
+" Note: This is analogous to builtin functions getloclist(), getjumplist(), etc.
+function! tags#get_tags(...)
   let pos = a:0 > 0 ? a:1 : line('.')
-  let bnum = type(pos) > 1 && !empty(pos[0]) ? bufnr(pos[0]) : bufnr()
+  let bnr = type(pos) > 1 && !empty(pos[0]) ? bufnr(pos[0]) : bufnr()
   let lnum = type(pos) > 1 ? pos[1] : type(pos) ? str2nr(pos) : pos
-  let major = a:0 > 1 ? a:2 : 0
-  let forward = a:0 > 2 ? a:3 : 0
-  let circular = a:0 > 3 ? a:4 : 0
-  let items = getbufvar(bnum, 'tags_by_line', [])
-  let [idx, max] = [-1, len(items) - 1]
-  if !empty(items)
-    if forward && lnum >= items[-1][1]
-      let idx = circular ? 0 : max
-    elseif !forward && lnum <= items[0][1]
-      let idx = circular ? max : 0
+  let items = getbufvar(bnr, 'tags_by_line', [])
+  let forward = a:0 > 1 ? a:2 : 0
+  let max = len(items) - 1  " maximum valid index
+  let idxs = forward ? range(max, 0, -1) : range(0, max)
+  let index = -1  " returned index
+  for idx in idxs
+    if forward && lnum > items[idx][1]
+      let index = min([idx + 1, max]) | break
     endif
-  endif
-  for jdx in idx < 0 ? range(1, max) : []  " search in between (endpoint inclusive)
-    if forward && lnum >= items[max - jdx - 1][1]
-      let idx = max - jdx | break
+    if !forward && lnum < items[idx][1]
+      let index = max([idx - 1, 0]) | break
     endif
-    if !forward && lnum <= items[jdx][1]
-      let idx = jdx - 1 | break
+    if idx == idxs[-1]
+      let index = idx | break
     endif
   endfor
-  " Get nearest tag matching criteria
-  let [jdx, kdx] = [idx, -1]
-  while jdx >= 0 && kdx < 0  " filter tags from starting point
-    let item = items[jdx]
+  return [items, index]
+endfunction
+
+" Return the nearest tag matching input criteria
+" Note: This translates kind to single-character for use e.g. in statusline
+function! tags#get_tag(...) abort
+  let [items, idx] = call('tags#get_tags', a:000[:1])
+  let forward = a:0 > 1 ? a:2 : 0
+  let circular = a:0 > 2 ? a:3 : 0
+  let major = a:0 > 3 ? a:4 : 0
+  let max = len(items) - 1
+  if forward
+    let idxs = range(idx, max)
+    let jdxs = range(0, idx - 1)
+  else
+    let idxs = range(idx, 0, -1)
+    let jdxs = range(max, idx + 1, -1)
+  endif
+  let jdxs = circular ? jdxs : reverse(jdxs)
+  let index = -1  " returned index
+  for idx in extend(idxs, jdxs)  " search valid tags
+    let item = items[idx]
     if major && len(item) == 3 && tags#is_major(item)
-      let kdx = jdx | break
-    elseif !major && len(item) > 2 && tags#is_minor(item)
-      let kdx = jdx | break
+      let index = idx | break
+    elseif !major && len(item) > 2 && !tags#is_minor(item)
+      let index = idx | break
     endif
-    if !circular && forward && jdx == max
-      let kdx = max | break
-    elseif !circular && !forward && jdx == 0
-      let kdx = 0 | break
-    endif
-    let jdx += forward ? 1 : -1
-    let jdx %= len(items)  " circular wrapping
-    if jdx == idx
-      let kdx = -1 | break
-    endif
-  endwhile
-  let item = kdx < 0 ? [] : copy(items[idx])
+  endfor
+  let item = copy(index >= 0 ? items[index] : [])
   if len(item) > 2
     let item[2] = tags#kind_char(item[2])
-  endif
-  return item
+  endif | return item
 endfunction
 
 " Go to the tag keyword under the cursor
@@ -744,21 +766,39 @@ function! tags#goto_name(...) abort
   echohl None | return 1
 endfunction
 
+" Return the tag name under or preceding the cursor
+" Note: This is used with statusline and :CurrentTag
+function! tags#current_tag(...) abort
+  let lnum = line('.')
+  let info = tags#get_tag(lnum)
+  let full = a:0 ? a:1 : 1  " print full tag
+  if empty(info)
+    let parts = []
+  elseif !full || len(info) == 3
+    let parts = [info[2], info[0]]
+  else  " include extra information
+    let extra = substitute(info[3], '^.*:', '', '')
+    let parts = [info[2], extra, info[0]]
+  endif
+  let string = join(parts, ':')
+  return string
+endfunction
+
 " Jump to the next or previous tag under the cursor
 " Note: This is used with bracket t/T mappings
 function! tags#next_tag(count, ...) abort
-  let forward = a:count >= 0
-  let args = [line('.'), a:0 && a:1, forward, 1]  " circular searching
-  for idx in range(abs(a:count))  " loop through repitition count
-    let tag = call('tags#find_tag', args)
-    if empty(tag)
+  let args = [a:count >= 0, 1, a:0 ? a:1 : 0]
+  for idx in range(abs(a:count))  " count times
+    let lnum = idx == 0 ? line('.') : str2nr(itag[1])
+    let lnum += idx == 0 ? 0 : a:count >= 0 ? 1 : -1
+    let itag = call('tags#get_tag', [lnum] + args)
+    if empty(itag)  " algorithm failed
       redraw | echohl WarningMsg
       echom 'Error: Next tag not found'
       echohl None | return
-    endif
-    let args[0] = str2nr(tag[1])  " adjust line number
+    endif  " assign line number
   endfor
-  call tags#_goto_tag(2, tag[1], tag[0])  " jump to line then name
+  call tags#_goto_tag(2, itag[1], itag[0])  " jump to line then name
   exe &l:foldopen =~# '\<block\>' ? 'normal! zv' : ''
 endfunction
 
@@ -785,51 +825,6 @@ function! tags#next_word(count, ...) abort
   let suffix = line1 && line2 ? ' (lines ' . line1 . ' to ' . line2 . ')' : ''
   redraw | echom 'Keyword: ' . prefix . suffix
   exe &l:foldopen =~# '\<block\>' ? 'normal! zv' : ''
-endfunction
-
-" Return tag files prioritized for current project
-" Note: Here tagfiles() function returns buffer-local variables so use &g:tags instead,
-" and note that literal commas/spaces preced by backslash (see :help option-backslash).
-function! tags#tag_files(...) abort
-  let strict = a:0 > 1 ? a:2 : 0
-  let source = a:0 > 0 ? a:1 : ''
-  let source = expand(empty(source) ? '%' : source)
-  let head = fnamemodify(source, ':p')  " initial value
-  let tags = split(&g:tags, '\\\@<!,')  " see above
-  call map(tags, {_, val -> substitute(val, '\\\(,\| \)', '\1', 'g')})
-  call map(tags, {_, val -> fnamemodify(val, ':p')})
-  let heads = map(copy(tags), {_, val -> fnamemodify(val, ':h')})
-  let result = []  " filtered tag files
-  while v:true
-    let ihead = fnamemodify(head, ':h')
-    if empty(ihead) || ihead ==# head | break | endif
-    let idx = index(heads, ihead)
-    if idx >= 0 | call add(result, tags[idx]) | endif
-    let head = ihead  " tag file candidate
-  endwhile
-  if !strict  " other paths lower priority
-    call extend(result, filter(tags, 'index(result, v:val) < 0'))
-  endif
-  return result
-endfunction
-
-" Return tags from tag files
-" Note: Here taglist() uses path only to prioritize tags (i.e. does not filter) and
-" name is treated as a regex as with :tags /<name> (see :help taglist()).
-" Note: Here modify &l:tags temporarily to optionally exclude unrelated projects, since
-" taglist() uses tagfiles() which may include unrelated projects if &l:tags unset.
-function! tags#tag_list(name, ...) abort
-  let regex = '^' . escape(a:name, s:regex_magic) . '$'
-  let path = expand(a:0 ? a:1 : '%')
-  let tags = call('tags#tag_files', a:000)
-  call map(tags, {_, val -> substitute(val, '\(,\| \)', '\\\1', 'g')})
-  let [itags, jtags] = [&l:tags, join(tags, ',')]
-  try
-    let &l:tags = jtags
-    return taglist(regex, path)
-  finally
-    let &l:tags = itags
-  endtry
 endfunction
 
 "-----------------------------------------------------------------------------"
