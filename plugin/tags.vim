@@ -5,18 +5,16 @@
 " Author: Luke Davis (lukelbd@gmail.com)
 " This plugin works as a companion to project-wide tag navigation utilities.
 " Supports jumping across open buffers and search and replace within buffers.
-if exists('g:loaded_tags') | finish | endif
+exe exists('g:loaded_tags') ? 'finish' : ''
 let g:loaded_tags = 1
 call system('type ctags &>/dev/null')
-if v:shell_error " exit code
-  echoerr 'Error: Command-line executable ''ctags'' not found.' | finish
-endif
+if v:shell_error | echoerr 'Error: ''ctags'' executable not found.' | finish | endif
+silent! exe 'au! tags'
 augroup vim_tags
   au!
   au InsertLeave * silent call tags#change_setup()  " finish change operation and set repeat
   au BufReadPost,BufWritePost * silent call tags#update_tags(expand('<afile>'))
 augroup END
-silent! autocmd! tags
 
 " Disable mappings {{{2
 if !exists('g:tags_nomap')
