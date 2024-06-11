@@ -823,7 +823,6 @@ function! tags#next_word(count, ...) abort
   let [line1, line2] = [str2nr(line1), str2nr(line2)]  " note str2nr('') is zero
   let prefix = substitute(word, '\\[<>cC]', '', 'g')
   let suffix = line1 && line2 ? ' (lines ' . line1 . ' to ' . line2 . ')' : ''
-  redraw | echom 'Keyword: ' . prefix . suffix
   exe &l:foldopen =~# '\<block\>' ? 'normal! zv' : ''
 endfunction
 
