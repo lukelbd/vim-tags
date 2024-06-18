@@ -807,7 +807,7 @@ endfunction
 function! tags#next_word(count, ...) abort
   let winview = winsaveview()  " tags#set_search() moves to start of match
   let local = a:0 ? 1 - a:1 : 1
-  silent call tags#set_search(1, 0, local, 1)  " suppress scope message for now
+  call tags#set_search(1, 1, 0, local, 1)
   let [regex, flags] = [@/, a:count < 0 ? 'bw' : 'w']
   for _ in range(abs(a:count))
     let pos = getpos('.')
@@ -915,8 +915,9 @@ endfunction
 " to silently abort for some weird reason... so instead call this manually.
 function! tags#show_search(...) abort
   let regex = a:0 ? a:1 : @/
-  if !empty(get(s:, 'scope_bounds', []))
-    let [line1, line2; rest] = s:scope_bounds
+  let scope = get(s:, 'scope_bounds', [])
+  if !empty(scope)
+    let [line1, line2; rest] = scope
     let part1 = empty(rest) ? line1 : line1 . ' (' . rest[0] . ')'
     let part2 = empty(rest) ? line2 : line2 . ' (' . rest[1] . ')'
     echom 'Selected lines ' . part1 . ' to ' . part2 . '.'
@@ -927,12 +928,11 @@ function! tags#show_search(...) abort
     call winrestview(winview)
   endif
   let keys = "\<Cmd>setlocal hlsearch\<CR>"
-  call feedkeys(keys, 'n') | let s:scope_bounds = []  " reset message cache
+  call feedkeys(keys, 'n') | unlet! s:scope_bounds
 endfunction
-function! tags#set_search(level, ...) range abort
+function! tags#set_search(level, local, ...) range abort
   let adjust = a:0 > 1 ? a:2 : 0
-  let local = a:0 > 0 ? a:1 : 0
-  let bnds = [a:firstline, a:lastline]
+  let force = a:0 > 0 ? a:1 : 0
   let match = tags#get_search(a:level, 0)
   if adjust && empty(match) && foldclosed('.') == -1
     exe getline('.') =~# '^\s*$' ? '' : 'normal! B'
@@ -942,31 +942,30 @@ function! tags#set_search(level, ...) range abort
   let flag = char =~# '\s' || a:level == 1 && char !~# '\k' ? 'cW' : 'cbW'
   if adjust && strwidth(match) > 1
     call search(regex, flag, line('.'))
-  endif
-  if bnds[0] != bnds[1]  " user-input range
-    let scope = printf('\%%>%dl\%%<%dl', bnds[0] - 1, bnds[1] + 1) | let s:scope_bounds = bnds
-  elseif local  " local scope
+  endi
+  if a:local > 1  " manual scope
+    let scope = printf('\%%>%dl\%%<%dl', a:firstline - 1, a:lastline + 1)
+  elseif a:local > 0  " local scope
     let scope = tags#get_scope()
   else  " global scope
     let scope = ''
   endif
-  if local && empty(scope)  " reset pattern
+  if a:local && empty(scope)  " reset pattern
     let @/ = '' | return []
   else  " update pattern
     let @/ = scope . regex
   endif
-  let prefix = a:level > 1 ? 'WORD' : a:level > 0 ? 'Word' : 'Char'
-  let suffix = local ? 'Local' : 'Global'
-  if empty(scope) && exists(':ShowSearchIndex')
-    let cmds = ['ShowSearchIndex', 'setlocal hlsearch']
-    let s:scope_bounds = []
+  if !force && a:local != 1 && exists(':ShowSearchIndex')
+    unlet! s:scope_bounds
+    let cmd = "\<Cmd>ShowSearchIndex\<CR>\<Cmd>setlocal hlsearch\<CR>"
   else
-    let cmds = ['call tags#show_search(' . string(scope) . ')']
+    if a:local > 1 | let s:scope_bounds = [a:firstline, a:lastline] | endif
+    let cmd = "\<Cmd>call tags#show_search(" . string(scope) . ")\<CR>"
   endif
   exe &l:foldopen =~# '\<block\>' && adjust ? 'normal! zv' : ''
-  call map(cmds, {_, val -> "\<Cmd>" . val . "\<CR>"})
-  call feedkeys(join(cmds, ''), 'n')
-  return [prefix, suffix]
+  let name1 = a:level > 1 ? 'WORD' : a:level > 0 ? 'Word' : 'Char'
+  let name2 = a:local ? 'Local' : 'Global'
+  call feedkeys(cmd, 'n') | return [name1, name2]
 endfunction
 
 "-----------------------------------------------------------------------------
@@ -997,9 +996,8 @@ function! tags#change_all() abort
   call s:feed_repeat('Change', 'All')
 endfunction
 function! tags#change_setup() abort
-  let force = get(g:, 'tags_change_arg', -1)
-  if force < 0 | return | endif
-  unlet! g:tags_change_arg
+  let force = get(g:, 'tags_change_all', -1)
+  if force < 0 | return | endif | unlet! g:tags_change_all
   let g:tags_change_sub = substitute(@., "\n", "\<CR>", 'g')
   if !force  " change single item
     let name = 'Again'
@@ -1018,30 +1016,34 @@ endfunction
 " register may have keystrokes e.g. <80>kb (backspace) so must feed as 'typed'
 " Note: Unlike 'change all', 'delete all' can simply use :substitute. Also note
 " :hlsearch inside functions fails: https://stackoverflow.com/q/1803539/4970632
-function! tags#change_next(level, force, ...) abort
+function! tags#change_next(level, local, ...) abort
+  let adjust = a:0 > 1 ? a:2 : 0
+  let force = a:0 > 0 ? a:1 : 0
   if a:level < 0  " e.g. c/
-    let key = a:0 && a:1 ? 'N' : 'n'
+    let key = a:local ? 'N' : 'n'  " shorthand
     let names = ['Match', key ==# 'N' ? 'Prev' : 'Next']
   else  " e.g. c*
     let key = 'n'
-    let names = call('tags#set_search', [a:level] + a:000)
+    let names = tags#set_search(a:level, a:local, force, adjust)
   endif
   if empty(names) | return | endif  " scope not found
-  let g:tags_change_arg = a:force
+  let g:tags_change_all = force
   let g:tags_change_next = key
   call feedkeys('cg' . key, 'n')
 endfunction
-function! tags#delete_next(level, force, ...) abort
+function! tags#delete_next(level, local, ...) abort
+  let adjust = a:0 > 1 ? a:2 : 0
+  let force = a:0 > 0 ? a:1 : 0
   if a:level < 0
-    let key = a:0 && a:1 ? 'N' : 'n'
+    let key = a:local ? 'N' : 'n'  " shorthand
     let names = ['Match', key ==# 'N' ? 'Prev' : 'Next']
   else
     let key = 'n'
-    let names = call('tags#set_search', [a:level] + a:000)
+    let names = tags#set_search(a:level, a:local, force, adjust)
   endif
   if empty(names) | return | endif  " scope not found
-  let names[0] .= a:force ? a:level < 0 ? 'es' : 's' : ''
-  if !a:force  " delete single item
+  let names[0] .= force ? a:level < 0 ? 'es' : 's' : ''
+  if !a:0 || !a:1  " delete single item
     let keys = 'dg' . repeat(key, 2) . 'zv'
     call feedkeys(keys, 'n')
   else  " delete all matches
