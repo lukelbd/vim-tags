@@ -957,7 +957,7 @@ function! tags#set_search(level, local, ...) range abort
   endif
   if !force && a:local != 1 && exists(':ShowSearchIndex')
     unlet! s:scope_bounds
-    let cmd = "\<Cmd>ShowSearchIndex\<CR>\<Cmd>setlocal hlsearch\<CR>"
+    let cmd = "\<Cmd>ShowSearchIndex\<CR>\<Cmd>setlocal hlsearch\<CR>\<Cmd>redraw\<CR>"
   else
     if a:local > 1 | let s:scope_bounds = [a:firstline, a:lastline] | endif
     let cmd = "\<Cmd>call tags#show_search(" . string(scope) . ")\<CR>"
@@ -980,13 +980,12 @@ function! s:feed_repeat(name, ...) abort
   if !exists('*repeat#set') | return | endif
   let keys = '\<Plug>Tags' . a:name . 'Repeat\<Plug>Tags' . a:name . join(a:000, '')
   let feed = 'call repeat#set("' . keys . '", 1)'
-  unsilent echom 'Feed!!! ' . feed
   call feedkeys("\<Cmd>" . feed . "\<CR>", 'n')
 endfunction
 function! tags#change_again() abort
-  let motion = get(g:, 'tags_change_next', 'n')
+  let key = get(g:, 'tags_change_key', 'n')
   let feed = "call feedkeys(mode() ==# 'i' ? get(g:, 'tags_change_sub', '') : '', 'ti')"
-  call feedkeys('cg' . motion . "\<Cmd>" . feed . "\<CR>\<Esc>" . motion, 'n')
+  call feedkeys('cg' . key . "\<Cmd>" . feed . "\<CR>\<Esc>" . key, 'n')
   call s:feed_repeat('Change', 'Again')
 endfunction
 function! tags#change_all() abort
@@ -995,17 +994,15 @@ function! tags#change_all() abort
   let winview = winsaveview() | exe expr | call winrestview(winview)
   call s:feed_repeat('Change', 'All')
 endfunction
-function! tags#change_setup() abort
+function! tags#change_setup(...) abort
   let force = get(g:, 'tags_change_all', -1)
   if force < 0 | return | endif | unlet! g:tags_change_all
-  let g:tags_change_sub = substitute(@., "\n", "\<CR>", 'g')
+  let g:tags_change_sub = substitute(a:0 ? a:1 : @., "\n", "\<CR>", 'g')
   if !force  " change single item
     let name = 'Again'
-    let motion = get(g:, 'tags_change_next', 'n')
-    call feedkeys(motion . 'zv', 'nt')
+    call feedkeys(get(g:, 'tags_change_key', 'n') . 'zv', 'nt')
   else  " change all items
     let name = 'All'
-    call feedkeys('u', 'n')
     call feedkeys("\<Plug>TagsChangeAll", 'm')
   endif
   call s:feed_repeat('Change', name)
@@ -1019,36 +1016,31 @@ endfunction
 function! tags#change_next(level, local, ...) abort
   let adjust = a:0 > 1 ? a:2 : 0
   let force = a:0 > 0 ? a:1 : 0
-  if a:level < 0  " e.g. c/
+  if a:level < 0  " change match e.g. c/
     let key = a:local ? 'N' : 'n'  " shorthand
     let names = ['Match', key ==# 'N' ? 'Prev' : 'Next']
-  else  " e.g. c*
+  else  " change word e.g. c*
     let key = 'n'
-    let names = tags#set_search(a:level, a:local, force, adjust)
+    let names = tags#set_search(a:level, a:local, 0, adjust)
   endif
   if empty(names) | return | endif  " scope not found
   let g:tags_change_all = force
-  let g:tags_change_next = key
+  let g:tags_change_key = key
   call feedkeys('cg' . key, 'n')
 endfunction
 function! tags#delete_next(level, local, ...) abort
   let adjust = a:0 > 1 ? a:2 : 0
   let force = a:0 > 0 ? a:1 : 0
-  if a:level < 0
+  if a:level < 0  " delete match e.g. d/
     let key = a:local ? 'N' : 'n'  " shorthand
     let names = ['Match', key ==# 'N' ? 'Prev' : 'Next']
-  else
+  else  " delete word e.g. d*
     let key = 'n'
-    let names = tags#set_search(a:level, a:local, force, adjust)
+    let names = tags#set_search(a:level, a:local, 0, adjust)
   endif
   if empty(names) | return | endif  " scope not found
-  let names[0] .= force ? a:level < 0 ? 'es' : 's' : ''
-  if !a:0 || !a:1  " delete single item
-    let keys = 'dg' . repeat(key, 2) . 'zv'
-    call feedkeys(keys, 'n')
-  else  " delete all matches
-    let expr = 'keepjumps %s@' . escape(@/, '@') . '@@ge'
-    let winview = winsaveview() | exe expr | call winrestview(winview)
-  endif
-  call s:feed_repeat('Delete', names[0], names[1])
+  let g:tags_change_all = force
+  let g:tags_change_key = key
+  call feedkeys('dg' . key, 'n')
+  call tags#change_setup('')
 endfunction
