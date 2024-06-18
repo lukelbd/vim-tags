@@ -190,6 +190,7 @@ if !g:tags_nomap_searches
   exe 'nmap ca' . g:tags_word_local_map . ' <Plug>TagsChangeWordsLocal'
   exe 'nmap ca' . g:tags_WORD_local_map . ' <Plug>TagsChangeWORDSLocal'
 endif
+nnoremap <Plug>TagsChangeRepeat zv
 nnoremap <Plug>TagsChangeAll <Cmd>call tags#change_all()<CR>
 nnoremap <Plug>TagsChangeAgain <Cmd>call tags#change_again()<CR>
 nnoremap <Plug>TagsChangeMatchNext <Cmd>call tags#change_next(@/, 0, 0)<CR>
@@ -207,7 +208,7 @@ nnoremap <Plug>TagsChangeWORDSGlobal <Cmd>call tags#change_next(2, 1, 0)<CR>
 nnoremap <Plug>TagsChangeWordsLocal <Cmd>call tags#change_next(1, 1, 1)<CR>
 nnoremap <Plug>TagsChangeWORDSLocal <Cmd>call tags#change_next(2, 1, 1)<CR>
 
-" Current word deltion {{{2
+" Current word deletion {{{2
 " Normal mode mappings that replicate :d/regex/ behavior and can be repeated with '.'.
 " Cursor automatically jumps to the next match. The 'a' mappings delete all matches.
 if !g:tags_nomap_searches
@@ -228,6 +229,7 @@ if !g:tags_nomap_searches
   exe 'nmap da' . g:tags_word_local_map . ' <Plug>TagsDeleteWordsLocal'
   exe 'nmap da' . g:tags_WORD_local_map . ' <Plug>TagsDeleteWORDSLocal'
 endif
+nnoremap <Plug>TagsDeleteRepeat zv
 nnoremap <Plug>TagsDeleteMatchNext <Cmd>call tags#delete_next(@/, 0, 0)<CR>
 nnoremap <Plug>TagsDeleteMatchPrev <Cmd>call tags#delete_next(@/, 0, 1)<CR>
 nnoremap <Plug>TagsDeleteMatchesNext <Cmd>call tags#delete_next(@/, 1, 0)<CR>

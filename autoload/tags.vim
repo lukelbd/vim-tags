@@ -972,52 +972,45 @@ endfunction
 "-----------------------------------------------------------------------------
 " Keyword manipulation utilities {{{1
 "-----------------------------------------------------------------------------
-" Helper functions
-" Note: Critical to feed repeat command and use : instead of <Cmd> or will
-" not work properly. See: https://vi.stackexchange.com/a/20661/8084
-function! s:feed_repeat(name, ...) abort
-  if !exists('*repeat#set') | return | endif
-  let plug = '\<Plug>' . a:name
-  let cnt = a:0 ? a:1 : v:count
-  let cmd = 'call repeat#set("zv' . plug . '", ' . cnt . ')'
-  call feedkeys("\<Cmd>" . cmd . "\<CR>", 'n')
-endfunction
-
-" Set up repeat after finishing previous change on InsertLeave
+" Helper functions for changing after InsertLeave
 " Note: Critical to use global variables or else have issues with nested feed
 " Note: The 'cgn' command silently fails to trigger insert mode if no matches found
 " so we check for that. Putting <Esc> in feedkeys() cancels operation so must come
 " afterward (may be no-op) and the 'i' is necessary to insert <C-a> before <Esc>.
+function! s:feed_repeat(name, ...) abort
+  if !exists('*repeat#set') | return | endif
+  let keys = '\<Plug>Tags' . a:name . 'Repeat\<Plug>Tags' . a:name . join(a:000, '')
+  let feed = 'call repeat#set("' . keys . '", 1)'
+  unsilent echom 'Feed!!! ' . feed
+  call feedkeys("\<Cmd>" . feed . "\<CR>", 'n')
+endfunction
 function! tags#change_again() abort
-  let motion = get(g:, 'tags_change_motion', 'n')
-  let replace = "mode() ==# 'i' ? get(g:, 'tags_change_string', '') : ''"
-  let replace = "\<Cmd>call feedkeys(" . replace . ", 'ti')\<CR>"
-  call feedkeys('cg' . motion . replace . "\<Esc>" . motion, 'n')
-  call s:feed_repeat('TagsChangeAgain')
+  let motion = get(g:, 'tags_change_next', 'n')
+  let feed = "call feedkeys(mode() ==# 'i' ? get(g:, 'tags_change_sub', '') : '', 'ti')"
+  call feedkeys('cg' . motion . "\<Cmd>" . feed . "\<CR>\<Esc>" . motion, 'n')
+  call s:feed_repeat('Change', 'Again')
 endfunction
 function! tags#change_all() abort
-  let winview = winsaveview()
-  let regex = escape(@/, '@')
-  let string = get(g:, 'tags_change_string', '')
-  let replace = escape(string, '@')
-  exe 'keepjumps %s@' . regex . '@' . replace . '@ge'
-  call winrestview(winview)
-  call s:feed_repeat('TagsChangeAll')
+  let string = escape(get(g:, 'tags_change_sub', ''), '@')
+  let expr = 'keepjumps %s@' . escape(@/, '@') . '@' . string . '@ge'
+  let winview = winsaveview() | exe expr | call winrestview(winview)
+  call s:feed_repeat('Change', 'All')
 endfunction
 function! tags#change_setup() abort
-  let setup = get(g:, 'tags_change_setup', 0)
-  if !setup | return | endif
-  let g:tags_change_setup = 0
-  let g:tags_change_string = substitute(@., "\n", "\<CR>", 'g')
-  if setup == 1  " change single item
-    let motion = get(g:, 'tags_change_motion', 'n')
+  let force = get(g:, 'tags_change_arg', -1)
+  if force < 0 | return | endif
+  unlet! g:tags_change_arg
+  let g:tags_change_sub = substitute(@., "\n", "\<CR>", 'g')
+  if !force  " change single item
+    let name = 'Again'
+    let motion = get(g:, 'tags_change_next', 'n')
     call feedkeys(motion . 'zv', 'nt')
-    call s:feed_repeat('TagsChangeAgain')
   else  " change all items
+    let name = 'All'
     call feedkeys('u', 'n')
     call feedkeys("\<Plug>TagsChangeAll", 'm')
-    call s:feed_repeat('TagsChangeAll')
   endif
+  call s:feed_repeat('Change', name)
 endfunction
 
 " Change and delete next match
@@ -1027,36 +1020,33 @@ endfunction
 " :hlsearch inside functions fails: https://stackoverflow.com/q/1803539/4970632
 function! tags#change_next(level, force, ...) abort
   if a:level < 0  " e.g. c/
-    let motion = a:0 && a:1 ? 'N' : 'n'
-    let names = ['Match', motion ==# 'N' ? 'Prev' : 'Next']
+    let key = a:0 && a:1 ? 'N' : 'n'
+    let names = ['Match', key ==# 'N' ? 'Prev' : 'Next']
   else  " e.g. c*
-    let motion = 'n'
+    let key = 'n'
     let names = call('tags#set_search', [a:level] + a:000)
   endif
   if empty(names) | return | endif  " scope not found
-  let g:tags_change_motion = motion
-  call feedkeys('cg' . motion, 'n')
-  let g:tags_change_setup = 1 + a:force
+  let g:tags_change_arg = a:force
+  let g:tags_change_next = key
+  call feedkeys('cg' . key, 'n')
 endfunction
 function! tags#delete_next(level, force, ...) abort
   if a:level < 0
-    let motion = a:0 && a:1 ? 'N' : 'n'
-    let names = ['Match', motion ==# 'N' ? 'Prev' : 'Next']
+    let key = a:0 && a:1 ? 'N' : 'n'
+    let names = ['Match', key ==# 'N' ? 'Prev' : 'Next']
   else
-    let motion = 'n'
+    let key = 'n'
     let names = call('tags#set_search', [a:level] + a:000)
   endif
   if empty(names) | return | endif  " scope not found
+  let names[0] .= a:force ? a:level < 0 ? 'es' : 's' : ''
   if !a:force  " delete single item
-    let plug = 'TagsDelete' . names[0] . names[1]
-    call feedkeys('dg' . repeat(motion, 2) . 'zv', 'n')
-    call s:feed_repeat(plug)
+    let keys = 'dg' . repeat(key, 2) . 'zv'
+    call feedkeys(keys, 'n')
   else  " delete all matches
-    let plural = a:level < 0 ? 'es' : 's'
-    let plug = 'TagsDelete' . names[0] . plural . names[1]
-    let winview = winsaveview()
-    exe 'keepjumps %s@' . escape(@/, '@') . '@@ge'
-    call winrestview(winview)
-    call s:feed_repeat(plug)
+    let expr = 'keepjumps %s@' . escape(@/, '@') . '@@ge'
+    let winview = winsaveview() | exe expr | call winrestview(winview)
   endif
+  call s:feed_repeat('Delete', names[0], names[1])
 endfunction
