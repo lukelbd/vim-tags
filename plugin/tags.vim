@@ -12,7 +12,7 @@ if v:shell_error | echoerr 'Error: ''ctags'' executable not found.' | finish | e
 silent! exe 'au! tags'
 augroup vim_tags
   au!
-  au InsertLeave * silent call tags#change_setup()  " setup change repeat
+  au InsertLeave * silent call tags#change_init()  " initialize repeats
   au BufReadPost,BufWritePost * silent call tags#update_tags(expand('<afile>'))
 augroup END
 

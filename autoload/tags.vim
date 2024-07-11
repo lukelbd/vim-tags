@@ -971,67 +971,91 @@ endfunction
 "-----------------------------------------------------------------------------
 " Keyword manipulation utilities {{{1
 "-----------------------------------------------------------------------------
-" Helper functions for changing after InsertLeave
+" Helper functions
+" Note: Here tags#sub_scope() is also used in forked version of vim-repeat
+" Note: Replacing search-scope text with newlines will make subsequent scope
+" restrictions out-of-date. Fix this by offsetting scope regex by number of
+" newlines in replacement string minus number of newlines in search string.
+function! s:feed_repeat(name, ...) abort
+  if !exists('*repeat#set') | return | endif
+  let cnt = v:count ? v:count1 : get(g:, 'tags_change_count', 1)
+  let key = '"\<Plug>Tags' . a:name . join(a:000, '') . '"'
+  let feed = 'call repeat#set(' . key . ', ' . cnt . ')'
+  call feedkeys("\<Cmd>" . feed . "\<CR>", 'n')
+endfunction
+function! tags#sub_scope(...) abort
+  let search = a:0 > 0 ? a:1 : @/
+  let scale = a:0 > 1 ? a:2 : 1
+  let regex = '\\%<\(\d\+\)l'  " search scope
+  let parts = matchlist(search, regex)
+  let lnum = str2nr(get(parts, 1, ''))
+  if empty(lnum) | return search | endif
+  let sub = get(g:, 'tags_change_sub', '')
+  let cnt1 = count(substitute(search, '\\n', "\r", 'g'), "\r")
+  let cnt2 = count(substitute(sub, '\\r', "\r", 'g'), "\r")
+  let lnum += scale * (cnt2 - cnt1)
+  return substitute(search, regex, '\\%<' . lnum . 'l', '')
+endfunction
+
+" Setup and repeat changes
 " Note: Register @. may have keystrokes e.g. <80>kb (backspace) so feed as 'typed'
 " Note: The 'cgn' command silently fails to trigger insert mode if no matches found
 " so we check for that. Putting <Esc> in feedkeys() cancels operation so must come
-" afterward (may be no-op) and the 'i' is necessary to insert <C-a> before <Esc>.
-function! s:feed_repeat(name, ...) abort
-  if !exists('*repeat#set') | return | endif
-  let keys = '\<Plug>Tags' . a:name . 'Repeat\<Plug>Tags' . a:name . join(a:000, '')
-  let feed = 'call repeat#set("' . keys . '", 1)'
-  call feedkeys("\<Cmd>" . feed . "\<CR>", 'n')
+" afterward (may be no-op) and the 'i's are necessary to insert previously-inserted
+" text before <Esc> and to complete initial v:count1 repeats before s:feed_repeat().
+function! tags#change_force() abort
+  let g:tags_change_count = 1
+  let g:tags_change_view = winsaveview()
+  let args = [@/, get(g:, 'tags_change_sub', '')]
+  call map(args, "escape(v:val, '@')")
+  call feedkeys(':keepjumps %s@' . args[0] . '@' . args[1] . "@ge\<CR>", 'nt')
+  call feedkeys("\<Cmd>call winrestview(g:tags_change_view)\<CR>", 'n')
+  call feedkeys("\<Cmd>call histdel('cmd', -1)\<CR>", 'n')
+  call s:feed_repeat('Change', 'Force')
 endfunction
-function! tags#change_again() abort
+function! tags#change_again(...) abort
+  let cnt = a:0 ? a:1 : get(g:, 'tags_change_count', 1)
   let key = get(g:, 'tags_change_key', 'n')
   let feed = "mode() ==# 'i' ? get(g:, 'tags_change_sub', '') : ''"
   let feed = "\<Cmd>call feedkeys(" . feed . ", 'ti')\<CR>\<Esc>"
-  call feedkeys('cg' . key . feed . key, 'n')
-  call s:feed_repeat('Change', 'Again')
+  for idx in range(cnt)
+    let @/ = tags#sub_scope(@/, 1)
+    call feedkeys('cg' . key . feed . key . 'zv', 'ni')
+  endfor
+  if empty(a:000)  " i.e. not an internal call
+    call s:feed_repeat('Change', 'Again')
+  endif
 endfunction
-function! tags#change_force() abort
-  let g:repeat_view = winsaveview()
-  let args = map([@/, get(g:, 'tags_change_sub', '')], "escape(v:val, '@')")
-  call feedkeys(':keepjumps %s@' . args[0] . '@' . args[1] . "@ge\<CR>", 'nt')
-  call feedkeys("\<Cmd>call winrestview(g:repeat_view) | call histdel(':', -1)\<CR>", 'n')
-  call s:feed_repeat('Change', 'Force')
-endfunction
-function! tags#change_setup(...) abort
-  let force = get(g:, 'tags_change_all', -1)
-  if force < 0 | return | endif
-  if force  " change every item
+function! tags#change_init(...) abort
+  if !exists('g:tags_change_force') | return | endif
+  let cnt = get(g:, 'tags_change_count', 1)
+  let key = get(g:, 'tags_change_key', 'n')
+  let feed = cnt > 1 ? "\<Cmd>call tags#change_again(" . (cnt - 1) . ")\<CR>" : ''
+  if g:tags_change_force  " change all items
     let sub = substitute(a:0 ? a:1 : @., "\n", '\\r', 'g')
-    call feedkeys('u', 'in')  " undo initial insertion
+    call feedkeys('u', 'in')  " reset repeat and preserve search scope
     call feedkeys("\<Plug>TagsChangeForce", 'm')
   else  " change one item
     let sub = substitute(a:0 ? a:1 : @., "\n", "\<CR>", 'g')
-    call feedkeys(get(g:, 'tags_change_key', 'n') . 'zv', 'nt')
+    call feedkeys(key . 'zv' . feed, 'n')
     call s:feed_repeat('Change', 'Again')
   endif
-  unlet! g:tags_change_all
+  let @/ = tags#sub_scope(@/, g:tags_change_force ? 0 : 1)
   let g:tags_change_sub = sub
+  unlet! g:tags_change_force
 endfunction
 
 " Change and delete next match
 " Note: Here global variables are required to avoid issues with nested feedkeys().
 " Note: Here implement global and repeated deletions by calling tags#change_again()
 " and tags#change_force() commands with empty replacement strings.
-function! tags#change_next(level, local, ...) abort
-  let adjust = a:0 > 1 ? a:2 : 0
-  let force = a:0 > 0 ? a:1 : 0
-  if a:level < 0  " change match e.g. c/
-    let key = a:local ? 'N' : 'n'  " shorthand
-    let names = ['Match', key ==# 'N' ? 'Prev' : 'Next']
-  else  " change word e.g. c*
-    let key = 'n'
-    let names = tags#set_search(a:level, a:local, 0, adjust)
-  endif
-  if empty(names) | return | endif  " scope not found
-  let g:tags_change_all = force
-  let g:tags_change_key = key
-  call feedkeys('cg' . key, 'n')
+function! tags#change_next(...) abort
+  return call('s:change_next', [0] + a:000)
 endfunction
-function! tags#delete_next(level, local, ...) abort
+function! tags#delete_next(...) abort
+  return call('s:change_next', [1] + a:000)
+endfunction
+function! s:change_next(delete, level, local, ...) abort
   let adjust = a:0 > 1 ? a:2 : 0
   let force = a:0 > 0 ? a:1 : 0
   if a:level < 0  " delete match e.g. d/
@@ -1042,8 +1066,12 @@ function! tags#delete_next(level, local, ...) abort
     let names = tags#set_search(a:level, a:local, 0, adjust)
   endif
   if empty(names) | return | endif  " scope not found
-  let g:tags_change_all = force
+  let g:tags_change_count = v:count1
+  let g:tags_change_force = force
   let g:tags_change_key = key
-  call feedkeys('dg' . key, 'n')
-  call tags#change_setup('')
+  if a:delete  " empty replacement
+    call feedkeys('dg' . key, 'n') | call tags#change_init('')
+  else  " user replacement
+    call feedkeys('cg' . key, 'n')
+  endif
 endfunction
