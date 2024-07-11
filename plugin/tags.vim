@@ -12,7 +12,7 @@ if v:shell_error | echoerr 'Error: ''ctags'' executable not found.' | finish | e
 silent! exe 'au! tags'
 augroup vim_tags
   au!
-  au InsertLeave * silent call tags#change_setup()  " finish change operation and set repeat
+  au InsertLeave * silent call tags#change_setup()  " setup change repeat
   au BufReadPost,BufWritePost * silent call tags#update_tags(expand('<afile>'))
 augroup END
 
@@ -191,8 +191,8 @@ if !g:tags_nomap_searches
   exe 'nmap ca' . g:tags_WORD_local_map . ' <Plug>TagsChangeWORDSLocal'
 endif
 nnoremap <Plug>TagsChangeRepeat zv
-nnoremap <Plug>TagsChangeAll <Cmd>call tags#change_all()<CR>
 nnoremap <Plug>TagsChangeAgain <Cmd>call tags#change_again()<CR>
+nnoremap <Plug>TagsChangeForce <Cmd>call tags#change_force()<CR>
 nnoremap <Plug>TagsChangeMatchNext <Cmd>call tags#change_next(-1, 0, 0)<CR>
 nnoremap <Plug>TagsChangeMatchPrev <Cmd>call tags#change_next(-1, 1, 0)<CR>
 nnoremap <Plug>TagsChangeMatchesNext <Cmd>call tags#change_next(-1, 0, 1)<CR>

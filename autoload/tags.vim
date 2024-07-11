@@ -972,7 +972,7 @@ endfunction
 " Keyword manipulation utilities {{{1
 "-----------------------------------------------------------------------------
 " Helper functions for changing after InsertLeave
-" Note: Critical to use global variables or else have issues with nested feed
+" Note: Register @. may have keystrokes e.g. <80>kb (backspace) so feed as 'typed'
 " Note: The 'cgn' command silently fails to trigger insert mode if no matches found
 " so we check for that. Putting <Esc> in feedkeys() cancels operation so must come
 " afterward (may be no-op) and the 'i' is necessary to insert <C-a> before <Esc>.
@@ -984,35 +984,38 @@ function! s:feed_repeat(name, ...) abort
 endfunction
 function! tags#change_again() abort
   let key = get(g:, 'tags_change_key', 'n')
-  let feed = "call feedkeys(mode() ==# 'i' ? get(g:, 'tags_change_sub', '') : '', 'ti')"
-  call feedkeys('cg' . key . "\<Cmd>" . feed . "\<CR>\<Esc>" . key, 'n')
+  let feed = "mode() ==# 'i' ? get(g:, 'tags_change_sub', '') : ''"
+  let feed = "\<Cmd>call feedkeys(" . feed . ", 'ti')\<CR>\<Esc>"
+  call feedkeys('cg' . key . feed . key, 'n')
   call s:feed_repeat('Change', 'Again')
 endfunction
-function! tags#change_all() abort
-  let string = escape(get(g:, 'tags_change_sub', ''), '@')
-  let expr = 'keepjumps %s@' . escape(@/, '@') . '@' . string . '@ge'
-  let winview = winsaveview() | exe expr | call winrestview(winview)
-  call s:feed_repeat('Change', 'All')
+function! tags#change_force() abort
+  let g:repeat_view = winsaveview()
+  let args = map([@/, get(g:, 'tags_change_sub', '')], "escape(v:val, '@')")
+  call feedkeys(':keepjumps %s@' . args[0] . '@' . args[1] . "@ge\<CR>", 'nt')
+  call feedkeys("\<Cmd>call winrestview(g:repeat_view) | call histdel(':', -1)\<CR>", 'n')
+  call s:feed_repeat('Change', 'Force')
 endfunction
 function! tags#change_setup(...) abort
   let force = get(g:, 'tags_change_all', -1)
-  if force < 0 | return | endif | unlet! g:tags_change_all
-  let g:tags_change_sub = substitute(a:0 ? a:1 : @., "\n", "\<CR>", 'g')
-  if !force  " change single item
-    let name = 'Again'
+  if force < 0 | return | endif
+  if force  " change every item
+    let sub = substitute(a:0 ? a:1 : @., "\n", '\\r', 'g')
+    call feedkeys('u', 'in')  " undo initial insertion
+    call feedkeys("\<Plug>TagsChangeForce", 'm')
+  else  " change one item
+    let sub = substitute(a:0 ? a:1 : @., "\n", "\<CR>", 'g')
     call feedkeys(get(g:, 'tags_change_key', 'n') . 'zv', 'nt')
-  else  " change all items
-    let name = 'All'
-    call feedkeys("\<Plug>TagsChangeAll", 'm')
+    call s:feed_repeat('Change', 'Again')
   endif
-  call s:feed_repeat('Change', name)
+  unlet! g:tags_change_all
+  let g:tags_change_sub = sub
 endfunction
 
 " Change and delete next match
-" Note: Undo first change so subsequent undo reverts all changes. Also note
-" register may have keystrokes e.g. <80>kb (backspace) so must feed as 'typed'
-" Note: Unlike 'change all', 'delete all' can simply use :substitute. Also note
-" :hlsearch inside functions fails: https://stackoverflow.com/q/1803539/4970632
+" Note: Here global variables are required to avoid issues with nested feedkeys().
+" Note: Here implement global and repeated deletions by calling tags#change_again()
+" and tags#change_force() commands with empty replacement strings.
 function! tags#change_next(level, local, ...) abort
   let adjust = a:0 > 1 ? a:2 : 0
   let force = a:0 > 0 ? a:1 : 0
