@@ -1016,11 +1016,12 @@ endfunction
 function! tags#change_again(...) abort
   let cnt = a:0 ? a:1 : get(g:, 'tags_change_count', 1)
   let key = get(g:, 'tags_change_key', 'n')
+  let fold = &l:foldopen =~# 'quickfix\|all' ? 'zv' : ''
   let feed = "mode() ==# 'i' ? get(g:, 'tags_change_sub', '') : ''"
   let feed = "\<Cmd>call feedkeys(" . feed . ", 'ti')\<CR>\<Esc>"
   for idx in range(cnt)
     let @/ = tags#sub_scope(@/, 1)
-    call feedkeys('cg' . key . feed . key . 'zv', 'ni')
+    call feedkeys('cg' . key . feed . key . fold, 'ni')
   endfor
   if empty(a:000)  " i.e. not an internal call
     call s:feed_repeat('Change', 'Again')
@@ -1030,6 +1031,7 @@ function! tags#change_init(...) abort
   if !exists('g:tags_change_force') | return | endif
   let cnt = get(g:, 'tags_change_count', 1)
   let key = get(g:, 'tags_change_key', 'n')
+  let fold = &l:foldopen =~# 'quickfix\|all' ? 'zv' : ''  " treat as 'quickfix'
   let feed = cnt > 1 ? "\<Cmd>call tags#change_again(" . (cnt - 1) . ")\<CR>" : ''
   if g:tags_change_force  " change all items
     let sub = substitute(a:0 ? a:1 : @., "\n", '\\r', 'g')
@@ -1037,7 +1039,7 @@ function! tags#change_init(...) abort
     call feedkeys("\<Plug>TagsChangeForce", 'm')
   else  " change one item
     let sub = substitute(a:0 ? a:1 : @., "\n", "\<CR>", 'g')
-    call feedkeys(key . 'zv' . feed, 'n')
+    call feedkeys(key . fold . feed, 'n')
     call s:feed_repeat('Change', 'Again')
   endif
   let @/ = tags#sub_scope(@/, g:tags_change_force ? 0 : 1)
