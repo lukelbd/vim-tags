@@ -1043,8 +1043,9 @@ function! tags#change_init(...) abort
     call feedkeys("\<Plug>TagsChangeForce", 'm')
   else  " change one item
     let sub = substitute(sub, "\n", "\<CR>", 'g')
-    let feed = cnt > 1 ? "\<Cmd>call tags#change_again(" . (cnt - 1) . ")\<CR>" : ''
-    call feedkeys(key . fold . feed, 'n')
+    let feed = cnt > 1 ? (cnt - 1) . "\<Plug>TagsChangeAgain" : ''
+    call feedkeys(key . fold, 'n')
+    call feedkeys(feed, 'm')
     call s:feed_repeat('Change', 'Again')
   endif
   let @/ = tags#rescope(@/, 1)
@@ -1065,8 +1066,8 @@ function! tags#change_force() abort
   call s:feed_repeat('Change', 'Force')  " critial or else fails
   call feedkeys("\<Cmd>Replace! " . text . "\<CR>", 't')
 endfunction
-function! tags#change_again(...) abort
-  let cnt = a:0 ? a:1 : get(g:, 'tags_change_count', 1)
+function! tags#change_again() abort
+  let cnt = v:count ? v:count : get(g:, 'tags_change_count', 1)
   let key = get(g:, 'tags_change_key', 'n')
   let fold = &l:foldopen =~# 'quickfix\|all' ? 'zv' : ''
   let feed = "mode() ==# 'i' ? get(g:, 'tags_change_sub', '') : ''"
