@@ -606,7 +606,7 @@ function! s:goto_tag(count, ...) abort
   if abs(a:count) < 2 && name !=# '<top>'  " i.e. not block jump
     call s:set_index(name, lnum, from, a:count)
   endif
-  if &l:foldopen =~# (a:count ? '\<block\>' : '\<tag\>')
+  if &l:foldopen =~# (a:count ? 'block\|all' : 'tag\|all')
     let keys = 'zvzz'  " open fold
   else  " center tag
     let keys = a:count ? '' : 'zz'
@@ -799,7 +799,7 @@ function! tags#next_tag(count, ...) abort
     endif  " assign line number
   endfor
   call tags#_goto_tag(2, itag[1], itag[0])  " jump to line then name
-  exe &l:foldopen =~# '\<block\>' ? 'normal! zv' : ''
+  exe &l:foldopen =~# 'block\|all' ? 'normal! zv' : ''
 endfunction
 
 " Jump to the next or previous word under the cursor
@@ -823,7 +823,7 @@ function! tags#next_word(count, ...) abort
   let [line1, line2] = [str2nr(line1), str2nr(line2)]  " note str2nr('') is zero
   let prefix = substitute(word, '\\[<>cC]', '', 'g')
   let suffix = line1 && line2 ? ' (lines ' . line1 . ' to ' . line2 . ')' : ''
-  exe &l:foldopen =~# '\<block\>' ? 'normal! zv' : ''
+  exe &l:foldopen =~# 'block\|all' ? 'normal! zv' : ''
 endfunction
 
 "-----------------------------------------------------------------------------"
@@ -962,7 +962,7 @@ function! tags#set_search(level, local, ...) range abort
     if a:local > 1 | let s:scope_bounds = [a:firstline, a:lastline] | endif
     let cmd = "\<Cmd>call tags#show_search(" . string(scope) . ")\<CR>"
   endif
-  exe &l:foldopen =~# '\<block\>' && adjust ? 'normal! zv' : ''
+  exe adjust && &l:foldopen =~# 'block\|all' ? 'normal! zv' : ''
   let name1 = a:level > 1 ? 'WORD' : a:level > 0 ? 'Word' : 'Char'
   let name2 = a:local ? 'Local' : 'Global'
   call feedkeys(cmd, 'n') | return [name1, name2]
