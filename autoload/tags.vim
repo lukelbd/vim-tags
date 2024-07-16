@@ -805,9 +805,9 @@ endfunction
 " Jump to the next or previous word under the cursor
 " Note: This is used with bracket w/W mappings
 function! tags#next_word(count, ...) abort
-  let winview = winsaveview()  " tags#set_search() moves to start of match
+  let winview = winsaveview()  " tags#search() moves to start of match
   let local = a:0 ? 1 - a:1 : 1
-  call tags#set_search(1, 1, 0, local, 1)
+  call tags#search(1, 1, 0, local, 1)
   let [regex, flags] = [@/, a:count < 0 ? 'bw' : 'w']
   for _ in range(abs(a:count))
     let pos = getpos('.')
@@ -827,9 +827,29 @@ function! tags#next_word(count, ...) abort
 endfunction
 
 "-----------------------------------------------------------------------------"
-" Keyword searching utilities {{{1
+" Scope searching utilities {{{1
 "-----------------------------------------------------------------------------"
-" Return match under cursor and whether inside requested syntax group
+" Helper function
+" Note: This is used to show search statistics for pattern-selection mappings. Use
+" vim-indexed-search plugin if available or else use :substitute no-op flag to
+" print 'N matches on M lines' message (take care to avoid suppressing message).
+function! tags#_show(...) abort
+  let bounds = get(s:, 'scope_bounds', [])
+  unlet! s:scope_bounds
+  if empty(bounds)  " usually only when ShowSearchIndex unavailable
+    let regex = a:0 && !empty(a:1) ? a:1 : @/
+    let regex = escape(regex, '@')
+    exe '%s@' . regex . '@@gne'
+  else  " show information on scope boundaries
+    let [line1, line2; rest] = bounds
+    let part1 = empty(rest) ? line1 : line1 . ' (' . rest[0] . ')'
+    let part2 = empty(rest) ? line2 : line2 . ' (' . rest[1] . ')'
+    echom 'Selected lines ' . part1 . ' to ' . part2 . '.'
+  endif
+  call feedkeys("\<Cmd>setlocal hlsearch\<CR>", 'n')
+endfunction
+
+" Return regex for object under cursor
 " Note: Here level -1 is previous search, level 0 is current character, level 1 is
 " current word, and level 2 is current WORD. Second arg denotes scope boundary.
 " Note: This uses the search() 'skip' parameter to skip matches inside comments and
@@ -865,8 +885,12 @@ endfunction
 " Return major tag folding scope
 " See: https://stackoverflow.com/a/597932/4970632
 " See: http://vim.wikia.com/wiki/Search_in_current_function
+function! s:get_scope(line1, line2) abort
+  let bnds = [a:line1 - 1, a:line2 + 1]
+  return call('printf', ['\%%>%dl\%%<%dl'] + bnds)
+endfunction
 function! tags#get_scope(...) abort
-  " Find closing line and tag
+  " Initial stuff
   let s:scope_bounds = []  " reset message cache
   let tags = get(b:, 'tags_by_line', [])
   let itags = filter(copy(tags), 'tags#is_major(v:val)')
@@ -875,8 +899,9 @@ function! tags#get_scope(...) abort
     let msg = empty(tags) ? 'tags unavailable' : 'no major tags found'
     redraw | echohl WarningMsg
     echom 'Error: Failed to restrict the search scope (' . msg . ').'
-    echohl None | return ''
+    echohl None | return []
   endif
+  " Find closing line and tag
   let winview = winsaveview()
   exe a:0 ? a:1 : '' | let lnum = line('.')
   let [iline, line1, level1] = [-1, lnum, foldlevel('.')]
@@ -898,84 +923,108 @@ function! tags#get_scope(...) abort
     let msg = !iscursor ? 'current scope is global' : 'major tag fold not found'
     redraw | echohl WarningMsg
     echom 'Error: Failed to restrict the search scope (' . msg . ').'
-    echohl None | return ''
+    echohl None | return []
   endif
-  let label1 = itags[idx][0]
-  let label2 = trim(getline(line2))
+  let name1 = itags[idx][0]
+  let name2 = trim(getline(line2))
   let nmax = 20  " maximum label length
-  let label1 = len(label1) > nmax ? label1[:nmax - 3] . '···' : label1
-  let label2 = len(label2) > nmax ? label2[:nmax - 3] . '···' : label2
-  let s:scope_bounds = [line1, line2, label1, label2]  " see tags#show_search
-  return printf('\%%>%dl\%%<%dl', line1 - 1, line2 + 1)
+  let name1 = len(name1) > nmax ? name1[:nmax - 3] . '···' : name1
+  let name2 = len(name2) > nmax ? name2[:nmax - 3] . '···' : name2
+  let s:scope_bounds = [line1, line2, name1, name2]  " see tags#_show
+  return [line1, line2]
 endfunction
 
-" Set the last search register to some 'current pattern' under cursor
+"-----------------------------------------------------------------------------
+" Search and replace commands {{{1
+"-----------------------------------------------------------------------------
+" Replace the current search
+" Note: Here tags#rescope() is also used in forked version of vim-repeat
+" Note: Replacing search-scope text with newlines will make subsequent scope
+" restrictions out-of-date. Fix this by offsetting scope regex by number of
+" newlines in replacement string minus number of newlines in search string.
+function! tags#rescope(...) abort
+  let search = a:0 > 0 ? a:1 : @/
+  let scale = a:0 > 1 ? a:2 : 1
+  let parts = matchlist(search, '\\%<\(\d\+\)l')
+  let lnum = str2nr(get(parts, 1, ''))
+  if empty(lnum) | return search | endif
+  let sub = get(g:, 'tags_change_sub', '')
+  let cnt1 = count(substitute(search, '\\n', "\r", 'g'), "\r")
+  let cnt2 = count(substitute(sub, '\\r', "\r", 'g'), "\r")
+  let lnum += scale * (cnt2 - cnt1)
+  return substitute(search, '\\%<\d\+l', '\\%<' . lnum . 'l', '')
+endfunction
+function! tags#replace(text, ...) range abort
+  let winview = get(g:, 'tags_change_view', winsaveview())
+  let local = a:0 ? a:1 : 0
+  let lines = []
+  if local > 1  " manual scope
+    let lines = [a:firstline, a:lastline]
+  elseif local > 0  " local scope
+    let lines = tags#get_scope() | let lines = type(lines) ? lines : []
+  endif  " global scope
+  let range = empty(lines) ? '%' : lines[0] . ',' . lines[1]
+  let regex = escape(@/, '@')
+  let text = escape(a:text, '@')
+  exe range . 's@' . regex . '@' . text . '@ge'
+  call winrestview(winview)
+endfunction
+
+" Search for object under cursor
 " Note: Native vim-indexed-search maps invoke <Plug>(indexed-search-after), which just
 " calls <Plug>(indexed-search-index) --> :ShowSearchIndex... but causes change maps
-" to silently abort for some weird reason... so instead call this manually.
-function! tags#show_search(...) abort
-  let regex = a:0 ? a:1 : @/
-  let scope = get(s:, 'scope_bounds', [])
-  if !empty(scope)
-    let [line1, line2; rest] = scope
-    let part1 = empty(rest) ? line1 : line1 . ' (' . rest[0] . ')'
-    let part2 = empty(rest) ? line2 : line2 . ' (' . rest[1] . ')'
-    echom 'Selected lines ' . part1 . ' to ' . part2 . '.'
-  else  " n flag prints results without substitution
-    let winview = winsaveview()  " store window as buffer variable
-    let search = escape(regex, '@')
-    call execute('%s@' . search . '@@gne')
-    call winrestview(winview)
-  endif
-  let keys = "\<Cmd>setlocal hlsearch\<CR>"
-  call feedkeys(keys, 'n') | unlet! s:scope_bounds
-endfunction
-function! tags#set_search(level, local, ...) range abort
-  let adjust = a:0 > 1 ? a:2 : 0
+" to silently abort for some weird reason... so instead call the command manually.
+function! tags#search(level, local, ...) range abort
+  let quiet = a:0 > 2 ? a:3 : 0
+  let focus = a:0 > 1 ? a:2 : 0
   let force = a:0 > 0 ? a:1 : 0
   let match = tags#get_search(a:level, 0)
-  if adjust && empty(match) && foldclosed('.') == -1
+  if focus && empty(match) && foldclosed('.') == -1
     exe getline('.') =~# '^\s*$' ? '' : 'normal! B'
   endif
   let regex = tags#get_search(a:level, 1)
   let char = strcharpart(strpart(getline('.'), col('.') - 1), 0, 1)
   let flag = char =~# '\s' || a:level == 1 && char !~# '\k' ? 'cW' : 'cbW'
-  if adjust && strwidth(match) > 1
+  if focus && strwidth(match) > 1
     call search(regex, flag, line('.'))
-  endi
+  endif
+  let bnds = []
+  let scope = ''
   if a:local > 1  " manual scope
-    let scope = printf('\%%>%dl\%%<%dl', a:firstline - 1, a:lastline + 1)
+    let bnds = [a:firstline, a:lastline]
   elseif a:local > 0  " local scope
-    let scope = tags#get_scope()
-  else  " global scope
-    let scope = ''
+    let bnds = tags#get_scope() | let bnds = type(bnds) ? bnds : []
+  endif  " global scope
+  if type(bnds) && !empty(bnds)
+    let scope = printf('\%%>%dl\%%<%dl', bnds[0] - 1, bnds[1] + 1)
   endif
   if a:local && empty(scope)  " reset pattern
     let @/ = '' | return []
   else  " update pattern
     let @/ = scope . regex
   endif
-  if !force && a:local != 1 && exists(':ShowSearchIndex')
+  if !force && a:local != 1 || exists(':ShowSearchIndex')  " vim-indexed-search
     unlet! s:scope_bounds
-    let cmd = "\<Cmd>ShowSearchIndex\<CR>\<Cmd>setlocal hlsearch\<CR>\<Cmd>redraw\<CR>"
-  else
+    let feed = "\<Cmd>ShowSearchIndex\<CR>\<Cmd>setlocal hlsearch\<CR>"
+  else  " show scope information or @/ summary (if scope empty)
     if a:local > 1 | let s:scope_bounds = [a:firstline, a:lastline] | endif
-    let cmd = "\<Cmd>call tags#show_search(" . string(scope) . ")\<CR>"
+    let feed = "\<Cmd>call tags#_show(" . string(scope) . ")\<CR>"
   endif
-  exe adjust && &l:foldopen =~# 'block\|all' ? 'normal! zv' : ''
   let name1 = a:level > 1 ? 'WORD' : a:level > 0 ? 'Word' : 'Char'
   let name2 = a:local ? 'Local' : 'Global'
-  call feedkeys(cmd, 'n') | return [name1, name2]
+  exe focus && &l:foldopen =~# 'block\|all' ? 'normal! zv' : ''
+  call feedkeys(quiet ? "\<Cmd>setlocal hlsearch\<CR>" : feed, 'n')
+  return [name1, name2]
 endfunction
 
 "-----------------------------------------------------------------------------
-" Keyword manipulation utilities {{{1
+" Search and replace mappings {{{1
 "-----------------------------------------------------------------------------
-" Helper functions
-" Note: Here tags#sub_scope() is also used in forked version of vim-repeat
-" Note: Replacing search-scope text with newlines will make subsequent scope
-" restrictions out-of-date. Fix this by offsetting scope regex by number of
-" newlines in replacement string minus number of newlines in search string.
+" Change and delete next match
+" Note: Register @. may have keystrokes e.g. <80>kb (backspace) so must feed 'typed'
+" keys, and vim automatically suppresses standard :substitute message 'changed N
+" matches on M lines' if mapping includes multiple text-changing commands so must
+" :undo the initial 'cgn' or 'dgn' operation before changing the other matches.
 function! s:feed_repeat(name, ...) abort
   if !exists('*repeat#set') | return | endif
   let cnt = v:count ? v:count1 : get(g:, 'tags_change_count', 1)
@@ -983,35 +1032,38 @@ function! s:feed_repeat(name, ...) abort
   let feed = 'call repeat#set(' . key . ', ' . cnt . ')'
   call feedkeys("\<Cmd>" . feed . "\<CR>", 'n')
 endfunction
-function! tags#sub_scope(...) abort
-  let search = a:0 > 0 ? a:1 : @/
-  let scale = a:0 > 1 ? a:2 : 1
-  let regex = '\\%<\(\d\+\)l'  " search scope
-  let parts = matchlist(search, regex)
-  let lnum = str2nr(get(parts, 1, ''))
-  if empty(lnum) | return search | endif
-  let sub = get(g:, 'tags_change_sub', '')
-  let cnt1 = count(substitute(search, '\\n', "\r", 'g'), "\r")
-  let cnt2 = count(substitute(sub, '\\r', "\r", 'g'), "\r")
-  let lnum += scale * (cnt2 - cnt1)
-  return substitute(search, regex, '\\%<' . lnum . 'l', '')
+function! tags#change_init(...) abort
+  if !exists('g:tags_change_force') | return | endif
+  let cnt = get(g:, 'tags_change_count', 1)
+  let key = get(g:, 'tags_change_key', 'n')
+  let sub = escape(a:0 ? a:1 : @., '\')
+  let fold = &l:foldopen =~# 'quickfix\|all' ? 'zv' : ''  " treat as 'quickfix'
+  if g:tags_change_force  " change all items
+    let sub = substitute(sub, "\n", '\\r', 'g')
+    call feedkeys("\<Plug>TagsChangeForce", 'm')
+  else  " change one item
+    let sub = substitute(sub, "\n", "\<CR>", 'g')
+    let feed = cnt > 1 ? "\<Cmd>call tags#change_again(" . (cnt - 1) . ")\<CR>" : ''
+    call feedkeys(key . fold . feed, 'n')
+    call s:feed_repeat('Change', 'Again')
+  endif
+  let @/ = tags#rescope(@/, 1)
+  let g:tags_change_sub = sub
+  unlet! g:tags_change_force
 endfunction
 
-" Setup and repeat changes
-" Note: Register @. may have keystrokes e.g. <80>kb (backspace) so feed as 'typed'
-" Note: The 'cgn' command silently fails to trigger insert mode if no matches found
-" so we check for that. Putting <Esc> in feedkeys() cancels operation so must come
-" afterward (may be no-op) and the 'i's are necessary to insert previously-inserted
-" text before <Esc> and to complete initial v:count1 repeats before s:feed_repeat().
+" Repeat initial changes
+" Note: Here global variables are required to avoid issues with nested feedkeys().
+" Note: Here implement global and repeated deletions by calling tags#change_again()
+" and tags#change_force() commands with empty replacement strings.
 function! tags#change_force() abort
   let g:tags_change_count = 1
   let g:tags_change_view = winsaveview()
-  let args = [@/, get(g:, 'tags_change_sub', '')]
-  call map(args, "escape(v:val, '@')")
-  call feedkeys(':keepjumps %s@' . args[0] . '@' . args[1] . "@ge\<CR>", 'nt')
-  call feedkeys("\<Cmd>call winrestview(g:tags_change_view)\<CR>", 'n')
-  call feedkeys("\<Cmd>call histdel('cmd', -1)\<CR>", 'n')
-  call s:feed_repeat('Change', 'Force')
+  let text = get(g:, 'tags_change_sub', '')
+  let tick = get(g:, 'tags_change_tick', b:changedtick)
+  exe tick != b:changedtick ? 'silent undo' : ''
+  call s:feed_repeat('Change', 'Force')  " critial or else fails
+  call feedkeys("\<Cmd>Replace! " . text . "\<CR>", 't')
 endfunction
 function! tags#change_again(...) abort
   let cnt = a:0 ? a:1 : get(g:, 'tags_change_count', 1)
@@ -1020,37 +1072,19 @@ function! tags#change_again(...) abort
   let feed = "mode() ==# 'i' ? get(g:, 'tags_change_sub', '') : ''"
   let feed = "\<Cmd>call feedkeys(" . feed . ", 'ti')\<CR>\<Esc>"
   for idx in range(cnt)
-    let @/ = tags#sub_scope(@/, 1)
+    let @/ = tags#rescope(@/, 1)
     call feedkeys('cg' . key . feed . key . fold, 'ni')
   endfor
   if empty(a:000)  " i.e. not an internal call
     call s:feed_repeat('Change', 'Again')
   endif
 endfunction
-function! tags#change_init(...) abort
-  if !exists('g:tags_change_force') | return | endif
-  let cnt = get(g:, 'tags_change_count', 1)
-  let key = get(g:, 'tags_change_key', 'n')
-  let fold = &l:foldopen =~# 'quickfix\|all' ? 'zv' : ''  " treat as 'quickfix'
-  let feed = cnt > 1 ? "\<Cmd>call tags#change_again(" . (cnt - 1) . ")\<CR>" : ''
-  if g:tags_change_force  " change all items
-    let sub = substitute(a:0 ? a:1 : @., "\n", '\\r', 'g')
-    call feedkeys('u', 'in')  " reset repeat and preserve search scope
-    call feedkeys("\<Plug>TagsChangeForce", 'm')
-  else  " change one item
-    let sub = substitute(a:0 ? a:1 : @., "\n", "\<CR>", 'g')
-    call feedkeys(key . fold . feed, 'n')
-    call s:feed_repeat('Change', 'Again')
-  endif
-  let @/ = tags#sub_scope(@/, g:tags_change_force ? 0 : 1)
-  let g:tags_change_sub = sub
-  unlet! g:tags_change_force
-endfunction
 
-" Change and delete next match
-" Note: Here global variables are required to avoid issues with nested feedkeys().
-" Note: Here implement global and repeated deletions by calling tags#change_again()
-" and tags#change_force() commands with empty replacement strings.
+" Setup and repeat changes
+" Note: The 'cgn' command silently fails to trigger insert mode if no matches found
+" so we check for that. Putting <Esc> in feedkeys() cancels operation so must come
+" afterward (may be no-op) and the 'i's are necessary to insert previously-inserted
+" text before <Esc> and to complete initial v:count1 repeats before s:feed_repeat().
 function! tags#change_next(...) abort
   return call('s:change_next', [0] + a:000)
 endfunction
@@ -1058,22 +1092,18 @@ function! tags#delete_next(...) abort
   return call('s:change_next', [1] + a:000)
 endfunction
 function! s:change_next(delete, level, local, ...) abort
-  let adjust = a:0 > 1 ? a:2 : 0
-  let force = a:0 > 0 ? a:1 : 0
   if a:level < 0  " delete match e.g. d/
     let key = a:local ? 'N' : 'n'  " shorthand
     let names = ['Match', key ==# 'N' ? 'Prev' : 'Next']
   else  " delete word e.g. d*
     let key = 'n'
-    let names = tags#set_search(a:level, a:local, 0, adjust)
+    let names = tags#search(a:level, a:local, 0, 0, 1)
   endif
   if empty(names) | return | endif  " scope not found
+  let feed = a:delete ? "\<Esc>\<Cmd>call tags#change_init('')\<CR>" : ''
   let g:tags_change_count = v:count1
-  let g:tags_change_force = force
+  let g:tags_change_force = a:0 ? a:1 : 0
+  let g:tags_change_tick = b:changedtick
   let g:tags_change_key = key
-  if a:delete  " empty replacement
-    call feedkeys('dg' . key, 'n') | call tags#change_init('')
-  else  " user replacement
-    call feedkeys('cg' . key, 'n')
-  endif
+  call feedkeys('cg' . key . feed, 'n')
 endfunction

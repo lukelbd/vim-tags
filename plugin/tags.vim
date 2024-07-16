@@ -12,7 +12,7 @@ if v:shell_error | echoerr 'Error: ''ctags'' executable not found.' | finish | e
 silent! exe 'au! tags'
 augroup vim_tags
   au!
-  au InsertLeave * silent call tags#change_init()  " initialize repeats
+  au InsertLeave * call tags#change_init()  " initialize repeats
   au BufReadPost,BufWritePost * silent call tags#update_tags(expand('<afile>'))
 augroup END
 
@@ -123,7 +123,9 @@ command! -bang -nargs=* -complete=buffer UpdateTags
 command! -nargs=? -complete=buffer UpdateKinds
   \ call call('tags#update_kinds', [])
 command! -bang -nargs=* -range Search
-  \ <line1>,<line2>call tags#set_search(<q-args>, <range> > 1 ? <range> : <bang>1)
+  \ <line1>,<line2>call tags#search(<q-args>, <range> > 1 ? <range> : <bang>1)
+command! -bang -nargs=* -range Replace
+  \ <line1>,<line2>call tags#replace(<q-args>, <range> > 1 ? <range> : <bang>1)
 
 " Tag select maps {{{2
 " Note: Must use :n instead of <expr> ngg so we can use <C-u> to discard count!
@@ -157,15 +159,15 @@ noremap <Plug>TagsNextGlobal <Cmd>call tags#next_word(v:count1, 1)<CR>
 " Note: Current character copied from https://stackoverflow.com/a/23323958/4970632
 " Todo: Add scope-local matches? No because use those for other mappings.
 if !g:tags_nomap_searches
-  if !hasmapto('tags#set_search('''', 1)')  " avoid overwriting
-    noremap g/ <Cmd>call tags#set_search('', 1)<CR><Cmd>call feedkeys(empty(@/) ? '' : '/' . @/, 'n')<CR>
-    noremap g? <Cmd>call tags#set_search('', 1)<CR><Cmd>call feedkeys(empty(@/) ? '' : '?' . @/, 'n')<CR>
+  if !hasmapto('tags#search('''', 1)')  " avoid overwriting
+    noremap g/ <Cmd>call tags#search('', 1)<CR><Cmd>call feedkeys(empty(@/) ? '' : '/' . @/, 'n')<CR>
+    noremap g? <Cmd>call tags#search('', 1)<CR><Cmd>call feedkeys(empty(@/) ? '' : '?' . @/, 'n')<CR>
   endif
-  exe 'noremap ' . g:tags_char_global_map . ' <Cmd>call tags#set_search(0, 0, 0, 1)<CR>'
-  exe 'noremap ' . g:tags_word_global_map . ' <Cmd>call tags#set_search(1, 0, 0, 1)<CR>'
-  exe 'noremap ' . g:tags_WORD_global_map . ' <Cmd>call tags#set_search(2, 0, 0, 1)<CR>'
-  exe 'noremap ' . g:tags_word_local_map . ' <Cmd>call tags#set_search(1, 1, 0, 1)<CR>'
-  exe 'noremap ' . g:tags_WORD_local_map . ' <Cmd>call tags#set_search(2, 1, 0, 1)<CR>'
+  exe 'noremap ' . g:tags_char_global_map . ' <Cmd>call tags#search(0, 0, 0, 1)<CR>'
+  exe 'noremap ' . g:tags_word_global_map . ' <Cmd>call tags#search(1, 0, 0, 1)<CR>'
+  exe 'noremap ' . g:tags_WORD_global_map . ' <Cmd>call tags#search(2, 0, 0, 1)<CR>'
+  exe 'noremap ' . g:tags_word_local_map . ' <Cmd>call tags#search(1, 1, 0, 1)<CR>'
+  exe 'noremap ' . g:tags_WORD_local_map . ' <Cmd>call tags#search(2, 1, 0, 1)<CR>'
 endif
 
 " Current word search-and-replace {{{2
@@ -190,7 +192,6 @@ if !g:tags_nomap_searches
   exe 'nmap ca' . g:tags_word_local_map . ' <Plug>TagsChangeWordsLocal'
   exe 'nmap ca' . g:tags_WORD_local_map . ' <Plug>TagsChangeWORDSLocal'
 endif
-nnoremap <Plug>TagsChangeRepeat zv
 nnoremap <Plug>TagsChangeAgain <Cmd>call tags#change_again()<CR>
 nnoremap <Plug>TagsChangeForce <Cmd>call tags#change_force()<CR>
 nnoremap <Plug>TagsChangeMatchNext <Cmd>call tags#change_next(-1, 0, 0)<CR>
