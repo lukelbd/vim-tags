@@ -652,15 +652,16 @@ function! tags#select_tag(level, ...) abort
     echom 'Error: fzf.vim plugin not available.'
     echohl None | return
   endif
-  let show = empty(a:level) ? '--with-nth=3..' : '--with-nth=2..'
+  let char = input || type(a:level) ? 'S' : a:level < 1 ? 'B' : a:level < 2 ? 'F' : ''
+  let name = input || type(a:level) || a:level < 1 ? 'chunk,index' : 'index'
+  let show = empty(a:level) ? '--with-nth 3..' : '--with-nth 2..'
   let opts = fzf#vim#with_preview({'placeholder': '{1}:{3..}'})
   let opts = join(map(get(opts, 'options', []), 'fzf#shellescape(v:val)'), ' ')
-  let opts = "-d': ' " . show . " --preview-window '+{3}-/2' " . opts
-  let char = input || type(a:level) ? 'S' : a:level < 1 ? 'B' : a:level < 2 ? 'F' : ''
+  let opts .= " -d': ' --tiebreak " . name . " --preview-window '+{3}-/2' " . show
   let options = {
     \ 'source': result,
     \ 'sink': function('tags#_select_tag', [cnt]),
-    \ 'options': opts . ' --no-sort --prompt=' . string(char . 'Tag> ')
+    \ 'options': opts . ' --tiebreak=index --prompt=' . string(char . 'Tag> ')
   \ }
   call fzf#run(fzf#wrap(options))
 endfunction
