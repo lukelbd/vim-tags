@@ -268,7 +268,8 @@ endfunction
 " Note: Here taglist() uses path only to prioritize tags (i.e. does not filter) and
 " name is treated as a regex as with :tags /<name> (see :help taglist()).
 function! tags#tag_list(name, ...) abort
-  let regex = '^' . escape(a:name, s:regex_magic) . '$'
+  let regex = escape(a:name, s:regex_magic)
+  let regex = '^' . regex . '$'
   let path = expand(a:0 ? a:1 : '%')
   let tags = call('tags#tag_files', a:000)
   call map(tags, {_, val -> substitute(val, '\(,\| \)', '\\\1', 'g')})
@@ -1022,6 +1023,7 @@ endfunction
 " Search and replace mappings {{{1
 "-----------------------------------------------------------------------------
 " Change and delete next match
+" Note: See :help sub-replace-special for special characters tht have to be escaped
 " Note: Register @. may have keystrokes e.g. <80>kb (backspace) so must feed 'typed'
 " keys, and vim automatically suppresses standard :substitute message 'changed N
 " matches on M lines' if mapping includes multiple text-changing commands so must
@@ -1035,9 +1037,9 @@ function! s:feed_repeat(name, ...) abort
 endfunction
 function! tags#change_init(...) abort
   if !exists('g:tags_change_force') | return | endif
+  let sub = a:0 ? a:1 : @.
   let cnt = get(g:, 'tags_change_count', 1)
   let key = get(g:, 'tags_change_key', 'n')
-  let sub = escape(a:0 ? a:1 : @., '\')
   let fold = &l:foldopen =~# 'quickfix\|all' ? 'zv' : ''  " treat as 'quickfix'
   if g:tags_change_force  " change all items
     let sub = substitute(sub, "\n", '\\r', 'g')
@@ -1062,6 +1064,7 @@ function! tags#change_force() abort
   let g:tags_change_count = 1
   let g:tags_change_view = winsaveview()
   let text = get(g:, 'tags_change_sub', '')
+  let text = escape(text, '&~\')  " see :help sub-special
   let tick = get(g:, 'tags_change_tick', b:changedtick)
   exe tick != b:changedtick ? 'silent undo' : ''
   call s:feed_repeat('Change', 'Force')  " critial or else fails
