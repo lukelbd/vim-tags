@@ -152,7 +152,7 @@ noremap <Plug>TagsBackwardTop <Cmd>call tags#next_tag(-v:count1, 1)<CR>
 noremap <Plug>TagsNextLocal <Cmd>call tags#next_word(v:count1, 0)<CR>
 noremap <Plug>TagsNextGlobal <Cmd>call tags#next_word(v:count1, 1)<CR>
 noremap <Plug>TagsPrevLocal <Cmd>call tags#next_word(-v:count1, 0)<CR>
-noremap <Plug>TagsNextGlobal <Cmd>call tags#next_word(v:count1, 1)<CR>
+noremap <Plug>TagsPrevGlobal <Cmd>call tags#next_word(-v:count1, 1)<CR>
 
 " Current word searches {{{2
 " Includes current character, global and local <cword>, global and local <cWORD>

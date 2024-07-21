@@ -378,10 +378,10 @@ function! tags#table_tags(...) abort
     if !filereadable(path)
       let types = getcompletion(path, 'filetype')  " https://vi.stackexchange.com/a/14990/8084
       if index(types, path) < 0
-        redraw | echohl WarningMsg
-        echom 'Warning: Path ' . string(path) . ' not open or not readable.'
-        echohl None
-      endif | continue
+        let msg = 'Warning: Path ' . string(path) . ' not open or not readable.'
+        redraw | echohl WarningMsg | echom msg | echohl None
+      endif
+      continue
     endif
     let table = ''  " intialize table
     let items = getbufvar(bufnr(path), 'tags_by_name', [])  " prefer from buffer
@@ -788,9 +788,8 @@ function! tags#next_tag(count, ...) abort
     let inum = (fnum > 0 ? fnum : lnum) + (forward ? 1 : -1)
     let itag = call('tags#get_tag', [inum] + args)
     if empty(itag)  " algorithm failed
-      redraw | echohl WarningMsg
-      echom 'Error: Next tag not found'
-      echohl None | return
+      let msg = 'Error: Next tag not found'
+      redraw | echohl WarningMsg | echom msg | echohl None | return
     endif  " assign line number
   endfor
   call tags#_goto_tag(0, itag[1], itag[0])  " jump to line then name
@@ -801,15 +800,17 @@ endfunction
 " Note: This is used with bracket w/W mappings
 function! tags#next_word(count, ...) abort
   let winview = winsaveview()  " tags#search() moves to start of match
+  let search = @/  " record previous search
   let [name1, name2] = tags#search(1, a:0 ? 1 - a:1 : 1, 0, 2)
   let [regex, flags] = [@/, a:count < 0 ? 'bw' : 'w']
+  let @/ = search  " restore previous search
   for _ in range(abs(a:count))
     let pos = getpos('.')
     call search(regex, flags, 0, 0, "!tags#get_skip(0, 'Constant', 'Comment')")
     if getpos('.') == pos
-      redraw | echohl WarningMsg
-      echom 'Error: Next keyword not found'
-      echohl None | call winrestview(winview) | return
+      let msg = 'Error: Next keyword not found'
+      redraw | echohl WarningMsg | echom msg | echohl None
+      call winrestview(winview)
     endif
   endfor
   let parts = matchlist(regex, '^\(\\%>\(\d\+\)l\)\?\(\\%<\(\d\+\)l\)\?\(.*\)$')
@@ -819,6 +820,7 @@ function! tags#next_word(count, ...) abort
   let msg = 'Keyword: ' . substitute(name, '\\[<>cC]', '', 'g')
   let msg .= empty(info) ? '' : ' (' . info . ')'
   exe &l:foldopen =~# 'block\|all' ? 'normal! zv' : ''
+  exe 'setlocal nohlsearch'
   redraw | echo msg | return 0
 endfunction
 
@@ -893,9 +895,8 @@ function! tags#get_scope(...) abort
   let lines = map(deepcopy(itags), 'str2nr(v:val[1])')
   if empty(itags)
     let msg = empty(tags) ? 'tags unavailable' : 'no major tags found'
-    redraw | echohl WarningMsg
-    echom 'Error: Failed to restrict the search scope (' . msg . ').'
-    echohl None | return []
+    let msg = 'Error: Failed to restrict the search scope (' . msg . ').'
+    redraw | echohl WarningMsg | echom msg | echohl None | return []
   endif
   " Find closing line and tag
   let winview = winsaveview()
@@ -917,9 +918,8 @@ function! tags#get_scope(...) abort
   let idx = index(lines, line1)  " fold aligns with tags
   if idx < 0 || !isfold || !iscursor
     let msg = !iscursor ? 'current scope is global' : 'major tag fold not found'
-    redraw | echohl WarningMsg
-    echom 'Error: Failed to restrict the search scope (' . msg . ').'
-    echohl None | return []
+    let msg = 'Error: Failed to restrict the search scope (' . msg . ').'
+    redraw | echohl WarningMsg | echom msg | echohl None | return []
   endif
   let name1 = itags[idx][0]
   let name2 = trim(getline(line2))
@@ -967,7 +967,8 @@ function! tags#replace(text, ...) range abort
 endfunction
 
 " Search for object under cursor
-" Note: Native vim-indexed-search maps invoke <Plug>(indexed-search-after), which just
+" Note: Native vim * mappings update search history so do this explicitly below
+" Note: Default vim-indexed-search maps invoke <Plug>(indexed-search-after), which just
 " calls <Plug>(indexed-search-index) --> :ShowSearchIndex... but causes change maps
 " to silently abort for some weird reason... so instead call the command manually.
 function! tags#search(level, local, ...) range abort
@@ -984,6 +985,7 @@ function! tags#search(level, local, ...) range abort
     call search(regex, flag, line('.'))
   endif
   let bnds = []
+  let feed = ''
   let scope = ''
   if a:local > 1  " manual scope
     let bnds = [a:firstline, a:lastline] | let s:scope_bounds = bnds
@@ -1001,15 +1003,16 @@ function! tags#search(level, local, ...) range abort
   if focus  " add e.g. '*' to search history
     call histadd('search', @/)
   endif
-  if a:local || !exists(':ShowSearchIndex')  " show scope or @/ summary (if scope empty)
-    let feed = "\<Cmd>call tags#_show(" . string(scope) . ")\<CR>"
-  else  " show vim-indexed-search
+  if quiet  " do not show message
+    let feed = quiet > 1 ? '' : "\<Cmd>setlocal hlsearch\<CR>"
+  elseif !a:local && exists(':ShowSearchIndex')  " show vim-indexed-search
     let feed = "\<Cmd>ShowSearchIndex\<CR>\<Cmd>setlocal hlsearch\<CR>"
+  else  " show scope or @/ summary (if scope empty)
+    let feed = "\<Cmd>call tags#_show(" . string(scope) . ")\<CR>"
   endif
   let name1 = a:level > 1 ? 'WORD' : a:level > 0 ? 'Word' : 'Char'
   let name2 = a:local ? 'Local' : 'Global'
   exe focus && &l:foldopen =~# 'block\|all' ? 'normal! zv' : ''
-  let feed = quiet > 1 ? '' : quiet > 0 ? "\<Cmd>setlocal hlsearch\<CR>" : feed
   call feedkeys(feed, 'n')
   return [name1, name2]
 endfunction
