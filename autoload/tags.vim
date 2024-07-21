@@ -686,6 +686,7 @@ endfunction
 " Note: This translates kind to single-character for use e.g. in statusline
 function! tags#get_tag(...) abort
   let [items, idx] = call('tags#get_tags', a:000[:1])
+  if idx < 0 | return [] | endif
   let forward = a:0 > 1 ? a:2 : 0
   let circular = a:0 > 2 ? a:3 : 0
   let major = a:0 > 3 ? a:4 : 0
@@ -785,7 +786,7 @@ function! tags#next_tag(count, ...) abort
     let inum = (fnum > 0 ? fnum : lnum) + (forward ? 1 : -1)
     let itag = call('tags#get_tag', [inum] + args)
     if empty(itag)  " algorithm failed
-      let msg = 'Error: Next tag not found'
+      let msg = 'Warning: No more tags'
       redraw | echohl WarningMsg | echom msg | echohl None | return
     endif  " assign line number
   endfor
