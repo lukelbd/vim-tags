@@ -450,7 +450,7 @@ endfunction
 " Return or set the tag stack index
 " Note: This is used to manually update the tag stack index, allowing us to emulate
 " native vim :tag with tags#iter_tags(1, ...) and :pop with tags#iter_tags(-1, ...).
-function! s:get_index(name, ...) abort  " stack index
+function! s:get_index(mode, name) abort  " stack index
   let stack = gettagstack(winnr())
   let items = get(stack, 'items', [])
   let idxs = []  " exact tag matches
@@ -460,18 +460,16 @@ function! s:get_index(name, ...) abort  " stack index
       call add(idxs, idx)
     endif
   endfor
-  return empty(idxs) ? -1 : a:0 && a:1 < 0 ? idxs[0] : idxs[-1]
+  return empty(idxs) ? -1 : a:mode < 0 ? idxs[0] : idxs[-1]
 endfunction
-function! s:set_index(name, lnum, from, ...) abort
-  let scroll = a:0 ? a:1 : 0
-  if a:name ==# '<top>' | return | endif
-  if !scroll && !g:tags_keep_stack  " perform :tag <name>
+function! s:set_index(mode, name, lnum, from) abort
+  if a:mode > 1 && !g:tags_keep_stack  " perform :tag <name>
     let item = {'bufnr': bufnr(), 'from': a:from, 'matchnr': 1, 'tagname': a:name}
     if item.bufnr != a:from[0] || a:lnum != a:from[1]  " push from curidx to top
       call settagstack(winnr(), {'items': [item]}, 't')
     endif
   else  " perform :tag or :pop
-    let idx = s:get_index(a:name, scroll)
+    let idx = s:get_index(a:mode, a:name)
     if idx > 0  " assign new stack index
       call settagstack(winnr(), {'curidx': idx})
     endif
@@ -519,7 +517,8 @@ function! s:tag_source(level, ...) abort
   endif
   let [result, cache] = [[], {}]  " path name caches
   for path in paths
-    let items = getbufvar(bufnr(path), 'tags_by_name', [])
+    let bnr = bufnr(expand(path))  " e.g. expand tilde
+    let items = getbufvar(bnr, 'tags_by_name', [])
     if a:0 && type(a:1)  " user-input [path, line, name, other]
       let items = deepcopy(a:1)
     else  " [name, line, other] -> [path, line, name, other]
@@ -541,13 +540,10 @@ endfunction
 " Note: This supports reading base path from trailing tab-delimited character. For
 " now not implemented in dotfiles since slow for huge libraries (even though needed
 " for large tags libraries). Also note this positions cursor on exact tag column.
-function! tags#goto_tag(...) abort  " :tag <name> analogue
-  return call('s:goto_tag', [0] + a:000)
+function! tags#_goto_tag(mode, ...) abort  " 0:bracket jump, 1:tag/pop jump, 2:fzf jump
+  return call('s:goto_tag', [a:mode] + a:000)
 endfunction
-function! tags#_goto_tag(count, ...) abort  " 1:naked tag/pop, 2:bracket jump
-  return call('s:goto_tag', [a:count] + a:000)
-endfunction
-function! s:goto_tag(count, ...) abort
+function! s:goto_tag(mode, ...) abort
   " Parse tag input
   let path = expand('%:p')  " current path
   let from = getpos('.')  " current position
@@ -590,49 +586,44 @@ function! s:goto_tag(count, ...) abort
       silent exe 'tab drop ' . fnameescape(ipath)
     endif
   endif
+  let [lnum, cnum] = type(ipos) > 1 ? ipos : [ipos, 0]
+  let g:tag_name = [ipath, ipos, name]  " dotfiles stacks
   " Jump to tag position
-  if !a:count || !g:tags_keep_jumps  " add jump
+  if a:mode > 1 || !g:tags_keep_jumps  " update jumplist
     exe getpos('.') == getpos("''") ? '' : "normal! m'"
   endif
-  let g:tag_name = [ipath, ipos, name]  " dotfiles stacks
-  let [lnum, cnum] = type(ipos) > 1 ? ipos : [ipos, 0]
+  let regex = substitute(escape(name, s:regex_magic), '·*$', '', '')
   call cursor(lnum, 1)
   if cnum <= 0
-    let regex = substitute(escape(name, s:regex_magic), '·*$', '', '')
     silent call search(regex, 'cW', lnum)
   elseif cnum > 1
-    let motion = (cnum - 1) . 'l'
-    exe 'normal! ' . motion
+    exe 'normal! ' . (cnum - 1) . 'l'
   endif
-  if abs(a:count) < 2 && name !=# '<top>'  " i.e. not block jump
-    call s:set_index(name, lnum, from, a:count)
+  let regex = a:mode ? 'tag\|all' : 'block\|all'
+  exe &l:foldopen =~# regex ? 'normal! zvzz' : a:mode ? 'normal! zz' : ''
+  if a:mode != 0 && name !=# '<top>'  " i.e. not block jump
+    call s:set_index(a:mode, name, lnum, from)
   endif
-  if &l:foldopen =~# (a:count ? 'block\|all' : 'tag\|all')
-    let keys = 'zvzz'  " open fold
-  else  " center tag
-    let keys = a:count ? '' : 'zz'
+  if a:mode > 1 || !g:tags_keep_jumps  " add jump
+    exe getpos('.') == getpos("''") ? '' : "normal! m'"
   endif
-  if !a:count || !g:tags_keep_jumps  " add jump
-    let keys .= getpos('.') == getpos("''") ? '' : "m'"
-  endif
-  exe empty(keys) ? '' : 'normal! ' . keys
   let [kind; rest] = extra  " see above
   let long = tags#kind_name(kind)
   let kind = empty(long) ? kind : long
   let info = join(empty(kind) ? rest : [kind] + rest, ', ')
   let info = empty(info) ? '' : ' (' . info . ')'
-  redraw | echom 'Tag: ' . name . info
+  let msg = 'Tag: ' . name . info
+  redraw | if a:mode | echom msg | else | echo msg | endif
 endfunction
 
 " Select a specific tag using fzf
 " See: https://github.com/ludovicchabant/vim-gutentags/issues/349
-" Note: Usage is tags#select_tag(paths_or_level, options_or_iter) where second
-" argument indicates whether stacks should be updated (tags#goto_tag) or not
-" (tags#_goto_tag) and first argument indicates the paths to search and whether to
-" display the path in the fzf prompt. The second argument can also be a list of tags
-" in the format [line, name, other] (or [path, line, name, other] if level > 0)
-function! tags#_select_tag(count, item) abort
-  let args = type(a:item) > 1 ? [a:count] + a:item : [a:count, a:item]
+" Note: Usage is tags#select_tag(paths_or_level, options_or_iter) where first argument
+" indicates the paths from which to get tags (or a level indicating the path range)
+" and the optional second argument indicates manually provided tag source in the either
+" format [line, name, other] if level == 0 or [path, line, name, other] if level > 0.
+function! tags#_select_tag(mode, arg) abort
+  let args = type(a:arg) > 1 ? [a:mode] + a:arg : [a:mode, a:arg]
   if exists('*stack#push_stack')
     call stack#push_stack('tag', 'tags#_goto_tag', args, 0)
   else
@@ -640,9 +631,9 @@ function! tags#_select_tag(count, item) abort
   endif
 endfunction
 function! tags#select_tag(level, ...) abort
-  let cnt = a:0 > 1 ? a:2 : 0
-  let input = a:0 > 0 && !empty(a:1)
-  let result = s:tag_source(a:level, input ? a:1 : 1)
+  let mode = a:0 > 1 ? a:2 : 2  " echom and show name
+  let user = a:0 > 0 && !empty(a:1)
+  let result = s:tag_source(a:level, user ? a:1 : 1)
   if empty(result)
     redraw | echohl ErrorMsg
     echom 'Error: Tags not found or not available.'
@@ -653,15 +644,15 @@ function! tags#select_tag(level, ...) abort
     echom 'Error: fzf.vim plugin not available.'
     echohl None | return
   endif
-  let char = input || type(a:level) ? 'S' : a:level < 1 ? 'B' : a:level < 2 ? 'F' : ''
-  let name = input || type(a:level) || a:level < 1 ? 'chunk,index' : 'index'
+  let char = user || type(a:level) ? 'S' : a:level < 1 ? 'B' : a:level < 2 ? 'F' : ''
+  let name = user || type(a:level) || a:level < 1 ? 'chunk,index' : 'index'
   let show = empty(a:level) ? '--with-nth 3..' : '--with-nth 2..'
   let opts = fzf#vim#with_preview({'placeholder': '{1}:{3..}'})
   let opts = join(map(get(opts, 'options', []), 'fzf#shellescape(v:val)'), ' ')
   let opts .= " -d': ' --tiebreak " . name . " --preview-window '+{3}-/2' " . show
   let options = {
     \ 'source': result,
-    \ 'sink': function('tags#_select_tag', [cnt]),
+    \ 'sink': function('tags#_select_tag', [mode]),
     \ 'options': opts . ' --tiebreak=index --prompt=' . string(char . 'Tag> ')
   \ }
   call fzf#run(fzf#wrap(options))
@@ -672,7 +663,7 @@ endfunction
 "-----------------------------------------------------------------------------"
 " Return the tags and nearest index for the given buffer and line number
 " Note: This is analogous to builtin functions getloclist(), getjumplist(), etc.
-function! tags#get_tags(...)
+function! tags#get_tags(...) abort
   let pos = a:0 > 0 ? a:1 : line('.')
   let bnr = type(pos) > 1 && !empty(pos[0]) ? bufnr(pos[0]) : bufnr()
   let lnum = type(pos) > 1 ? pos[1] : type(pos) ? str2nr(pos) : pos
@@ -731,17 +722,17 @@ endfunction
 function! tags#goto_name(...) abort
   let level = a:0 ? a:1 : 0
   let names = a:000[1:]
-  let iskey = &l:iskeyword
   let ftype = &l:filetype
+  let keys = &l:iskeyword
   let path = expand('%:p')
   if empty(names)  " tag names
     let mods = get(s:keyword_mods, &l:filetype, '')
     let mods = split(mods, '\zs')
     try
-      let &l:iskeyword = join([iskey] + mods, ',')
+      let &l:iskeyword = join([keys] + mods, ',')
       let names = [expand('<cword>'), expand('<cWORD>')]
     finally
-      let &l:iskeyword = iskey
+      let &l:iskeyword = keys
     endtry
   endif
   for name in names
@@ -754,13 +745,13 @@ function! tags#goto_name(...) abort
       let itype = tags#type_match(ipath)
       if level < 2 && empty(itype) | continue | endif
       let item = [ipath, itag.cmd, itag.name, itag.kind]
-      return tags#_select_tag(0, item)
+      return tags#_select_tag(2, item)
     endfor
     let itags = s:tag_source(level)  " search buffer tag variables
     for [ipath, iline, iname; irest] in itags
       if name !=# iname | continue | endif
       let item = [ipath, iline, iname] + irest
-      return tags#_select_tag(0, item)
+      return tags#_select_tag(2, item)
     endfor
   endfor
   redraw | echohl ErrorMsg
@@ -802,7 +793,7 @@ function! tags#next_tag(count, ...) abort
       echohl None | return
     endif  " assign line number
   endfor
-  call tags#_goto_tag(2, itag[1], itag[0])  " jump to line then name
+  call tags#_goto_tag(0, itag[1], itag[0])  " jump to line then name
   exe &l:foldopen =~# 'block\|all' ? 'normal! zv' : ''
 endfunction
 
@@ -810,8 +801,7 @@ endfunction
 " Note: This is used with bracket w/W mappings
 function! tags#next_word(count, ...) abort
   let winview = winsaveview()  " tags#search() moves to start of match
-  let local = a:0 ? 1 - a:1 : 1
-  call tags#search(1, 1, 0, local, 1)
+  let [name1, name2] = tags#search(1, a:0 ? 1 - a:1 : 1, 0, 2)
   let [regex, flags] = [@/, a:count < 0 ? 'bw' : 'w']
   for _ in range(abs(a:count))
     let pos = getpos('.')
@@ -981,9 +971,8 @@ endfunction
 " calls <Plug>(indexed-search-index) --> :ShowSearchIndex... but causes change maps
 " to silently abort for some weird reason... so instead call the command manually.
 function! tags#search(level, local, ...) range abort
-  let quiet = a:0 > 2 ? a:3 : 0
-  let focus = a:0 > 1 ? a:2 : 0
-  let force = a:0 > 0 ? a:1 : 0
+  let focus = a:0 > 0 ? a:1 : 0
+  let quiet = a:0 > 1 ? a:2 : 0
   let match = tags#get_search(a:level, 0)
   if focus && empty(match) && foldclosed('.') == -1
     exe getline('.') =~# '^\s*$' ? '' : 'normal! B'
@@ -997,7 +986,7 @@ function! tags#search(level, local, ...) range abort
   let bnds = []
   let scope = ''
   if a:local > 1  " manual scope
-    let bnds = [a:firstline, a:lastline]
+    let bnds = [a:firstline, a:lastline] | let s:scope_bounds = bnds
   elseif a:local > 0  " local scope
     let bnds = tags#get_scope() | let bnds = type(bnds) ? bnds : []
   endif  " global scope
@@ -1009,17 +998,16 @@ function! tags#search(level, local, ...) range abort
   else  " update pattern
     let @/ = scope . regex
   endif
-  if !force && a:local != 1 || exists(':ShowSearchIndex')  " vim-indexed-search
-    unlet! s:scope_bounds
-    let feed = "\<Cmd>ShowSearchIndex\<CR>\<Cmd>setlocal hlsearch\<CR>"
-  else  " show scope information or @/ summary (if scope empty)
-    if a:local > 1 | let s:scope_bounds = [a:firstline, a:lastline] | endif
+  if a:local || !exists(':ShowSearchIndex')  " show scope or @/ summary (if scope empty)
     let feed = "\<Cmd>call tags#_show(" . string(scope) . ")\<CR>"
+  else  " show vim-indexed-search
+    let feed = "\<Cmd>ShowSearchIndex\<CR>\<Cmd>setlocal hlsearch\<CR>"
   endif
   let name1 = a:level > 1 ? 'WORD' : a:level > 0 ? 'Word' : 'Char'
   let name2 = a:local ? 'Local' : 'Global'
   exe focus && &l:foldopen =~# 'block\|all' ? 'normal! zv' : ''
-  call feedkeys(quiet ? "\<Cmd>setlocal hlsearch\<CR>" : feed, 'n')
+  let feed = quiet > 1 ? '' : quiet > 0 ? "\<Cmd>setlocal hlsearch\<CR>" : feed
+  call feedkeys(feed, 'n')
   return [name1, name2]
 endfunction
 
@@ -1106,7 +1094,7 @@ function! s:change_next(delete, level, local, ...) abort
     let names = ['Match', key ==# 'N' ? 'Prev' : 'Next']
   else  " delete word e.g. d*
     let key = 'n'
-    let names = tags#search(a:level, a:local, 0, 0, 1)
+    let names = tags#search(a:level, a:local, 0, 1)
   endif
   if empty(names) | return | endif  " scope not found
   let feed = a:delete ? "\<Esc>\<Cmd>call tags#change_init('')\<CR>" : ''

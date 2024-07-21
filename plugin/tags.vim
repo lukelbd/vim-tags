@@ -163,11 +163,11 @@ if !g:tags_nomap_searches
     noremap g/ <Cmd>call tags#search('', 1)<CR><Cmd>call feedkeys(empty(@/) ? '' : '/' . @/, 'n')<CR>
     noremap g? <Cmd>call tags#search('', 1)<CR><Cmd>call feedkeys(empty(@/) ? '' : '?' . @/, 'n')<CR>
   endif
-  exe 'noremap ' . g:tags_char_global_map . ' <Cmd>call tags#search(0, 0, 0, 1)<CR>'
-  exe 'noremap ' . g:tags_word_global_map . ' <Cmd>call tags#search(1, 0, 0, 1)<CR>'
-  exe 'noremap ' . g:tags_WORD_global_map . ' <Cmd>call tags#search(2, 0, 0, 1)<CR>'
-  exe 'noremap ' . g:tags_word_local_map . ' <Cmd>call tags#search(1, 1, 0, 1)<CR>'
-  exe 'noremap ' . g:tags_WORD_local_map . ' <Cmd>call tags#search(2, 1, 0, 1)<CR>'
+  exe 'noremap ' . g:tags_char_global_map . ' <Cmd>call tags#search(0, 0, 1)<CR>'
+  exe 'noremap ' . g:tags_word_global_map . ' <Cmd>call tags#search(1, 0, 1)<CR>'
+  exe 'noremap ' . g:tags_WORD_global_map . ' <Cmd>call tags#search(2, 0, 1)<CR>'
+  exe 'noremap ' . g:tags_word_local_map . ' <Cmd>call tags#search(1, 1, 1)<CR>'
+  exe 'noremap ' . g:tags_WORD_local_map . ' <Cmd>call tags#search(2, 1, 1)<CR>'
 endif
 
 " Current word search-and-replace {{{2
