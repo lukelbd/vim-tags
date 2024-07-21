@@ -998,6 +998,9 @@ function! tags#search(level, local, ...) range abort
   else  " update pattern
     let @/ = scope . regex
   endif
+  if focus  " add e.g. '*' to search history
+    call histadd('search', @/)
+  endif
   if a:local || !exists(':ShowSearchIndex')  " show scope or @/ summary (if scope empty)
     let feed = "\<Cmd>call tags#_show(" . string(scope) . ")\<CR>"
   else  " show vim-indexed-search
