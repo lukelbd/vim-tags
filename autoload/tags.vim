@@ -823,11 +823,13 @@ function! tags#next_word(count, ...) abort
     endif
   endfor
   let parts = matchlist(regex, '^\(\\%>\(\d\+\)l\)\?\(\\%<\(\d\+\)l\)\?\(.*\)$')
-  let [line1, line2, word] = [parts[2], parts[4], parts[5]]  " get scope from regex
-  let [line1, line2] = [str2nr(line1), str2nr(line2)]  " note str2nr('') is zero
-  let prefix = substitute(word, '\\[<>cC]', '', 'g')
-  let suffix = line1 && line2 ? ' (lines ' . line1 . ' to ' . line2 . ')' : ''
+  let [line1, line2, name] = [parts[2], parts[4], parts[5]]  " get scope from regex
+  let bnds = get(s:, 'scope_bounds', [line1, line2])  " get named scope
+  let info = len(bnds) > 2 ? bnds[2] : !empty(bnds) ? line1 . ' ' . line2 : ''
+  let msg = 'Keyword: ' . substitute(name, '\\[<>cC]', '', 'g')
+  let msg .= empty(info) ? '' : ' (' . info . ')'
   exe &l:foldopen =~# 'block\|all' ? 'normal! zv' : ''
+  redraw | echo msg | return 0
 endfunction
 
 "-----------------------------------------------------------------------------"
