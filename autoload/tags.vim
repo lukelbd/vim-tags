@@ -1032,14 +1032,15 @@ function! tags#change_init(...) abort
   let sub = a:0 ? a:1 : @.
   let cnt = get(g:, 'tags_change_count', 1)
   let key = get(g:, 'tags_change_key', 'n')
-  let fold = &l:foldopen =~# 'quickfix\|all' ? 'zv' : ''  " treat as 'quickfix'
+  let post = &l:foldopen =~# 'quickfix\|all' ? 'zv' : ''  " treat as 'quickfix'
+  let post .= cnt > 1 && exists(':ShowSearchIndex') ? "\<Cmd>ShowSearchIndex\<CR>" : ''
+  let feed = cnt > 1 ? (cnt - 1) . "\<Plug>TagsChangeAgain" : ''
   if g:tags_change_force  " change all items
     let sub = substitute(sub, "\n", '\\r', 'g')
     call feedkeys("\<Plug>TagsChangeForce", 'm')
   else  " change one item
     let sub = substitute(sub, "\n", "\<CR>", 'g')
-    let feed = cnt > 1 ? (cnt - 1) . "\<Plug>TagsChangeAgain" : ''
-    call feedkeys(key . fold, 'n')
+    call feedkeys(key . post, 'n')
     call feedkeys(feed, 'm')
     call s:feed_repeat('Change', 'Again')
   endif
@@ -1065,12 +1066,13 @@ endfunction
 function! tags#change_again() abort
   let cnt = v:count ? v:count : get(g:, 'tags_change_count', 1)
   let key = get(g:, 'tags_change_key', 'n')
-  let fold = &l:foldopen =~# 'quickfix\|all' ? 'zv' : ''
+  let post = &l:foldopen =~# 'quickfix\|all' ? 'zv' : ''
+  let post .= exists(':ShowSearchIndex') ? "\<Cmd>ShowSearchIndex\<CR>" : ''
   let feed = "mode() ==# 'i' ? get(g:, 'tags_change_sub', '') : ''"
   let feed = "\<Cmd>call feedkeys(" . feed . ", 'ti')\<CR>\<Esc>"
   for idx in range(cnt)
     let @/ = tags#rescope(@/, 1)
-    call feedkeys('cg' . key . feed . key . fold, 'ni')
+    call feedkeys('cg' . key . feed . key . post, 'ni')
   endfor
   if empty(a:000)  " i.e. not an internal call
     call s:feed_repeat('Change', 'Again')
