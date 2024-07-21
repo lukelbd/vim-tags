@@ -789,11 +789,13 @@ endfunction
 " Jump to the next or previous tag under the cursor
 " Note: This is used with bracket t/T mappings
 function! tags#next_tag(count, ...) abort
-  let args = [a:count >= 0, 1, a:0 ? a:1 : 0]
+  let forward = a:count >= 0
+  let args = [forward, 1, a:0 ? a:1 : 0]
   for idx in range(abs(a:count))  " count times
     let lnum = idx == 0 ? line('.') : str2nr(itag[1])
-    let lnum += idx == 0 ? 0 : a:count >= 0 ? 1 : -1
-    let itag = call('tags#get_tag', [lnum] + args)
+    let fnum = forward ? foldclosedend(lnum) : foldclosed(lnum)
+    let inum = (fnum > 0 ? fnum : lnum) + (forward ? 1 : -1)
+    let itag = call('tags#get_tag', [inum] + args)
     if empty(itag)  " algorithm failed
       redraw | echohl WarningMsg
       echom 'Error: Next tag not found'
