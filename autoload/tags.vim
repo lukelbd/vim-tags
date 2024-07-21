@@ -1066,23 +1066,30 @@ endfunction
 " Note: Here global variables are required to avoid issues with nested feedkeys().
 " Note: Here implement global and repeated deletions by calling tags#change_again()
 " and tags#change_force() commands with empty replacement strings.
+function! tags#_change_input(...) abort
+  let text = input('Replace: ', '')  " see below; used to convert literals
+  return call('tags#replace', [text] + a:000)
+endfunction
 function! tags#change_force() abort
-  let g:tags_change_count = 1
-  let g:tags_change_view = winsaveview()
-  let text = get(g:, 'tags_change_sub', '')
-  let text = escape(text, '&~\')  " see :help sub-special
   let tick = get(g:, 'tags_change_tick', b:changedtick)
   exe tick != b:changedtick ? 'silent undo' : ''
+  let g:tags_change_count = 1  " overwrite count
+  let g:tags_change_view = winsaveview()  " see repeat.vim;
+  let g:tags_change_sub = get(g:, 'tags_change_sub', '')
+  let feed = 'mode() =~# "^c" ? escape(g:tags_change_sub . "\<CR>", "~&\\") : ""'
+  let feed = "\<Cmd>call feedkeys(" . feed . ", 'tni')\<CR>"
+  let cmd = "\<Cmd>call tags#_change_input()\<CR>"
   call s:feed_repeat('Change', 'Force')  " critial or else fails
-  call feedkeys("\<Cmd>Replace! " . text . "\<CR>", 't')
+  call feedkeys(cmd . feed, 'n')
 endfunction
 function! tags#change_again() abort
+  let g:tags_change_sub = get(g:, 'tags_change_sub', '')
   let cnt = v:count ? v:count : get(g:, 'tags_change_count', 1)
   let key = get(g:, 'tags_change_key', 'n')
   let post = &l:foldopen =~# 'quickfix\|all' ? 'zv' : ''
   let post .= exists(':ShowSearchIndex') ? "\<Cmd>ShowSearchIndex\<CR>" : ''
-  let feed = "mode() ==# 'i' ? get(g:, 'tags_change_sub', '') : ''"
-  let feed = "\<Cmd>call feedkeys(" . feed . ", 'ti')\<CR>\<Esc>"
+  let feed = "mode() ==# 'i' ? g:tags_change_sub : ''"
+  let feed = "\<Cmd>call feedkeys(" . feed . ", 'tni')\<CR>\<Esc>"
   for idx in range(cnt)
     let @/ = tags#rescope(@/, 1)
     call feedkeys('cg' . key . feed . key . post, 'ni')
