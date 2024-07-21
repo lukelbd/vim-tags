@@ -801,12 +801,20 @@ endfunction
 function! tags#next_word(count, ...) abort
   let winview = winsaveview()  " tags#search() moves to start of match
   let search = @/  " record previous search
-  let [name1, name2] = tags#search(1, a:0 ? 1 - a:1 : 1, 0, 2)
+  let closed = foldclosed('.')
+  let result = tags#search(1, a:0 ? 1 - a:1 : 1, 0, 2)
   let [regex, flags] = [@/, a:count < 0 ? 'bw' : 'w']
+  let skip = "tags#get_inside(0, 'Constant', 'Comment')"
+  let skip .= closed > 0 ? " || foldclosed('.') == " . closed : ''
   let @/ = search  " restore previous search
-  for _ in range(abs(a:count))
+  if empty(regex)
+    if empty(result) | return | endif  " scope error message
+    let msg = 'Error: No keyword under cursor.'
+    redraw | echohl WarningMsg | echom msg | echohl None | return
+  endif
+  for idx in range(abs(a:count))
     let pos = getpos('.')
-    call search(regex, flags, 0, 0, "!tags#get_skip(0, 'Constant', 'Comment')")
+    call search(regex, flags, 0, 0, skip)
     if getpos('.') == pos
       let msg = 'Error: Next keyword not found'
       redraw | echohl WarningMsg | echom msg | echohl None
@@ -820,7 +828,6 @@ function! tags#next_word(count, ...) abort
   let msg = 'Keyword: ' . substitute(name, '\\[<>cC]', '', 'g')
   let msg .= empty(info) ? '' : ' (' . info . ')'
   exe &l:foldopen =~# 'block\|all' ? 'normal! zv' : ''
-  exe 'setlocal nohlsearch'
   redraw | echo msg | return 0
 endfunction
 
@@ -852,7 +859,7 @@ endfunction
 " current word, and level 2 is current WORD. Second arg denotes scope boundary.
 " Note: This uses the search() 'skip' parameter to skip matches inside comments and
 " constants (i.e. strings). Similar method is used in succinct.vim for python docstrings
-function! tags#get_skip(arg, ...) abort
+function! tags#get_inside(arg, ...) abort
   let lnum = line('.')  " check against input column offset or given position
   let cnum = type(a:arg) ? col(a:arg) : col('.') + a:arg
   let cnum = max([cnum, 1])  " one-based indexing
@@ -861,8 +868,8 @@ function! tags#get_skip(arg, ...) abort
   let sids = map(stack, 'synIDtrans(v:val)')
   for name in a:000  " group names
     let sid = synIDtrans(hlID(name))
-    if sid && index(sids, sid) != -1 | return 0 | endif
-  endfor | return 1
+    if sid && index(sids, sid) != -1 | return 1 | endif
+  endfor | return 0
 endfunction
 function! tags#get_search(level, ...) abort
   let search = a:0 ? a:1 : 0
