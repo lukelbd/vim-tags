@@ -774,6 +774,8 @@ endfunction
 
 " Jump to the next or previous tag under the cursor
 " Note: This is used with bracket t/T mappings
+" Note: Native vim jumping maps e.g. n/N ignore content under cursor closed fold
+" even if foldopen is enabled. Here stay consistent with this behavior
 function! tags#next_tag(count, ...) abort
   let forward = a:count >= 0
   let args = [forward, 1, a:0 ? a:1 : 0]
@@ -793,14 +795,13 @@ endfunction
 
 " Jump to the next or previous word under the cursor
 " Note: This is used with bracket w/W mappings
+" Note: Native vim jumping maps e.g. n/N ignore content under cursor closed fold
+" even if foldopen is enabled. Here stay consistent with this behavior
 function! tags#next_word(count, ...) abort
   let winview = winsaveview()  " tags#search() moves to start of match
   let search = @/  " record previous search
-  let closed = foldclosed('.')
   let result = tags#search(1, a:0 ? 1 - a:1 : 1, 0, 2)
   let [regex, flags] = [@/, a:count < 0 ? 'bw' : 'w']
-  let skip = "tags#get_inside(0, 'Constant', 'Comment')"
-  let skip .= closed > 0 ? " || foldclosed('.') == " . closed : ''
   let @/ = search  " restore previous search
   if empty(regex)
     if empty(result) | return | endif  " scope error message
@@ -808,13 +809,11 @@ function! tags#next_word(count, ...) abort
     redraw | echohl WarningMsg | echom msg | echohl None | return
   endif
   for idx in range(abs(a:count))
+    let inum = foldclosed('.')
+    let skip = "tags#get_inside(0, 'Constant', 'Comment')"
+    let skip .= inum > 0 ? " || foldclosed('.') == " . inum : ''
     let pos = getpos('.')
     call search(regex, flags, 0, 0, skip)
-    if getpos('.') == pos
-      let msg = 'Error: Next keyword not found'
-      redraw | echohl WarningMsg | echom msg | echohl None
-      call winrestview(winview)
-    endif
   endfor
   let parts = matchlist(regex, '^\(\\%>\(\d\+\)l\)\?\(\\%<\(\d\+\)l\)\?\(.*\)$')
   let [line1, line2, name] = [parts[2], parts[4], parts[5]]  " get scope from regex
