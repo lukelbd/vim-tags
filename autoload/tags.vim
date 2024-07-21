@@ -398,9 +398,8 @@ function! tags#table_tags(...) abort
     if !empty(trim(table)) | call add(tables, trim(table)) | endif
   endfor
   if empty(tables)
-    redraw | echohl ErrorMsg
-    echom 'Error: Tags not found or not available.'
-    echohl None | return ''
+    let msg = 'Error: Tags not found or not available.'
+    redraw | echohl ErrorMsg | echom msg | echohl None | return ''
   endif
   return 'Tags for ' . label . ":\n" . join(tables, "\n")
 endfunction
@@ -575,9 +574,8 @@ function! s:goto_tag(mode, ...) abort
   elseif !empty(base)
     let ipath = fnamemodify(base, ':p') . ibuf
   else  " absolute path
-    redraw | echohl ErrorMsg
-    echom 'Error: Path ' . string(ibuf) . ' does not exist.'
-    echohl None | return
+    let msg = 'Error: Path ' . string(ibuf) . ' does not exist.'
+    redraw | echohl ErrorMsg | echom msg | echohl None | return
   endif
   if ipath !=# path  " record mark
     if exists('*file#goto_file')  " dotfiles utility
@@ -635,14 +633,12 @@ function! tags#select_tag(level, ...) abort
   let user = a:0 > 0 && !empty(a:1)
   let result = s:tag_source(a:level, user ? a:1 : 1)
   if empty(result)
-    redraw | echohl ErrorMsg
-    echom 'Error: Tags not found or not available.'
-    echohl None | return
+    let msg = 'Error: Tags not found or not available.'
+    redraw | echohl ErrorMsg | echom msg | echohl None | return
   endif
   if !exists('*fzf#run')
-    redraw | echohl ErrorMsg
-    echom 'Error: fzf.vim plugin not available.'
-    echohl None | return
+    let msg = 'Error: fzf.vim plugin not available.'
+    redraw | echohl ErrorMsg | echom msg | echohl None | return
   endif
   let char = user || type(a:level) ? 'S' : a:level < 1 ? 'B' : a:level < 2 ? 'F' : ''
   let name = user || type(a:level) || a:level < 1 ? 'chunk,index' : 'index'
@@ -754,9 +750,8 @@ function! tags#goto_name(...) abort
       return tags#_select_tag(2, item)
     endfor
   endfor
-  redraw | echohl ErrorMsg
-  echom 'Error: Tag ' . string(names[0]) . ' not found'
-  echohl None | return 1
+  let msg = 'Error: Tag ' . string(names[0]) . ' not found'
+  redraw | echohl ErrorMsg | echom msg | echohl None | return 1
 endfunction
 
 " Return the tag name under or preceding the cursor
