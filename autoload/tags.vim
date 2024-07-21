@@ -380,8 +380,7 @@ function! tags#table_tags(...) abort
       if index(types, path) < 0
         let msg = 'Warning: Path ' . string(path) . ' not open or not readable.'
         redraw | echohl WarningMsg | echom msg | echohl None
-      endif
-      continue
+      endif | continue
     endif
     let table = ''  " intialize table
     let items = getbufvar(bufnr(path), 'tags_by_name', [])  " prefer from buffer
@@ -398,7 +397,7 @@ function! tags#table_tags(...) abort
     if !empty(trim(table)) | call add(tables, trim(table)) | endif
   endfor
   if empty(tables)
-    let msg = 'Error: Tags not found or not available.'
+    let msg = 'Error: Tags not found or not available'
     redraw | echohl ErrorMsg | echom msg | echohl None | return ''
   endif
   return 'Tags for ' . label . ":\n" . join(tables, "\n")
@@ -440,7 +439,8 @@ function! tags#table_kinds(...) abort
   let title = 'Tag kinds for ' . label
   let major = 'Major tag kinds: ' . join(major, ' ')
   let minor = 'Minor tag kinds: ' . join(minor, ' ')
-  return title . ":\n" . major . "\n" . minor . "\n" . trim(table)
+  let table = empty(trim(table)) ? '' : "\n" . trim(table)
+  return title . ":\n" . major . "\n" . minor . table
 endfunction
 
 "-----------------------------------------------------------------------------
@@ -686,7 +686,7 @@ endfunction
 " Note: This translates kind to single-character for use e.g. in statusline
 function! tags#get_tag(...) abort
   let [items, idx] = call('tags#get_tags', a:000[:1])
-  if idx < 0 | return [] | endif
+  if idx < 0 | return 0 | endif
   let forward = a:0 > 1 ? a:2 : 0
   let circular = a:0 > 2 ? a:3 : 0
   let major = a:0 > 3 ? a:4 : 0
@@ -755,28 +755,22 @@ function! tags#goto_name(...) abort
   redraw | echohl ErrorMsg | echom msg | echohl None | return 1
 endfunction
 
-" Return the tag name under or preceding the cursor
-" Note: This is used with statusline and :CurrentTag
+" Jump to the next or previous tag under the cursor and get current tag
+" Note: This is used with bracket t/T mappings and statusline
+" Note: Native vim jumping maps e.g. n/N ignore content under cursor closed fold
+" even if foldopen is enabled. Here stay consistent with this behavior
 function! tags#current_tag(...) abort
   let lnum = line('.')
   let info = tags#get_tag(lnum)
-  let full = a:0 ? a:1 : 1  " print full tag
   if empty(info)
-    let parts = []
-  elseif !full || len(info) == 3
-    let parts = [info[2], info[0]]
+    return ''
+  elseif !a:0 || !a:1 || len(info) == 3
+    return info[2] . ':' . info[0]
   else  " include extra information
     let extra = substitute(info[3], '^.*:', '', '')
-    let parts = [info[2], extra, info[0]]
+    return info[2] . ':' . extra . ':' . info[0]
   endif
-  let string = join(parts, ':')
-  return string
 endfunction
-
-" Jump to the next or previous tag under the cursor
-" Note: This is used with bracket t/T mappings
-" Note: Native vim jumping maps e.g. n/N ignore content under cursor closed fold
-" even if foldopen is enabled. Here stay consistent with this behavior
 function! tags#next_tag(count, ...) abort
   let forward = a:count >= 0
   let args = [forward, 1, a:0 ? a:1 : 0]
@@ -786,7 +780,7 @@ function! tags#next_tag(count, ...) abort
     let inum = (fnum > 0 ? fnum : lnum) + (forward ? 1 : -1)
     let itag = call('tags#get_tag', [inum] + args)
     if empty(itag)  " algorithm failed
-      let msg = 'Warning: No more tags'
+      let msg = 'Warning: ' . (type(itag) ? 'No more tags' : 'Tags not available')
       redraw | echohl WarningMsg | echom msg | echohl None | return
     endif  " assign line number
   endfor
