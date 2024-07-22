@@ -935,7 +935,7 @@ function! tags#rescope(...) abort
   return substitute(search, '\\%<\d\+l', '\\%<' . lnum . 'l', '')
 endfunction
 function! tags#replace(text, ...) range abort
-  let winview = get(g:, 'tags_change_view', winsaveview())
+  let winview = get(b:, 'tags_change_winview', winsaveview())
   let local = a:0 ? a:1 : 0
   let lines = []
   if local > 1  " manual scope
@@ -948,6 +948,7 @@ function! tags#replace(text, ...) range abort
   let text = escape(a:text, '@')
   exe range . 's@' . regex . '@' . text . '@ge'
   call winrestview(winview)
+  let g:tags_repeat_tick = b:changedtick  " see repeat.vim
 endfunction
 
 " Search for object under cursor
@@ -1012,31 +1013,34 @@ endfunction
 " :undo the initial 'cgn' or 'dgn' operation before changing the other matches.
 function! s:feed_repeat(name, ...) abort
   if !exists('*repeat#set') | return | endif
-  let cnt = v:count ? v:count1 : get(g:, 'tags_change_count', 1)
+  let cnt = v:count ? v:count : get(g:, 'tags_change_count', 0)
   let key = '"\<Plug>Tags' . a:name . join(a:000, '') . '"'
   let feed = 'call repeat#set(' . key . ', ' . cnt . ')'
   call feedkeys("\<Cmd>" . feed . "\<CR>", 'n')
 endfunction
 function! tags#change_init(...) abort
-  if !exists('g:tags_change_force') | return | endif
+  let force = get(g:, 'tags_change_force', -1)
   let sub = a:0 ? a:1 : @.
-  let cnt = get(g:, 'tags_change_count', 1)
+  if force < 0 | return | endif
+  let cnt = get(g:, 'tags_change_count', 0)
   let key = get(g:, 'tags_change_key', 'n')
   let post = &l:foldopen =~# 'quickfix\|all' ? 'zv' : ''  " treat as 'quickfix'
-  let post .= cnt > 1 && exists(':ShowSearchIndex') ? "\<Cmd>ShowSearchIndex\<CR>" : ''
-  let feed = cnt > 1 ? (cnt - 1) . "\<Plug>TagsChangeAgain" : ''
+  if cnt > 1  " trigger additional changes
+    let post .= exists(':ShowSearchIndex') ? "\<Cmd>ShowSearchIndex\<CR>" : ''
+    let post .= (cnt - 1) . "\<Cmd>call tags#change_again(1)\<CR>"
+  endif
   if g:tags_change_force  " change all items
     let sub = substitute(sub, "\n", '\\r', 'g')
-    call feedkeys("\<Plug>TagsChangeForce", 'm')
+    let feed = "\<Cmd>call tags#change_force(1)\<CR>"
+    call feedkeys(feed, 'n')
   else  " change one item
     let sub = substitute(sub, "\n", "\<CR>", 'g')
     call feedkeys(key . post, 'n')
-    call feedkeys(feed, 'm')
     call s:feed_repeat('Change', 'Again')
   endif
   let @/ = tags#rescope(@/, 1)
   let g:tags_change_sub = sub
-  unlet! g:tags_change_force
+  let g:tags_change_force = -1
 endfunction
 
 " Repeat initial changes
@@ -1047,31 +1051,33 @@ function! tags#_change_input(...) abort
   let text = input('Replace: ', '')  " see below; used to convert literals
   return call('tags#replace', [text] + a:000)
 endfunction
-function! tags#change_force() abort
-  let tick = get(g:, 'tags_change_tick', b:changedtick)
-  exe tick != b:changedtick ? 'silent undo' : ''
-  let g:tags_change_count = 1  " overwrite count
-  let g:tags_change_view = winsaveview()  " see repeat.vim;
+function! tags#change_force(...) abort
+  let tick = get(b:, 'tags_change_tick', 0)  " before initial change
+  exe a:0 && a:1 && tick && tick != b:changedtick ? 'silent undo' : ''
+  let b:tags_change_tick = 0  " possible edge case
+  let b:tags_change_winview = winsaveview()  " see repeat.vim
   let g:tags_change_sub = get(g:, 'tags_change_sub', '')
+  let g:tags_change_count = 0  " overwrite unused count
   let feed = 'mode() =~# "^c" ? escape(g:tags_change_sub . "\<CR>", "~&\\") : ""'
   let feed = "\<Cmd>call feedkeys(" . feed . ", 'tni')\<CR>"
   let cmd = "\<Cmd>call tags#_change_input()\<CR>"
   call s:feed_repeat('Change', 'Force')  " critial or else fails
   call feedkeys(cmd . feed, 'n')
 endfunction
-function! tags#change_again() abort
+function! tags#change_again(...) abort
   let g:tags_change_sub = get(g:, 'tags_change_sub', '')
-  let cnt = v:count ? v:count : get(g:, 'tags_change_count', 1)
+  let b:tags_change_tick = 0  " possible edge case
+  let cnt = v:count ? v:count : get(g:, 'tags_change_count', 0)
   let key = get(g:, 'tags_change_key', 'n')
   let post = &l:foldopen =~# 'quickfix\|all' ? 'zv' : ''
   let post .= exists(':ShowSearchIndex') ? "\<Cmd>ShowSearchIndex\<CR>" : ''
   let feed = "mode() ==# 'i' ? g:tags_change_sub : ''"
   let feed = "\<Cmd>call feedkeys(" . feed . ", 'tni')\<CR>\<Esc>"
-  for idx in range(cnt)
-    let @/ = tags#rescope(@/, 1)
-    call feedkeys('cg' . key . feed . key . post, 'ni')
+  let feed = 'cg' . key . feed . key . post  " change next match
+  for idx in range(max([cnt, 1]))
+    let @/ = tags#rescope(@/, 1) | call feedkeys(feed, 'ni')
   endfor
-  if empty(a:000)  " i.e. not an internal call
+  if !a:0 || !a:1  " i.e. not initial call
     call s:feed_repeat('Change', 'Again')
   endif
 endfunction
@@ -1088,6 +1094,8 @@ function! tags#delete_next(...) abort
   return call('s:change_next', [1] + a:000)
 endfunction
 function! s:change_next(delete, level, local, ...) abort
+  let cnt = v:count  " WARNING: this must come first
+  let force = a:0 ? a:1 : 0
   if a:level < 0  " delete match e.g. d/
     let key = a:local ? 'N' : 'n'  " shorthand
     let names = ['Match', key ==# 'N' ? 'Prev' : 'Next']
@@ -1097,9 +1105,9 @@ function! s:change_next(delete, level, local, ...) abort
   endif
   if empty(names) | return | endif  " scope not found
   let feed = a:delete ? "\<Esc>\<Cmd>call tags#change_init('')\<CR>" : ''
-  let g:tags_change_count = v:count1
-  let g:tags_change_force = a:0 ? a:1 : 0
-  let g:tags_change_tick = b:changedtick
+  let b:tags_change_tick = b:changedtick
   let g:tags_change_key = key
+  let g:tags_change_count = cnt
+  let g:tags_change_force = force
   call feedkeys('cg' . key . feed, 'n')
 endfunction
