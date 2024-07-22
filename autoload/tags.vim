@@ -838,7 +838,7 @@ function! tags#_show(...) abort
     let [line1, line2; rest] = bounds
     let part1 = empty(rest) ? line1 : line1 . ' (' . rest[0] . ')'
     let part2 = empty(rest) ? line2 : line2 . ' (' . rest[1] . ')'
-    echom 'Selected lines ' . part1 . ' to ' . part2 . '.'
+    redraw | echo 'Selected lines ' . part1 . ' to ' . part2 . '.'
   endif
   call feedkeys("\<Cmd>setlocal hlsearch\<CR>", 'n')
 endfunction
