@@ -12,7 +12,7 @@ function! s:sort_by_line(tag1, tag2) abort
   let num1 = a:tag1[1]
   let num2 = a:tag2[1]
   return num1 - num2  " >0 if greater, 0 if equal, <0 if lesser
-endfunc
+endfunction
 function! s:sort_by_name(tag1, tag2) abort
   let str1 = a:tag1[0]
   let str2 = a:tag2[0]
@@ -657,64 +657,53 @@ endfunction
 "-----------------------------------------------------------------------------"
 " Tag navigation utilities {{{1
 "-----------------------------------------------------------------------------"
-" Return the tags and nearest index for the given buffer and line number
+" Return tags and nearest index the given buffer and line
+" Note: This translates kind to single-character for use e.g. in statusline
 " Note: This is analogous to builtin functions getloclist(), getjumplist(), etc.
 function! tags#get_tags(...) abort
+  let forward = a:0 > 1 ? a:2 : 0
   let pos = a:0 > 0 ? a:1 : line('.')
   let bnr = type(pos) > 1 && !empty(pos[0]) ? bufnr(pos[0]) : bufnr()
   let lnum = type(pos) > 1 ? pos[1] : type(pos) ? str2nr(pos) : pos
   let items = getbufvar(bnr, 'tags_by_line', [])
-  let forward = a:0 > 1 ? a:2 : 0
-  let max = len(items) - 1  " maximum valid index
-  let idxs = forward ? range(max, 0, -1) : range(0, max)
-  let index = -1  " returned index
-  for idx in idxs
-    if forward && lnum > items[idx][1]
-      let index = min([idx + 1, max]) | break
-    endif
-    if !forward && lnum < items[idx][1]
-      let index = max([idx - 1, 0]) | break
-    endif
-    if idx == idxs[-1]
-      let index = idx | break
+  for idx in forward ? range(len(items)) : reverse(range(len(items)))
+    if forward ? lnum <= items[idx][1] : lnum >= items[idx][1]
+      return [items, idx]
     endif
   endfor
+  let index = forward ? len(items) : -1
   return [items, index]
 endfunction
-
-" Return the nearest tag matching input criteria
-" Note: This translates kind to single-character for use e.g. in statusline
 function! tags#get_tag(...) abort
   let [items, idx] = call('tags#get_tags', a:000[:1])
-  if idx < 0 | return 0 | endif
   let forward = a:0 > 1 ? a:2 : 0
-  let circular = a:0 > 2 ? a:3 : 0
+  let block = a:0 > 2 ? a:3 : 0
   let major = a:0 > 3 ? a:4 : 0
   let max = len(items) - 1
   if forward
-    let idxs = range(idx, max)
-    let jdxs = range(0, idx - 1)
+    let idxs = range(max([idx, 0]), max)
+    let jdxs = reverse(range(0, max([idx, 0]) - 1))  " start + 1 == stop allowed
   else
-    let idxs = range(idx, 0, -1)
-    let jdxs = range(max, idx + 1, -1)
+    let idxs = reverse(range(0, min([idx, max])))
+    let jdxs = range(min([idx, max]) + 1, max)  " start + 1 == stop allowed
   endif
-  let jdxs = circular ? jdxs : reverse(jdxs)
-  let index = -1  " returned index
-  for idx in extend(idxs, jdxs)  " search valid tags
+  let itag = []  " closest tag
+  for idx in block ? idxs : idxs + jdxs
     let item = items[idx]
     if major && len(item) == 3 && tags#is_major(item)
-      let index = idx | break
+      let itag = copy(item) | break
     elseif !major && len(item) > 2 && !tags#is_minor(item)
-      let index = idx | break
+      let itag = copy(item) | break
     endif
   endfor
-  let item = copy(index >= 0 ? items[index] : [])
-  if len(item) > 2
-    let item[2] = tags#kind_char(item[2])
-  endif | return item
+  if len(itag) > 2
+    let itag[2] = tags#kind_char(itag[2])
+  endif
+  return itag
 endfunction
 
 " Go to the tag keyword under the cursor
+" NOTE: Here search both tag files using builtin functions and buffer-local method
 " Note: Vim does not natively support jumping separate windows so implement here
 function! tags#goto_name(...) abort
   let level = a:0 ? a:1 : 0
@@ -773,12 +762,11 @@ function! tags#current_tag(...) abort
 endfunction
 function! tags#next_tag(count, ...) abort
   let forward = a:count >= 0
-  let args = [forward, 1, a:0 ? a:1 : 0]
   for idx in range(abs(a:count))  " count times
     let lnum = idx == 0 ? line('.') : str2nr(itag[1])
     let fnum = forward ? foldclosedend(lnum) : foldclosed(lnum)
     let inum = (fnum > 0 ? fnum : lnum) + (forward ? 1 : -1)
-    let itag = call('tags#get_tag', [inum] + args)
+    let itag = call('tags#get_tag', [inum, forward, 1] + a:000)
     if empty(itag)  " algorithm failed
       let msg = 'Warning: ' . (type(itag) ? 'No more tags' : 'Tags not available')
       redraw | echohl WarningMsg | echom msg | echohl None | return
