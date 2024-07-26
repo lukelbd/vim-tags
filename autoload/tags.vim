@@ -45,11 +45,11 @@ function! tags#is_skipped(tag, ...) abort
 endfunction
 function! s:tag_is_kind(tag, name, default, ...) abort
   let name = 'tags_' . a:name . '_kinds'  " setting name
-  let name = call('tags#lang_name', a:000)
-  let opts = get(get(g:, name, {}), name, a:default)
+  let lang = call('tags#lang_name', a:000)
+  let opts = get(get(g:, name, {}), lang, a:default)
   let kind1 = get(a:tag, 2, '')  " translate to or from character
   let kinds = len(kind1) > 1 ? g:tags_kind_chars : g:tags_kind_names
-  let kind2 = get(get(kinds, name, {}), kind1, kind1)
+  let kind2 = get(get(kinds, lang, {}), kind1, kind1)
   if type(opts) > 1
     return index(opts, kind1) >= 0 || index(opts, kind2) >= 0
   else  " faster than splitting (important for statusline)
@@ -678,21 +678,28 @@ function! tags#get_tag(...) abort
   let [items, idx] = call('tags#get_tags', a:000[:1])
   let forward = a:0 > 1 ? a:2 : 0
   let block = a:0 > 2 ? a:3 : 0
-  let major = a:0 > 3 ? a:4 : 0
-  let max = len(items) - 1
+  let level = a:0 > 3 ? a:4 : 0
+  let imax = len(items) - 1
   if forward
-    let idxs = range(max([idx, 0]), max)
+    let idxs = range(max([idx, 0]), imax)
     let jdxs = reverse(range(0, max([idx, 0]) - 1))  " start + 1 == stop allowed
   else
-    let idxs = reverse(range(0, min([idx, max])))
-    let jdxs = range(min([idx, max]) + 1, max)  " start + 1 == stop allowed
+    let idxs = reverse(range(0, min([idx, imax])))
+    let jdxs = range(min([idx, imax]) + 1, imax)  " start + 1 == stop allowed
   endif
   let itag = []  " closest tag
   for idx in block ? idxs : idxs + jdxs
     let item = items[idx]
-    if major && len(item) == 3 && tags#is_major(item)
-      let itag = copy(item) | break
-    elseif !major && len(item) > 2 && !tags#is_minor(item)
+    if level > 1  " top-level
+      let bool = len(item) == 3 && tags#is_major(item)
+    elseif level > 0  " major
+      let bool = tags#is_major(item)
+    elseif level == 0  " non-minor
+      let bool = !tags#is_minor(item)
+    else  " any tag
+      let bool = v:true
+    endif
+    if bool  " meets requirements
       let itag = copy(item) | break
     endif
   endfor
@@ -750,7 +757,7 @@ endfunction
 " even if foldopen is enabled. Here stay consistent with this behavior
 function! tags#current_tag(...) abort
   let lnum = line('.')
-  let info = tags#get_tag(lnum)
+  let info = tags#get_tag(lnum, 0, 0, 0)
   if empty(info)
     return ''
   elseif !a:0 || !a:1 || len(info) == 3
@@ -872,42 +879,41 @@ function! s:get_scope(line1, line2) abort
   return call('printf', ['\%%>%dl\%%<%dl'] + bnds)
 endfunction
 function! tags#get_scope(...) abort
-  " Initial stuff
+  " Find current tag
   let s:scope_bounds = []  " reset message cache
-  let tags = get(b:, 'tags_by_line', [])
-  let itags = filter(copy(tags), 'tags#is_major(v:val)')
-  let lines = map(deepcopy(itags), 'str2nr(v:val[1])')
-  if empty(itags)
-    let msg = empty(tags) ? 'tags unavailable' : 'no major tags found'
+  let lnum = a:0 ? a:1 : line('.')
+  let itag = tags#get_tag(lnum, 0, 1, 1)
+  let line0 = str2nr(itag[1])
+  if empty(itag)
+    let nr = len(get(b:, 'tags_by_line', []))
+    let msg = nr > 0 ? 'no major tags found' : 'tags unavailable'
     let msg = 'Error: Failed to restrict the search scope (' . msg . ').'
     redraw | echohl WarningMsg | echom msg | echohl None | return []
   endif
-  " Find closing line and tag
-  let winview = winsaveview()
-  exe a:0 ? a:1 : '' | let lnum = line('.')
-  let [iline, line1, level1] = [-1, lnum, foldlevel('.')]
-  while iline != line1 && index(lines, line1) == -1
+  " Find current fold
+  let winview = winsaveview() | exe lnum + 1
+  let offsets = get(b:, 'fold_offsets', {})
+  let [iline, jline] = [-1, 0]  " iterate lines
+  let [line1, level1] = [-1, 999]
+  while jline != iline && line1 != line0 && level1 > 1
     let [iline, ifold] = [line('.'), foldclosed('.')]
-    exe ifold > 0 && iline != ifold ? ifold : 'keepjumps normal! [z'
-    let [line1, level1] = [line('.'), foldlevel('.')]
-    let line1 = get(get(b:, 'fold_heads', {}), line1, line1)  " python decorators
+    exe ifold > 0 && iline > ifold ? ifold : 'keepjumps normal! [z'
+    let [jline, level1] = [line('.'), foldlevel('.')]
+    let line1 = jline + get(offsets, string(line1), 0)
   endwhile
-  let ifold = foldclosedend('.')
-  exe ifold > 0 ? ifold : 'keepjumps normal! ]z'
+  let jfold = foldclosedend('.')
+  exe jfold > 0 ? jfold : 'keepjumps normal! ]z'
   let [line2, level2] = [line('.'), foldlevel('.')]
   call winrestview(winview)
-  " Return scope if within fold
+  " Return scope bounds
   let iscursor = lnum >= line1 && lnum <= line2
   let isfold = level1 > 0 && line1 != line2
-  let idx = index(lines, line1)  " fold aligns with tags
-  if idx < 0 || !isfold || !iscursor
+  if line1 != line0 || !isfold || !iscursor
     let msg = !iscursor ? 'current scope is global' : 'major tag fold not found'
     let msg = 'Error: Failed to restrict the search scope (' . msg . ').'
     redraw | echohl WarningMsg | echom msg | echohl None | return []
   endif
-  let name1 = itags[idx][0]
-  let name2 = trim(getline(line2))
-  let nmax = 20  " maximum label length
+  let [name1, name2, nmax] = [itag[0], trim(getline(line2)), 20]
   let name1 = len(name1) > nmax ? name1[:nmax - 3] . '···' : name1
   let name2 = len(name2) > nmax ? name2[:nmax - 3] . '···' : name2
   let s:scope_bounds = [line1, line2, name1, name2]  " see tags#_show

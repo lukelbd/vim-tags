@@ -146,9 +146,9 @@ nnoremap <Plug>TagsCursor <Cmd>call tags#goto_name(1)<CR>
 nnoremap <Plug>TagsBSelect <Cmd>call tags#select_tag(0)<CR>
 nnoremap <Plug>TagsGSelect <Cmd>call tags#select_tag(2)<CR>
 noremap <Plug>TagsForwardAll <Cmd>call tags#next_tag(v:count1, 0)<CR>
-noremap <Plug>TagsForwardTop <Cmd>call tags#next_tag(v:count1, 1)<CR>
+noremap <Plug>TagsForwardTop <Cmd>call tags#next_tag(v:count1, 2)<CR>
 noremap <Plug>TagsBackwardAll <Cmd>call tags#next_tag(-v:count1, 0)<CR>
-noremap <Plug>TagsBackwardTop <Cmd>call tags#next_tag(-v:count1, 1)<CR>
+noremap <Plug>TagsBackwardTop <Cmd>call tags#next_tag(-v:count1, 2)<CR>
 noremap <Plug>TagsNextLocal <Cmd>call tags#next_word(v:count1, 0)<CR>
 noremap <Plug>TagsNextGlobal <Cmd>call tags#next_word(v:count1, 1)<CR>
 noremap <Plug>TagsPrevLocal <Cmd>call tags#next_word(-v:count1, 0)<CR>
