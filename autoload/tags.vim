@@ -874,46 +874,52 @@ endfunction
 " Return major tag folding scope
 " See: https://stackoverflow.com/a/597932/4970632
 " See: http://vim.wikia.com/wiki/Search_in_current_function
-function! s:get_scope(line1, line2) abort
-  let bnds = [a:line1 - 1, a:line2 + 1]
-  return call('printf', ['\%%>%dl\%%<%dl'] + bnds)
-endfunction
-function! tags#get_scope(...) abort
-  " Find current tag
-  let s:scope_bounds = []  " reset message cache
-  let lnum = a:0 ? a:1 : line('.')
-  let itag = tags#get_tag(lnum, 0, 1, 1)
-  let line0 = str2nr(itag[1])
+function! s:get_scope(...) abort
+  let level = a:0 > 1 ? a:2 : 1
+  let lnum = a:0 > 0 ? a:1 : line('.')
+  let itag = tags#get_tag(lnum, 0, 1, level)
   if empty(itag)
     let nr = len(get(b:, 'tags_by_line', []))
     let msg = nr > 0 ? 'no major tags found' : 'tags unavailable'
-    let msg = 'Error: Failed to restrict the search scope (' . msg . ').'
+    let msg = 'Error: Failed to restrict the search scope (' . msg . ')'
     redraw | echohl WarningMsg | echom msg | echohl None | return []
   endif
-  " Find current fold
-  let winview = winsaveview() | exe lnum + 1
-  let offsets = get(b:, 'fold_offsets', {})
-  let [iline, jline] = [-1, 0]  " iterate lines
-  let [line1, level1] = [-1, 999]
-  while jline != iline && line1 != line0 && level1 > 1
-    let [iline, ifold] = [line('.'), foldclosed('.')]
-    exe ifold > 0 && iline > ifold ? ifold : 'keepjumps normal! [z'
-    let [jline, level1] = [line('.'), foldlevel('.')]
-    let line1 = jline + get(offsets, string(line1), 0)
-  endwhile
-  let jfold = foldclosedend('.')
-  exe jfold > 0 ? jfold : 'keepjumps normal! ]z'
-  let [line2, level2] = [line('.'), foldlevel('.')]
+  let name0 = itag[0]
+  let line0 = str2nr(itag[1])
+  let winview = winsaveview()
+  let closed = foldclosed(line0)  " WARNING: critical (needed for foldtextresult())
+  exe closed > 0 ? '': line0 . 'foldclose'
+  let line1 = foldclosed(line0)
+  let line2 = foldclosedend(line0)
+  call foldtextresult(line1)  " WARNING: critical (updates foldtext cache)
+  exe closed > 0 ? '' : line0 . 'foldopen'
   call winrestview(winview)
-  " Return scope bounds
-  let iscursor = lnum >= line1 && lnum <= line2
-  let isfold = level1 > 0 && line1 != line2
-  if line1 != line0 || !isfold || !iscursor
-    let msg = !iscursor ? 'current scope is global' : 'major tag fold not found'
-    let msg = 'Error: Failed to restrict the search scope (' . msg . ').'
+  let deltas = get(b:, 'foldtext_delta', {})
+  let delta = get(deltas, string(line1), 0)
+  return [name0, line0, line1 + delta, line2]
+endfunction
+function! tags#get_scope(...) abort
+  let lnum = a:0 ? a:1 : line('.')
+  let s:scope_bounds = []  " reset message cache
+  for level in [1, 2]  " attempt cursor then parent
+    let bounds = s:get_scope(lnum, level)
+    if empty(bounds)
+      return bounds
+    endif
+    let [name0, line0, line1, line2] = bounds
+    let iscursor = lnum >= line1 && lnum <= line2
+    let isfold = line2 > line1 && foldlevel(line0)
+    let istag = line0 == line1 && line0 <= line2
+    if iscursor && isfold && istag
+      break
+    elseif isfold && level == 1
+      continue
+    endif
+    let msg = istag ? 'current scope is global' : 'major tag fold not found'
+    let msg = 'Error: Failed to restrict the search scope (' . msg . ')'
     redraw | echohl WarningMsg | echom msg | echohl None | return []
-  endif
-  let [name1, name2, nmax] = [itag[0], trim(getline(line2)), 20]
+  endfor
+  let [name1, name2, nmax] = [name0, trim(getline(line2)), 20]
   let name1 = len(name1) > nmax ? name1[:nmax - 3] . '···' : name1
   let name2 = len(name2) > nmax ? name2[:nmax - 3] . '···' : name2
   let s:scope_bounds = [line1, line2, name1, name2]  " see tags#_show
