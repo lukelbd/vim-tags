@@ -47,13 +47,15 @@ function! s:tag_is_kind(tag, name, default, ...) abort
   let name = 'tags_' . a:name . '_kinds'  " setting name
   let lang = call('tags#lang_name', a:000)
   let opts = get(get(g:, name, {}), lang, a:default)
-  let kind1 = get(a:tag, 2, '')  " translate to or from character
-  let kinds = len(kind1) > 1 ? g:tags_kind_chars : g:tags_kind_names
-  let kind2 = get(get(kinds, lang, {}), kind1, kind1)
+  let kind0 = get(a:tag, 2, '')  " translate to or from character
+  let kinds = len(kind0) > 1 ? g:tags_kind_chars : g:tags_kind_names
+  let kind1 = get(get(kinds, lang, {}), kind0, kind0)
   if type(opts) > 1
-    return index(opts, kind1) >= 0 || index(opts, kind2) >= 0
-  else  " faster than splitting (important for statusline)
-    return kind1 =~# '[' . opts . ']' || kind2 =~# '[' . opts . ']'
+    return index(opts, kind0) >= 0 || index(opts, kind1) >= 0
+  elseif len(kind0) > 1  " faster than splitting (important for statusline)
+    return kind0 ==# opts || kind1 =~# '^[' . opts . ']$'
+  else  " full name or string of chatacters
+    return kind1 ==# opts || kind0 =~# '^[' . opts . ']$'
   endif
 endfunction
 
