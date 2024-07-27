@@ -380,7 +380,7 @@ function! tags#table_tags(...) abort
     if !filereadable(path)
       let types = getcompletion(path, 'filetype')  " https://vi.stackexchange.com/a/14990/8084
       if index(types, path) < 0
-        let msg = 'Warning: Path ' . string(path) . ' not open or not readable.'
+        let msg = 'Warning: Path ' . string(path) . ' not open or not readable'
         redraw | echohl WarningMsg | echom msg | echohl None
       endif | continue
     endif
@@ -527,11 +527,11 @@ function! s:tag_source(level, ...) abort
     endif
     if a:0 > 0  " line:name (other) or file:line:name (other)
       let size = max(map(copy(items), 'len(string(str2nr(v:val[1])))'))
-      let format = string('%s: %s: %' . size . 'd: %s (%s)')
+      let fmt = string('%s: %s: %' . size . 'd: %s (%s)')
       call map(items, 'v:val[:2] + [tags#kind_char(v:val[3])] + v:val[4:]')
       call map(items, 'add(v:val[:2], join(v:val[3:], ", "))')  " combine parts
       call map(items, '[v:val[0], s:get_name(v:val[0], cache)] + v:val[1:]')
-      call map(items, 'call("printf", [' . format  . '] + v:val)')
+      call map(items, 'call("printf", [' . fmt  . '] + v:val)')
     endif
     call extend(result, uniq(items))  " ignore duplicates
   endfor | return result
@@ -576,7 +576,7 @@ function! s:goto_tag(mode, ...) abort
   elseif !empty(base)
     let ipath = fnamemodify(base, ':p') . ibuf
   else  " absolute path
-    let msg = 'Error: Path ' . string(ibuf) . ' does not exist.'
+    let msg = 'Error: Path ' . string(ibuf) . ' does not exist'
     redraw | echohl ErrorMsg | echom msg | echohl None | return
   endif
   if ipath !=# path  " record mark
@@ -635,11 +635,11 @@ function! tags#select_tag(level, ...) abort
   let user = a:0 > 0 && !empty(a:1)
   let result = s:tag_source(a:level, user ? a:1 : 1)
   if empty(result)
-    let msg = 'Error: Tags not found or not available.'
+    let msg = 'Error: Tags not found or not available'
     redraw | echohl ErrorMsg | echom msg | echohl None | return
   endif
   if !exists('*fzf#run')
-    let msg = 'Error: fzf.vim plugin not available.'
+    let msg = 'Error: fzf.vim plugin not available'
     redraw | echohl ErrorMsg | echom msg | echohl None | return
   endif
   let char = user || type(a:level) ? 'S' : a:level < 1 ? 'B' : a:level < 2 ? 'F' : ''
@@ -797,7 +797,7 @@ function! tags#next_word(count, ...) abort
   let @/ = search  " restore previous search
   if empty(regex)
     if empty(result) | return | endif  " scope error message
-    let msg = 'Error: No keyword under cursor.'
+    let msg = 'Error: No keyword under cursor'
     redraw | echohl WarningMsg | echom msg | echohl None | return
   endif
   for idx in range(abs(a:count))
@@ -820,7 +820,7 @@ endfunction
 "-----------------------------------------------------------------------------"
 " Scope searching utilities {{{1
 "-----------------------------------------------------------------------------"
-" Helper function
+" Helper function for printing scope
 " Note: This is used to show search statistics for pattern-selection mappings. Use
 " vim-indexed-search plugin if available or else use :substitute no-op flag to
 " print 'N matches on M lines' message (take care to avoid suppressing message).
@@ -835,7 +835,7 @@ function! tags#_show(...) abort
     let [line1, line2; rest] = bounds
     let part1 = empty(rest) ? line1 : line1 . ' (' . rest[0] . ')'
     let part2 = empty(rest) ? line2 : line2 . ' (' . rest[1] . ')'
-    redraw | echo 'Selected lines ' . part1 . ' to ' . part2 . '.'
+    redraw | echo 'Selected lines ' . part1 . ' to ' . part2
   endif
   call feedkeys("\<Cmd>setlocal hlsearch\<CR>", 'n')
 endfunction

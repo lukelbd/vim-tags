@@ -8,7 +8,7 @@
 exe exists('g:loaded_tags') ? 'finish' : ''
 let g:loaded_tags = 1
 call system('type ctags &>/dev/null')
-if v:shell_error | echoerr 'Error: ''ctags'' executable not found.' | finish | endif
+if v:shell_error | echoerr 'Error: ''ctags'' executable not found' | finish | endif
 silent! exe 'au! tags'
 augroup vim_tags
   au!
