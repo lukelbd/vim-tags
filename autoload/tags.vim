@@ -1107,7 +1107,7 @@ function! s:change_next(delete, level, local, ...) abort
     let names = ['Match', key ==# 'N' ? 'Prev' : 'Next']
   else  " delete word e.g. d*
     let key = 'n'
-    let names = tags#search(a:level, a:local, 0, 1)
+    let names = tags#search(a:level, a:local)
   endif
   if empty(names) | return | endif  " scope not found
   let feed = a:delete ? "\<Esc>\<Cmd>call tags#change_init('')\<CR>" : ''
