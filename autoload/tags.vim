@@ -846,10 +846,15 @@ endfunction
 " Note: This uses the search() 'skip' parameter to skip matches inside comments and
 " constants (i.e. strings). Similar method is used in succinct.vim for python docstrings
 function! tags#get_inside(arg, ...) abort
-  let lnum = line('.')  " check against input column offset or given position
-  let cnum = type(a:arg) ? col(a:arg) : col('.') + a:arg
+  if type(a:arg) > 1  " explicit position
+    let [lnum, cnum] = a:arg
+  elseif type(a:arg) > 0  " column string
+    let [lnum, cnum] = [line('.'), col(a:arg)]
+  else  " column offset
+    let [lnum, cnum] = [line('.'), col('.') + a:arg]
+  endif
   let cnum = max([cnum, 1])  " one-based indexing
-  let cnum = min([cnum, col('$') - 1])  " end-of-line or end-of-file plus 1
+  let cnum = min([cnum, col([lnum, '$']) - 1])  " end-of-line or end-of-file plus 1
   let stack = synstack(lnum, cnum)
   let sids = map(stack, 'synIDtrans(v:val)')
   for name in a:000  " group names
@@ -874,20 +879,16 @@ function! tags#get_search(level, ...) abort
 endfunction
 
 " Return major tag folding scope
+" NOTE: Here also do extra check to ensure tag scope is not outdated. Otherwise allow
+" scope search on unsaved files since e.g. editing text below major tags is very common
 " See: https://stackoverflow.com/a/597932/4970632
 " See: http://vim.wikia.com/wiki/Search_in_current_function
 function! s:get_scope(...) abort
   let level = a:0 > 1 ? a:2 : 1
   let lnum = a:0 > 0 ? a:1 : line('.')
   let itag = tags#get_tag(lnum, 0, 1, level)
-  if empty(itag)
-    let nr = len(get(b:, 'tags_by_line', []))
-    let msg = nr > 0 ? 'no major tags found' : 'tags unavailable'
-    let msg = 'Error: Failed to restrict the search scope (' . msg . ')'
-    redraw | echohl WarningMsg | echom msg | echohl None | return []
-  endif
-  let name0 = itag[0]
-  let line0 = str2nr(itag[1])
+  let name0 = empty(itag) ? '' : itag[0]
+  let line0 = empty(itag) ? 0 : str2nr(itag[1])
   let winview = winsaveview()
   let closed = foldclosed(line0)  " WARNING: critical (needed for foldtextresult())
   exe closed > 0 ? '': line0 . 'foldclose'
@@ -903,23 +904,39 @@ endfunction
 function! tags#get_scope(...) abort
   let lnum = a:0 ? a:1 : line('.')
   let s:scope_bounds = []  " reset message cache
+  if exists('*fold#update_folds')
+    silent! call fold#update_folds(0)
+  elseif exists(':FastFoldUpdate')
+    silent! FastFoldUpdate
+  endif
   for level in [1, 2]  " attempt cursor then parent
-    let bounds = s:get_scope(lnum, level)
-    if empty(bounds)
-      return bounds
-    endif
-    let [name0, line0, line1, line2] = bounds
-    let iscursor = lnum >= line1 && lnum <= line2
+    let [name0, line0, line1, line2] = s:get_scope(lnum, level)
+    let regex = substitute(escape(name0, s:regex_magic), '·*$', '', '')
+    let isavail = !empty(get(b:, 'tags_by_line', []))  " check if tags available
+    let istag = matchend(getline(line0), regex) >= 0  " check if tag is valid
     let isfold = line2 > line1 && foldlevel(line0)
-    let istag = line0 == line1 && line0 <= line2
-    if iscursor && isfold && istag
+    let ismatch = line0 == line1 && line0 < line2  " fails for invalid tags
+    let isinside = lnum >= line1 && lnum <= line2  " fails for invalid tags
+    if isinside && ismatch && istag
       break
-    elseif isfold && level == 1
+    elseif isinside && level == 1
       continue
     endif
-    let msg = istag ? 'current scope is global' : 'major tag fold not found'
+    let icol = matchend(getline(line1), '^\s*\S')
+    let iscomment = icol > 0 ? tags#get_inside([line1, icol], 'Comment') : 0
+    if istag && isavail && !ismatch && !empty(name0)  " e.g. missing folds
+      let msg = string(name0) . ' fold not found'
+    elseif istag && isavail && !isinside  " e.g. global scope
+      let msg = 'search scope appears to be global'
+    elseif &l:modified  " e.g. oudated changes
+      let msg = 'tags appear to be outdated; try :write'
+    elseif !isavail  " inactive tags
+      let msg = 'tags appear to be unavailable'
+    else  " invalid tag name
+      let msg = string(name0) . ' tag not found'
+    endif
     let msg = 'Error: Failed to restrict the search scope (' . msg . ')'
-    redraw | echohl WarningMsg | echom msg | echohl None | return []
+    redraw | echohl ErrorMsg | echom msg | echohl None | return []
   endfor
   let [name1, name2, nmax] = [name0, trim(getline(line2)), 20]
   let name1 = len(name1) > nmax ? name1[:nmax - 3] . '···' : name1
