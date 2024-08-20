@@ -758,16 +758,20 @@ endfunction
 " Note: Native vim jumping maps e.g. n/N ignore content under cursor closed fold
 " even if foldopen is enabled. Here stay consistent with this behavior
 function! tags#current_tag(...) abort
-  let lnum = line('.')
-  let info = tags#get_tag(lnum, 0, 0, 0)
-  if empty(info)
-    return ''
-  elseif !a:0 || !a:1 || len(info) == 3
-    return info[2] . ':' . info[0]
-  else  " include extra information
-    let extra = substitute(info[3], '^.*:', '', '')
-    return info[2] . ':' . extra . ':' . info[0]
+  let scope = a:0 ? a:1 : 0
+  let stack = reverse(copy(get(g:, 'tag_stack', [])))
+  let path = expand('%:p')  " current path
+  let itag = tags#get_tag(line('.'))
+  let itag = type(itag) > 1 ? itag : []
+  let iloc = len(itag) > 2 ? 1 + index(stack, [path, itag[1], itag[0]]) : 0
+  let info = ''  " tag sidplay
+  if scope && len(itag) > 3  " show tag kind:scope:name
+    let info .= itag[2] . ':' . substitute(itag[3], '^\a:.\@=', '', '') . ':' . itag[0]
+  elseif len(itag) > 2  " show tag kind:name
+    let info .= itag[2] . ':' . substitute(itag[0], '^\a:.\@=', '', '')
   endif
+  let info .= iloc > 0 ? '*' . iloc : ''
+  return info
 endfunction
 function! tags#next_tag(count, ...) abort
   let forward = a:count >= 0
