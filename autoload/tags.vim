@@ -759,18 +759,21 @@ endfunction
 " even if foldopen is enabled. Here stay consistent with this behavior
 function! tags#current_tag(...) abort
   let scope = a:0 ? a:1 : 0
-  let stack = reverse(copy(get(g:, 'tag_stack', [])))
-  let path = expand('%:p')  " current path
   let itag = tags#get_tag(line('.'))
   let itag = type(itag) > 1 ? itag : []
-  let iloc = len(itag) > 2 ? 1 + index(stack, [path, itag[1], itag[0]]) : 0
-  let info = ''  " tag sidplay
   if scope && len(itag) > 3  " show tag kind:scope:name
-    let info .= itag[2] . ':' . substitute(itag[3], '^\a:.\@=', '', '') . ':' . itag[0]
+    let info = itag[2] . ':' . substitute(itag[3], '^\a:.\@=', '', '') . ':' . itag[0]
   elseif len(itag) > 2  " show tag kind:name
-    let info .= itag[2] . ':' . substitute(itag[0], '^\a:.\@=', '', '')
+    let info = itag[2] . ':' . substitute(itag[0], '^\a:.\@=', '', '')
+  else  " unknown tag
+    return ''
   endif
-  let info .= iloc > 0 ? '*' . iloc : ''
+  let stack = reverse(copy(get(g:, 'tag_stack', [])))
+  let name = [expand('%:p'), itag[1], itag[0]]  " tag stack name
+  let index = len(stack) - get(g:, 'tag_loc', len(stack))
+  let info .= index > 0 ? ':' . index : ''
+  let idx = index(stack, name) + 1
+  let info .= idx > 0 && idx != index ? ':' . idx : ''
   return info
 endfunction
 function! tags#next_tag(count, ...) abort
