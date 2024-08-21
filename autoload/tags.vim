@@ -770,10 +770,10 @@ function! tags#current_tag(...) abort
   endif
   let stack = reverse(copy(get(g:, 'tag_stack', [])))
   let name = [expand('%:p'), itag[1], itag[0]]  " tag stack name
-  let index = len(stack) - get(g:, 'tag_loc', len(stack))
-  let info .= index > 0 ? ':' . index : ''
   let idx = index(stack, name) + 1
-  let info .= idx > 0 && idx != index ? ':' . idx : ''
+  let info .= idx > 0 ? ':' . idx : ''
+  let jdx = len(stack) - get(g:, 'tag_loc', len(stack))
+  let info .= jdx > 0 ? ':' . jdx : ''
   return info
 endfunction
 function! tags#next_tag(count, ...) abort
