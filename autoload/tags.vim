@@ -1,6 +1,6 @@
-"------------------------------------------------------------------------------
+"-----------------------------------------------------------------------------"
 " General tag processing utiltiies {{{1
-"------------------------------------------------------------------------------
+"-----------------------------------------------------------------------------"
 " Todo: Add tag file-reading utilities here including file sorting
 " Note: Encountered strange error where naming .vim/autoload file same as
 " vim-tags/autoload file or naming the latter to tags.vim at all caused an autocmd
@@ -22,6 +22,10 @@ function! s:filter_buffer(...) abort
   let bnr = a:0 > 0 ? a:1 : bufnr()
   let ftype = a:0 > 1 ? a:2 : ''
   let btype = getbufvar(bnr, '&filetype')
+  let info = get(getwininfo(bufwinid(bnr)), 0, {})
+  if !empty(win_gettype()) || get(info, 'terminal', 0) || get(info, 'quickfix', 0)
+    return 0
+  endif
   if empty(btype) || !empty(ftype) && ftype !=# btype  " type required
     return 0
   endif
@@ -321,7 +325,7 @@ function! tags#update_tags(...) abort
   if global  " global paths
     let paths = tags#get_paths()
   else  " local path
-    let paths = [expand('%:p')]
+    let paths = s:filter_buffer() ? [expand('%:p')] : []
   endif
   for path in paths
     let bnr = bufnr(path)  " buffer unique to path
@@ -445,9 +449,9 @@ function! tags#table_kinds(...) abort
   return title . ":\n" . major . "\n" . minor . table
 endfunction
 
-"-----------------------------------------------------------------------------
+"-----------------------------------------------------------------------------"
 " Tag selection utiltiies {{{1
-"-----------------------------------------------------------------------------
+"-----------------------------------------------------------------------------"
 " Return or set the tag stack index
 " Note: This is used to manually update the tag stack index, allowing us to emulate
 " native vim :tag with tags#iter_tags(1, ...) and :pop with tags#iter_tags(-1, ...).
@@ -952,9 +956,9 @@ function! tags#get_scope(...) abort
   return [line1, line2]
 endfunction
 
-"-----------------------------------------------------------------------------
+"-----------------------------------------------------------------------------"
 " Search and replace commands {{{1
-"-----------------------------------------------------------------------------
+"-----------------------------------------------------------------------------"
 " Replace the current search
 " Note: Here tags#rescope() is also used in forked version of vim-repeat
 " Note: Replacing search-scope text with newlines will make subsequent scope
@@ -1040,9 +1044,9 @@ function! tags#search(level, local, ...) range abort
   return [name1, name2]
 endfunction
 
-"-----------------------------------------------------------------------------
+"-----------------------------------------------------------------------------"
 " Search and replace mappings {{{1
-"-----------------------------------------------------------------------------
+"-----------------------------------------------------------------------------"
 " Change and delete next match
 " Note: See :help sub-replace-special for special characters tht have to be escaped
 " Note: Register @. may have keystrokes e.g. <80>kb (backspace) so must feed 'typed'
