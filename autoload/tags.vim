@@ -925,12 +925,12 @@ function! tags#get_scope(...) abort
     let regex = substitute(escape(name0, s:regex_magic), '·*$', '', '')
     let isavail = !empty(get(b:, 'tags_by_line', []))  " check if tags available
     let istag = matchend(getline(line0), regex) >= 0  " check if tag is valid
-    let isfold = line2 > line1 && foldlevel(line0)
+    let isfold = line2 > line1 && foldlevel(lnum)  " fails for invalid folds
     let ismatch = line0 == line1 && line0 < line2  " fails for invalid tags
     let isinside = lnum >= line1 && lnum <= line2  " fails for invalid tags
     if isinside && ismatch && istag
       break
-    elseif isinside && level == 1
+    elseif isfold && level == 1
       continue
     endif
     let icol = matchend(getline(line1), '^\s*\S')
