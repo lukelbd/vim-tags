@@ -32,7 +32,7 @@ function! s:filter_buffer(...) abort
   if !filereadable(expand('#' . bnr . ':p'))  " file required
     return 0
   endif
-  if index(g:tags_skip_filetypes, btype) != -1  " additional skips
+  if index(get(g:, 'tags_skip_filetypes', []), btype) != -1  " additional skips
     return 0
   endif | return 1
 endfunction
@@ -249,7 +249,7 @@ function! s:execute_tags(path, ...) abort
 endfunction
 function! s:generate_tags(path) abort
   let ftype = getbufvar(bufnr(a:path), '&filetype')  " possibly empty string
-  if !empty(ftype) && index(g:tags_skip_filetypes, ftype) < 0
+  if !empty(ftype) && index(get(g:, 'tags_skip_filetypes', []), ftype) < 0
     let items = split(s:execute_tags(a:path), '\n')
   else  " skip generating tags
     let items = []
@@ -413,7 +413,8 @@ endfunction
 " Note: Ctags cannot show specific filetype kinds so instead filter '--list-kinds=all'
 " Note: See https://stackoverflow.com/a/71334/4970632 for difference between \r and \n
 function! tags#table_kinds(...) abort
-  let [umajor, uminor] = [copy(g:tags_major_kinds), copy(g:tags_minor_kinds)]
+  let umajor = copy(get(g:, 'tags_major_kinds', []))
+  let uminor = copy(get(g:, 'tags_minor_kinds', []))
   if index(a:000, 'all') >= 0  " all open filetypes
     let [flag, langs] = ['all', uniq(sort(keys(umajor) + keys(uminor)))]
     let major = map(copy(langs), {idx, val -> val . ' ' . string(get(umajor, val, 'f'))})
@@ -468,7 +469,7 @@ function! s:get_index(mode, name) abort  " stack index
   return empty(idxs) ? -1 : a:mode < 0 ? idxs[0] : idxs[-1]
 endfunction
 function! s:set_index(mode, name, lnum, from) abort
-  if a:mode > 1 && !g:tags_keep_stack  " perform :tag <name>
+  if a:mode > 1 && empty(get(g:, 'tags_keep_stack', 0))  " perform :tag <name>
     let item = {'bufnr': bufnr(), 'from': a:from, 'matchnr': 1, 'tagname': a:name}
     if item.bufnr != a:from[0] || a:lnum != a:from[1]  " push from curidx to top
       call settagstack(winnr(), {'items': [item]}, 't')
@@ -593,7 +594,7 @@ function! s:goto_tag(mode, ...) abort
   let [lnum, cnum] = type(ipos) > 1 ? ipos : [ipos, 0]
   let g:tag_name = [ipath, ipos, name]  " dotfiles stacks
   " Jump to tag position
-  if a:mode > 1 || !g:tags_keep_jumps  " update jumplist
+  if a:mode > 1 || empty(get(g:, 'tags_keep_jumps', 0))  " update jumplist
     exe getpos('.') == getpos("''") ? '' : "normal! m'"
   endif
   let regex = substitute(escape(name, s:regex_magic), '·*$', '', '')
@@ -608,7 +609,7 @@ function! s:goto_tag(mode, ...) abort
   if a:mode != 0 && name !=# '<top>'  " i.e. not block jump
     call s:set_index(a:mode, name, lnum, from)
   endif
-  if a:mode > 1 || !g:tags_keep_jumps  " add jump
+  if a:mode > 1 || empty(get(g:, 'tags_keep_jumps', 0))  " add jump
     exe getpos('.') == getpos("''") ? '' : "normal! m'"
   endif
   let [kind; rest] = extra  " see above
@@ -902,11 +903,11 @@ function! s:get_scope(...) abort
   let line0 = empty(itag) ? 0 : str2nr(itag[1])
   let winview = winsaveview()
   let closed = foldclosed(line0)  " WARNING: critical (needed for foldtextresult())
-  exe closed > 0 ? '': line0 . 'foldclose'
+  silent! exe closed > 0 ? '': line0 . 'foldclose'
   let line1 = foldclosed(line0)
   let line2 = foldclosedend(line0)
   call foldtextresult(line1)  " WARNING: critical (updates foldtext cache)
-  exe closed > 0 ? '' : line0 . 'foldopen'
+  silent! exe closed > 0 ? '' : line0 . 'foldopen'
   call winrestview(winview)
   let deltas = get(b:, 'foldtext_delta', {})
   let delta = get(deltas, string(line1), 0)
@@ -915,10 +916,12 @@ endfunction
 function! tags#get_scope(...) abort
   let lnum = a:0 ? a:1 : line('.')
   let s:scope_bounds = []  " reset message cache
-  if exists('*fold#update_folds')
-    silent! call fold#update_folds(0)
-  elseif exists(':FastFoldUpdate')
-    silent! FastFoldUpdate
+  if empty(get(g:, 'tags_keep_folds', 0))
+    if exists('*fold#update_folds')
+      silent! call fold#update_folds(0)
+    elseif exists(':FastFoldUpdate')
+      silent! FastFoldUpdate
+    endif
   endif
   for level in [1, 2]  " attempt cursor then parent
     let [name0, line0, line1, line2] = s:get_scope(lnum, level)

@@ -48,6 +48,9 @@ endif
 if !exists('g:tags_keep_stack')
   let g:tags_keep_stack = 0
 endif
+if !exists('g:tags_keep_folds')
+  let g:tags_keep_folds = 0
+endif
 
 " Tag jump map settings {{{2
 if !exists('g:tags_cursor_map')

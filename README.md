@@ -93,11 +93,11 @@ Searching maps
 | Mapping | Description |
 | ---- | ---- |
 | `!`, `*`, `&` | Select the character, word or WORD under the cursor. The maps can be changed with `g:tags_char_global_map` (default `!`), `g:tags_word_global_map` (default `*`), and `g:tags_WORD_global_map` (default `@`), respectively. |
-| `#`, `@` | As for `*` and `&`, but select only the "local" scope defined syntax or expr-style folds that begin on the same line as tag kind in `g:tags_major_kinds` (default is functions i.e. `f`). The maps can be changed with `g:tags_word_local_map` (default `#`) and `g:tags_WORD_local_map` (default `@`). |
+| `#`, `@` | As for `*` and `&`, but select only the "local" scope defined by `syntax` or `expr` folds that begin on the same line as tag kinds in `g:tags_major_kinds` (default `f`, i.e. functions). The maps can be changed with `g:tags_word_local_map` (default `#`) and `g:tags_WORD_local_map` (default `@`). |
 | `g/`, `g?` | As for `/` and `?`, but again select only the approximate local scope instead of the entire file. Typing only `g/` and `g?` will highlight the entire scope. These maps cannot be changed from the default. |
-| `d/`, `d*`, `d&`, `d#`, `d@` | Delete the corresponding selection under the cursor and move to the next occurrence (`d/` uses the most recent search pattern). Use `.` to delete additional occurrences (whether or not they are under the cursor) and then jump to following matches. This is similar to `:substitute` but permits staying in normal mode. The mapping suffixes can be changed with `g:tags_word_global_map`, `g:tags_WORD_global_map`, `g:tags_word_local_map`, and `g:tags_WORD_local_map` (see above). |
+| `d/`, `d*`, `d&`, `d#`, `d@` | Delete the corresponding selection under the cursor and move to the next occurrence (`d/` uses the most recent search pattern). Use `.` to delete additional occurrences (whether or not they are under the cursor) and then jump to following matches. This is similar to `:substitute` but permits staying in normal mode. The map suffixes can be changed with `g:tags_word_global_map`, `g:tags_WORD_global_map`, `g:tags_word_local_map`, and `g:tags_WORD_local_map` (see above). |
 | `da/`, `da*`, `da&`, `da#`, `da@` | As with `d/`, `d*`, `d&`, `d#`, `d@`, but delete *all* occurrences. |
-| `c/`, `c*`, `c&`, `c#`, `c@` | Replace the corresponding selection under the cursor in insert mode and jump to the next occurrence after leaving insert mode (`c/` uses the most recent search pattern). Use `.` to replace additional occurrences with what you typed on the first replacement and then jump to following matches. The mapping suffixes can be changed with `g:tags_word_global_map`, `g:tags_WORD_global_map`, `g:tags_word_local_map`, and `g:tags_WORD_local_map` (see above). |
+| `c/`, `c*`, `c&`, `c#`, `c@` | Replace the corresponding selection under the cursor in insert mode and jump to the next occurrence after leaving insert mode (`c/` uses the most recent search pattern). Use `.` to replace additional occurrences with what you typed on the first replacement and then jump to following matches. The map suffixes can be changed with `g:tags_word_global_map`, `g:tags_WORD_global_map`, `g:tags_word_local_map`, and `g:tags_WORD_local_map` (see above). |
 | `ca/`, `ca*`, `ca&`, `ca#`, `ca@` | As with `c/`, `c*`, `c&`, `c#`, `c@`, but change *all* occurrences. |
 
 Options
@@ -112,8 +112,9 @@ Options
 | `g:tags_skip_kinds` | Dictionary whose keys are filetypes and whose values are strings indicating the tag kinds to ignore. Default behavior is to include all tags. |
 | `g:tags_major_kinds` | Dictionary whose keys are filetypes and whose values are strings indicating the tag kinds defining search scope boundaries. Default is `'f'` i.e. function definition tags. |
 | `g:tags_minor_kinds` | Dictionary whose keys are filetypes and whose values are strings indicating the tag kinds to ignore during bracket navigation. Default is `'v'` i.e. variable definition tags. |
-| `g:tags_keep_jumps` | Whether to preserve the jumplist when navigating tags with bracket maps. Default is ``0``. Note jumping to tags under the cursor or with fzf always changes the jumplist. |
-| `g:tags_keep_stack` | Whether to preserve the tag stack when jumping to tags under the cursor or with fzf. Default is ``0``. Note jumping to tags with bracket maps never changes the tag stack. |
+| `g:tags_keep_jumps` | Whether to preserve the current jumplist when navigating tags with bracket maps. Default is `0`. Note jumping to tags under the cursor or with fzf always changes the jumplist. |
+| `g:tags_keep_stack` | Whether to preserve the current tag stack when jumping to tags under the cursor or with fzf. Default is ``0``. Note that navigating between tags with the bracket maps never changes the tag stack. |
+| `g:tags_keep_folds` | Whether to preserve the current folds instead of updating them with `:FastFoldUpdate` before defining "local" scope boundaries. Default is `0`. Ignored unless the [FastFold](https://github.com/Konfekt/FastFold/tree/fff6d05064dec4d7e1398aa507db35fcd57edfb4) plugin is available. |
 
 Installation
 ============
