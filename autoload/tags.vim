@@ -895,6 +895,13 @@ endfunction
 " scope search on unsaved files since e.g. editing text below major tags is very common
 " See: https://stackoverflow.com/a/597932/4970632
 " See: http://vim.wikia.com/wiki/Search_in_current_function
+function! s:set_scope(...) abort
+  if exists('*fold#update_folds')
+    silent! call fold#update_folds(0)
+  elseif exists(':FastFoldUpdate')
+    silent! FastFoldUpdate
+  endif
+endfunction
 function! s:get_scope(...) abort
   let level = a:0 > 1 ? a:2 : 1
   let lnum = a:0 > 0 ? a:1 : line('.')
@@ -914,15 +921,10 @@ function! s:get_scope(...) abort
   return [name0, line0, line1 + delta, line2]
 endfunction
 function! tags#get_scope(...) abort
-  let lnum = a:0 ? a:1 : line('.')
+  let lnum = a:0 > 0 ? a:1 : line('.')
+  let keep = a:0 > 1 ? a:2 : get(g:, 'tags_keep_folds', 0)
+  if empty(keep) | call s:set_scope() | endif
   let s:scope_bounds = []  " reset message cache
-  if empty(get(g:, 'tags_keep_folds', 0))
-    if exists('*fold#update_folds')
-      silent! call fold#update_folds(0)
-    elseif exists(':FastFoldUpdate')
-      silent! FastFoldUpdate
-    endif
-  endif
   for level in [1, 2]  " attempt cursor then parent
     let [name0, line0, line1, line2] = s:get_scope(lnum, level)
     let regex = substitute(escape(name0, s:regex_magic), '·*$', '', '')
@@ -931,10 +933,12 @@ function! tags#get_scope(...) abort
     let isfold = line2 > line1 && foldlevel(lnum)  " fails for invalid folds
     let ismatch = line0 == line1 && line0 < line2  " fails for invalid tags
     let isinside = lnum >= line1 && lnum <= line2  " fails for invalid tags
-    if isinside && ismatch && istag
+    if isinside && ismatch && istag  " success
       break
-    elseif isfold && level == 1
+    elseif isfold && level == 1  " try again
       continue
+    elseif !empty(keep)  " try again
+      return tags#get_scope(lnum, 0)
     endif
     let icol = matchend(getline(line1), '^\s*\S')
     let iscomment = icol > 0 ? tags#get_inside([line1, icol], 'Comment') : 0
