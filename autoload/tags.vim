@@ -585,14 +585,14 @@ function! s:goto_tag(mode, ...) abort
     redraw | echohl ErrorMsg | echom msg | echohl None | return
   endif
   if ipath !=# path  " record mark
-    if exists('*file#goto_file')  " dotfiles utility
+    try  " dotfiles utility
       silent call file#goto_file(ipath)
-    else  " built-in utility
+    catch /^Vim\%((\a\+)\)\=:E117/  " E117: unknown function
       silent exe 'tab drop ' . fnameescape(ipath)
-    endif
+    endtry
   endif
   let [lnum, cnum] = type(ipos) > 1 ? ipos : [ipos, 0]
-  let g:tag_name = [ipath, ipos, name]  " dotfiles stacks
+  let g:tag_name = [ipath, ipos, name]  " dotfiles stack
   " Jump to tag position
   if a:mode > 1 || empty(get(g:, 'tags_keep_jumps', 0))  " update jumplist
     exe getpos('.') == getpos("''") ? '' : "normal! m'"
